@@ -16,9 +16,7 @@ const recommendationStatus = document.querySelector("#recommendationStatus");
 const recommendationResult = document.querySelector("#recommendationResult");
 const runRecommendationButton = document.querySelector("#runRecommendationButton");
 const taskPoolRaw = document.querySelector("#taskPoolRaw");
-const taskPoolDebug = document.querySelector("#taskPoolDebug");
 const runtimeRaw = document.querySelector("#runtimeRaw");
-const runtimeDebug = document.querySelector("#runtimeDebug");
 const recommendationRaw = document.querySelector("#recommendationRaw");
 const recommendationIntentPanel = document.querySelector("#recommendationIntentPanel");
 
@@ -82,26 +80,6 @@ function createIntentPanel(intent) {
   return panel;
 }
 
-function createMetric(label, value) {
-  const metric = document.createElement("div");
-  metric.className = "runtime-metric";
-  metric.innerHTML = "<span></span><strong></strong>";
-  metric.querySelector("span").textContent = label;
-  metric.querySelector("strong").textContent = String(value);
-  return metric;
-}
-
-function renderDebugList(container, items, renderItem, emptyText) {
-  container.replaceChildren();
-  if (!items || items.length === 0) {
-    container.textContent = emptyText;
-    return;
-  }
-  for (const item of items) {
-    container.append(renderItem(item));
-  }
-}
-
 function renderList() {
   taskCount.textContent = `${tasks.length} 个文件`;
   taskList.replaceChildren();
@@ -133,24 +111,6 @@ function renderTaskPool() {
   poolCount.textContent = `${poolEntries.length} 个条目`;
   taskPool.replaceChildren();
   taskPoolRaw.textContent = JSON.stringify(poolEntries, null, 2);
-  renderDebugList(
-    taskPoolDebug,
-    poolEntries,
-    (entry) => {
-      const item = document.createElement("div");
-      item.className = `debug-card ${entry.status}`;
-      item.innerHTML = `
-        <strong></strong>
-        <span></span>
-        <em></em>
-      `;
-      item.querySelector("strong").textContent = entry.title || entry.id;
-      item.querySelector("span").textContent = `${entry.sourceFile} · ${entry.type || "unknown"}`;
-      item.querySelector("em").textContent = entry.status;
-      return item;
-    },
-    "还没有解析成功的任务进入任务池。",
-  );
 
   if (poolEntries.length === 0) {
     const empty = document.createElement("p");
@@ -177,12 +137,10 @@ function renderTaskPool() {
 
 function renderRuntime() {
   runtimePanel.replaceChildren();
-  runtimeDebug.replaceChildren();
   runtimeRaw.textContent = JSON.stringify(runtime, null, 2);
   if (!runtime) {
     runtimeStatus.textContent = "未载入";
     runtimePanel.textContent = "未返回运行时状态。";
-    runtimeDebug.textContent = "未返回运行时状态。";
     return;
   }
 
@@ -215,14 +173,6 @@ function renderRuntime() {
   gitChanges.querySelector("strong").textContent = String(repositoryStatus.entries?.length ?? 0);
 
   runtimePanel.append(summary, canStart, runnableCount, gitStatus, gitChanges);
-  const debugSummary = summary.cloneNode(true);
-  runtimeDebug.append(
-    debugSummary,
-    createMetric("canStartNewTask", runtime.canStartNewTask),
-    createMetric("runnableTasks", runtime.runnableTasks?.length ?? 0),
-    createMetric("git", repositoryStatus.clean ? "clean" : "dirty"),
-    createMetric("git changes", repositoryStatus.entries?.length ?? 0),
-  );
 
   const reasons = runtime.blockingReasons ?? [];
   if (reasons.length > 0) {
@@ -234,7 +184,6 @@ function renderRuntime() {
       list.append(item);
     }
     runtimePanel.append(list);
-    runtimeDebug.append(list.cloneNode(true));
   }
 
   const repositoryEntries = repositoryStatus.entries ?? [];
@@ -247,7 +196,6 @@ function renderRuntime() {
       list.append(item);
     }
     runtimePanel.append(list);
-    runtimeDebug.append(list.cloneNode(true));
   }
 }
 
@@ -264,14 +212,14 @@ function buildRecommendationRaw(run) {
 }
 
 function renderRecommendationRun() {
-  recommendationResult.replaceChildren();
+  recommendationResult?.replaceChildren();
   recommendationIntentPanel.replaceChildren();
   recommendationRaw.textContent = buildRecommendationRaw(recommendationRun);
   runRecommendationButton.disabled = recommendationRun?.status === "running";
 
   if (!recommendationRun) {
     recommendationStatus.textContent = "未运行";
-    recommendationResult.textContent = "尚未触发推荐器。";
+    if (recommendationResult) recommendationResult.textContent = "尚未触发推荐器。";
     recommendationIntentPanel.textContent = "尚未解析。";
     return;
   }
@@ -289,10 +237,10 @@ function renderRecommendationRun() {
   meta.textContent = `${recommendationRun.command} ${recommendationRun.args?.join(" ") ?? ""}`;
 
   if (recommendationRun.executionIntent) {
-    recommendationResult.append(summary, meta, createIntentPanel(recommendationRun.executionIntent));
+    recommendationResult?.append(summary, meta, createIntentPanel(recommendationRun.executionIntent));
     recommendationIntentPanel.append(createIntentPanel(recommendationRun.executionIntent));
   } else {
-    recommendationResult.append(summary, meta);
+    recommendationResult?.append(summary, meta);
     recommendationIntentPanel.textContent = recommendationRun.executionIntentError
       ? `解析失败：${recommendationRun.executionIntentError}`
       : "尚未解析出执行意图。";
@@ -306,7 +254,7 @@ function renderRecommendationRun() {
   }
   output.textContent = chunks.concat(buildRecommendationRaw(recommendationRun)).join("\n\n") || "等待输出...";
 
-  recommendationResult.append(output);
+  recommendationResult?.append(output);
 }
 
 function selectTask(fileName) {
@@ -422,7 +370,7 @@ async function loadRecommendationRun() {
 async function createRecommendationRun() {
   runRecommendationButton.disabled = true;
   recommendationStatus.textContent = "启动中";
-  recommendationResult.textContent = "正在启动推荐器...";
+  if (recommendationResult) recommendationResult.textContent = "正在启动推荐器...";
   const response = await fetch("/api/recommendation-runs", { method: "POST" });
   if (!response.ok) {
     throw new Error(`启动推荐器失败：${response.status}`);
@@ -462,7 +410,7 @@ function showError(error) {
   validationStatus.textContent = "失败";
   runtimeStatus.textContent = "失败";
   recommendationStatus.textContent = "失败";
-  recommendationResult.textContent = error.message;
+  if (recommendationResult) recommendationResult.textContent = error.message;
   runRecommendationButton.disabled = false;
 }
 

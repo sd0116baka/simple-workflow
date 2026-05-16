@@ -16,54 +16,24 @@
     </header>
 
     <main class="layout">
-      <aside class="task-list-panel" aria-label="任务控制面板">
-        <div class="sidebar-section">
-          <div class="panel-heading">
-            <h2>tasks/</h2>
-            <span id="taskCount">0 个文件</span>
-          </div>
-          <div id="taskList" class="task-list"></div>
-        </div>
-        <div class="sidebar-section pool-section">
-          <div class="panel-heading">
-            <h2>任务池</h2>
-            <span id="poolCount">0 个条目</span>
-          </div>
-          <div id="taskPool" class="pool-list"></div>
-        </div>
-        <div class="sidebar-section runtime-section">
-          <div class="panel-heading">
-            <h2>运行时</h2>
-            <span id="runtimeStatus">等待载入</span>
-          </div>
-          <div id="runtimePanel" class="runtime-panel">等待载入...</div>
-        </div>
-        <div class="sidebar-section recommender-section">
-          <div class="panel-heading">
-            <h2>任务推荐器</h2>
-            <span id="recommendationStatus">未运行</span>
-          </div>
-          <div class="recommendation-panel">
-            <button id="runRecommendationButton" class="primary-button" type="button">运行探针</button>
-            <div id="recommendationResult" class="recommendation-result">尚未触发推荐器。</div>
-          </div>
-        </div>
-      </aside>
-
       <section class="workflow-debug-panel" aria-label="工作流环节调试视图">
-        <div class="panel-heading">
-          <div>
-            <h2 id="selectedTitle">未选择任务</h2>
-            <p id="selectedMeta">按环节纵向排列，每行左侧是原始内容，右侧是解析结果。</p>
-          </div>
-        </div>
         <div class="stage-list">
           <section class="stage-row">
             <div class="stage-heading">
-              <h3>任务真源</h3>
-              <span id="parseStatus">等待载入</span>
+              <div>
+                <h3 id="selectedTitle">未选择任务</h3>
+                <p id="selectedMeta">选择任务、原始内容、解析结果在同一环节横向对照。</p>
+              </div>
+              <div class="stage-status">
+                <span id="taskCount">0 个文件</span>
+                <span id="parseStatus">等待载入</span>
+              </div>
             </div>
-            <div class="stage-columns">
+            <div class="stage-columns source-stage-columns">
+              <div class="stage-cell">
+                <div class="detail-heading"><h3>选择任务</h3></div>
+                <div id="taskList" class="task-list"></div>
+              </div>
               <div class="stage-cell">
                 <div class="detail-heading"><h3>原始 YAML</h3></div>
                 <pre id="rawText" class="code-block">等待载入...</pre>
@@ -82,7 +52,7 @@
           <section class="stage-row">
             <div class="stage-heading">
               <h3>任务池</h3>
-              <span>pool model</span>
+              <span id="poolCount">0 个条目</span>
             </div>
             <div class="stage-columns">
               <div class="stage-cell">
@@ -91,7 +61,7 @@
               </div>
               <div class="stage-cell">
                 <div class="detail-heading"><h3>解析视图</h3></div>
-                <div id="taskPoolDebug" class="debug-result">等待载入...</div>
+                <div id="taskPool" class="pool-list debug-result">等待载入...</div>
               </div>
             </div>
           </section>
@@ -99,7 +69,7 @@
           <section class="stage-row">
             <div class="stage-heading">
               <h3>运行时</h3>
-              <span>runtime decision</span>
+              <span id="runtimeStatus">等待载入</span>
             </div>
             <div class="stage-columns">
               <div class="stage-cell">
@@ -108,7 +78,7 @@
               </div>
               <div class="stage-cell">
                 <div class="detail-heading"><h3>解析视图</h3></div>
-                <div id="runtimeDebug" class="debug-result">等待载入...</div>
+                <div id="runtimePanel" class="runtime-panel debug-result">等待载入...</div>
               </div>
             </div>
           </section>
@@ -116,11 +86,14 @@
           <section class="stage-row">
             <div class="stage-heading">
               <h3>任务推荐器</h3>
-              <span>agent output</span>
+              <span id="recommendationStatus">未运行</span>
             </div>
             <div class="stage-columns">
               <div class="stage-cell">
-                <div class="detail-heading"><h3>原始输出</h3></div>
+                <div class="detail-heading">
+                  <h3>原始输出</h3>
+                  <button id="runRecommendationButton" class="primary-button inline-button" type="button">运行探针</button>
+                </div>
                 <pre id="recommendationRaw" class="code-block">尚未触发推荐器。</pre>
               </div>
               <div class="stage-cell">
