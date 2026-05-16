@@ -1,5 +1,5 @@
 import { once } from "node:events";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -13,6 +13,16 @@ async function writePrompt(name) {
   await writeFile(promptPath, "推荐一个任务，但不要修改文件。");
   return promptPath;
 }
+
+test("recommender prompt asks for a structured JSON artifact", async () => {
+  const prompt = await readFile(join(process.cwd(), "project_profiles", "recommender-agent.prompt.md"), "utf8");
+
+  assert.match(prompt, /fenced JSON/);
+  assert.match(prompt, /schemaVersion/);
+  assert.match(prompt, /recommendedTask/);
+  assert.match(prompt, /observedTasks/);
+  assert.match(prompt, /不要修改任何文件/);
+});
 
 test("workflow service captures a successful recommendation run", async () => {
   const promptPath = await writePrompt("recommendation-success");

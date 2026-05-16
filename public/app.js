@@ -168,9 +168,9 @@ function renderRecommendationRun() {
   const output = document.createElement("pre");
   output.className = "recommendation-output";
   const chunks = [];
-  if (recommendationRun.stdout) chunks.push(`stdout\n${stripAnsi(recommendationRun.stdout)}`);
-  if (recommendationRun.stderr) chunks.push(`stderr\n${stripAnsi(recommendationRun.stderr)}`);
-  if (recommendationRun.error) chunks.push(`error\n${stripAnsi(recommendationRun.error)}`);
+  if (recommendationRun.stdout) chunks.push(`结构化产物(stdout)\n${stripAnsi(recommendationRun.stdout)}`);
+  if (recommendationRun.stderr) chunks.push(`运行日志(stderr)\n${stripAnsi(recommendationRun.stderr)}`);
+  if (recommendationRun.error) chunks.push(`错误(error)\n${stripAnsi(recommendationRun.error)}`);
   output.textContent = chunks.join("\n\n") || "等待输出...";
 
   recommendationResult.append(summary, meta, output);
