@@ -45,8 +45,8 @@ test("allows a ready recommended task when runtime can start", () => {
     runtimeStatus: runtime(),
   });
 
-  assert.equal(admission.status, "ready");
-  assert.equal(admission.canExecute, true);
+  assert.equal(admission.status, "authorized");
+  assert.equal(admission.authorized, true);
   assert.equal(admission.requiresConfirmation, true);
   assert.equal(admission.taskId, "task-001");
 });
@@ -59,7 +59,7 @@ test("blocks when there is no execution intent", () => {
   });
 
   assert.equal(admission.status, "blocked");
-  assert.equal(admission.canExecute, false);
+  assert.equal(admission.authorized, false);
   assert.deepEqual(admission.reasons, ["No execution intent"]);
 });
 

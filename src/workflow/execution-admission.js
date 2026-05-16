@@ -1,7 +1,7 @@
 function block(taskId, reasons, extra = {}) {
   return {
     status: "blocked",
-    canExecute: false,
+    authorized: false,
     taskId,
     requiresConfirmation: false,
     reasons,
@@ -47,8 +47,8 @@ export function evaluateExecutionAdmission({
   }
 
   return {
-    status: "ready",
-    canExecute: true,
+    status: "authorized",
+    authorized: true,
     taskId,
     requiresConfirmation: true,
     reasons: [],

@@ -94,9 +94,9 @@ function createAdmissionPanel(admission) {
 
   const title = document.createElement("div");
   title.className = "admission-title";
-  title.textContent = admission.canExecute
-    ? `可以进入执行：${admission.taskId}`
-    : `暂不能执行：${admission.taskId ?? "无任务"}`;
+  title.textContent = admission.authorized
+    ? `已授权执行：${admission.taskId}`
+    : `未授权执行：${admission.taskId ?? "无任务"}`;
 
   const meta = document.createElement("div");
   meta.className = "admission-meta";
@@ -337,7 +337,7 @@ function renderRecommendationRun() {
     admissionPanel.append(createAdmissionPanel(recommendationRun.executionAdmission));
   } else {
     admissionStatus.textContent = "等待输入";
-    admissionPanel.textContent = "尚未计算准入结果。";
+    admissionPanel.textContent = "尚未计算执行授权。";
   }
 
   const output = document.createElement("pre");
