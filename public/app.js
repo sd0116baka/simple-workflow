@@ -22,7 +22,9 @@ const recommendationIntentPanel = document.querySelector("#recommendationIntentP
 const admissionStatus = document.querySelector("#admissionStatus");
 const admissionRaw = document.querySelector("#admissionRaw");
 const admissionPanel = document.querySelector("#admissionPanel");
+const taskContextPackageRaw = document.querySelector("#taskContextPackageRaw");
 const taskContextPackagePanel = document.querySelector("#taskContextPackagePanel");
+const taskContextPackageStatus = document.querySelector("#taskContextPackageStatus");
 const taskSourceInputs = document.querySelector("#taskSourceInputs");
 const taskPoolInputs = document.querySelector("#taskPoolInputs");
 const runtimeInputs = document.querySelector("#runtimeInputs");
@@ -337,6 +339,9 @@ function renderRecommendationRun() {
   recommendationIntentPanel.replaceChildren();
   admissionPanel.replaceChildren();
   taskContextPackagePanel.replaceChildren();
+  taskContextPackageRaw.textContent = recommendationRun?.taskContextPackage
+    ? JSON.stringify(recommendationRun.taskContextPackage, null, 2)
+    : "尚未生成任务上下文包。";
   recommendationRaw.textContent = buildRecommendationRaw(recommendationRun);
   admissionRaw.textContent = recommendationRun?.executionIntent
     ? JSON.stringify(recommendationRun.executionIntent, null, 2)
@@ -345,7 +350,7 @@ function renderRecommendationRun() {
     { label: "prompt", value: "project_profiles/recommender-agent.prompt.md" },
     { label: "命令", value: "opencode run --format json" },
     { label: "工作目录", value: "仓库根目录" },
-    { label: "读取范围", value: "git 状态 + tasks/ 目录" },
+    { label: "读取范围", value: "运行时注入的 candidateTasks + repoStatus" },
   ]);
   renderInputs(admissionInputs, [
     { label: "执行意图", value: recommendationRun?.executionIntent ? recommendationRun.executionIntent.recommendedTask.id : "未生成" },
@@ -360,6 +365,8 @@ function renderRecommendationRun() {
     if (recommendationResult) recommendationResult.textContent = "尚未触发推荐器。";
     recommendationIntentPanel.textContent = "尚未解析。";
     admissionPanel.textContent = "等待推荐器输出。";
+    taskContextPackageStatus.textContent = "等待输入";
+    taskContextPackageRaw.textContent = "等待执行准入器输出。";
     taskContextPackagePanel.textContent = "等待执行准入器输出。";
     return;
   }
@@ -395,8 +402,10 @@ function renderRecommendationRun() {
   }
 
   if (recommendationRun.taskContextPackage) {
+    taskContextPackageStatus.textContent = recommendationRun.taskContextPackage.status;
     taskContextPackagePanel.append(createTaskContextPackagePanel(recommendationRun.taskContextPackage));
   } else {
+    taskContextPackageStatus.textContent = "未生成";
     taskContextPackagePanel.textContent = "尚未生成任务上下文包快照。";
   }
 
