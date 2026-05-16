@@ -22,6 +22,11 @@ const recommendationIntentPanel = document.querySelector("#recommendationIntentP
 const admissionStatus = document.querySelector("#admissionStatus");
 const admissionRaw = document.querySelector("#admissionRaw");
 const admissionPanel = document.querySelector("#admissionPanel");
+const taskSourceInputs = document.querySelector("#taskSourceInputs");
+const taskPoolInputs = document.querySelector("#taskPoolInputs");
+const runtimeInputs = document.querySelector("#runtimeInputs");
+const recommendationInputs = document.querySelector("#recommendationInputs");
+const admissionInputs = document.querySelector("#admissionInputs");
 
 let tasks = [];
 let poolEntries = [];
@@ -52,7 +57,7 @@ function createIntentPanel(intent) {
 
   const meta = document.createElement("div");
   meta.className = "recommendation-intent-meta";
-  meta.textContent = `${intent.recommendedTask.id} · ${intent.recommendedTask.priority} · confidence: ${intent.confidence}`;
+  meta.textContent = `${intent.recommendedTask.id} · 任务优先级：${intent.recommendedTask.priority} · 推荐置信度：${intent.confidence}`;
 
   const nextAction = document.createElement("div");
   nextAction.className = "recommendation-intent-next";
@@ -113,9 +118,29 @@ function createAdmissionPanel(admission) {
   return panel;
 }
 
+function renderInputs(container, inputs) {
+  container.replaceChildren();
+  const list = document.createElement("ul");
+  list.className = "stage-input-list";
+  for (const input of inputs) {
+    const item = document.createElement("li");
+    item.innerHTML = "<strong></strong><span></span>";
+    item.querySelector("strong").textContent = input.label;
+    item.querySelector("span").textContent = input.value;
+    list.append(item);
+  }
+  container.append(list);
+}
+
 function renderList() {
   taskCount.textContent = `${tasks.length} 个文件`;
   taskList.replaceChildren();
+  renderInputs(taskSourceInputs, [
+    { label: "目录", value: "tasks/" },
+    { label: "文件类型", value: ".yaml, .yml" },
+    { label: "当前选择", value: selectedFileName ?? "未选择" },
+    { label: "文件数量", value: `${tasks.length}` },
+  ]);
 
   if (tasks.length === 0) {
     const empty = document.createElement("p");
@@ -144,6 +169,11 @@ function renderTaskPool() {
   poolCount.textContent = `${poolEntries.length} 个条目`;
   taskPool.replaceChildren();
   taskPoolRaw.textContent = JSON.stringify(poolEntries, null, 2);
+  renderInputs(taskPoolInputs, [
+    { label: "输入", value: "任务真源解析结果" },
+    { label: "任务文件", value: tasks.map((task) => task.fileName).join(", ") || "无" },
+    { label: "过滤规则", value: "只接收 parseError 为空且有 parsed 的任务" },
+  ]);
 
   if (poolEntries.length === 0) {
     const empty = document.createElement("p");
@@ -171,6 +201,12 @@ function renderTaskPool() {
 function renderRuntime() {
   runtimePanel.replaceChildren();
   runtimeRaw.textContent = JSON.stringify(runtime, null, 2);
+  renderInputs(runtimeInputs, [
+    { label: "输入", value: "任务池 + 仓库状态" },
+    { label: "任务池条目", value: `${poolEntries.length}` },
+    { label: "ready 任务", value: poolEntries.filter((entry) => entry.status === "ready").map((entry) => entry.id).join(", ") || "无" },
+    { label: "git", value: runtime?.repositoryStatus?.clean ? "clean" : "dirty/unknown" },
+  ]);
   if (!runtime) {
     runtimeStatus.textContent = "未载入";
     runtimePanel.textContent = "未返回运行时状态。";
@@ -252,6 +288,17 @@ function renderRecommendationRun() {
   admissionRaw.textContent = recommendationRun?.executionIntent
     ? JSON.stringify(recommendationRun.executionIntent, null, 2)
     : "尚未生成执行意图。";
+  renderInputs(recommendationInputs, [
+    { label: "prompt", value: "project_profiles/recommender-agent.prompt.md" },
+    { label: "命令", value: "opencode run --format json" },
+    { label: "工作目录", value: "仓库根目录" },
+    { label: "读取范围", value: "git 状态 + tasks/ 目录" },
+  ]);
+  renderInputs(admissionInputs, [
+    { label: "执行意图", value: recommendationRun?.executionIntent ? recommendationRun.executionIntent.recommendedTask.id : "未生成" },
+    { label: "任务池", value: `${poolEntries.length} 个条目` },
+    { label: "运行时", value: runtime?.status ?? "未载入" },
+  ]);
   runRecommendationButton.disabled = recommendationRun?.status === "running";
 
   if (!recommendationRun) {
@@ -402,6 +449,8 @@ async function loadTasks() {
     parseStatus.textContent = "无任务";
     validationStatus.textContent = "无任务";
   }
+
+  renderRecommendationRun();
 }
 
 async function loadRecommendationRun() {

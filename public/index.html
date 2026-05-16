@@ -32,6 +32,7 @@
             <div class="stage-columns source-stage-columns">
               <div class="stage-cell">
                 <div class="detail-heading"><h3>选择任务</h3></div>
+                <div id="taskSourceInputs" class="stage-inputs">等待载入...</div>
                 <div id="taskList" class="task-list"></div>
               </div>
               <div class="stage-cell">
@@ -56,7 +57,8 @@
             </div>
             <div class="stage-columns">
               <div class="stage-cell">
-                <div class="detail-heading"><h3>原始任务池 JSON</h3></div>
+                <div class="detail-heading"><h3>输入 / 原始任务池 JSON</h3></div>
+                <div id="taskPoolInputs" class="stage-inputs">等待载入...</div>
                 <pre id="taskPoolRaw" class="code-block parsed">等待载入...</pre>
               </div>
               <div class="stage-cell">
@@ -73,7 +75,8 @@
             </div>
             <div class="stage-columns">
               <div class="stage-cell">
-                <div class="detail-heading"><h3>原始运行时 JSON</h3></div>
+                <div class="detail-heading"><h3>输入 / 原始运行时 JSON</h3></div>
+                <div id="runtimeInputs" class="stage-inputs">等待载入...</div>
                 <pre id="runtimeRaw" class="code-block parsed">等待载入...</pre>
               </div>
               <div class="stage-cell">
@@ -91,9 +94,10 @@
             <div class="stage-columns">
               <div class="stage-cell">
                 <div class="detail-heading">
-                  <h3>原始输出</h3>
+                  <h3>输入 / 原始输出</h3>
                   <button id="runRecommendationButton" class="primary-button inline-button" type="button">运行探针</button>
                 </div>
+                <div id="recommendationInputs" class="stage-inputs">等待输入。</div>
                 <pre id="recommendationRaw" class="code-block">尚未触发推荐器。</pre>
               </div>
               <div class="stage-cell">
@@ -110,7 +114,8 @@
             </div>
             <div class="stage-columns">
               <div class="stage-cell">
-                <div class="detail-heading"><h3>执行意图 JSON</h3></div>
+                <div class="detail-heading"><h3>输入 / 执行意图 JSON</h3></div>
+                <div id="admissionInputs" class="stage-inputs">等待推荐器输出。</div>
                 <pre id="admissionRaw" class="code-block parsed">尚未生成执行意图。</pre>
               </div>
               <div class="stage-cell">
