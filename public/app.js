@@ -26,6 +26,15 @@ function stripAnsi(text) {
   return String(text ?? "").replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
 }
 
+function formatProgress(progress) {
+  return (progress ?? [])
+    .map((entry) => {
+      const time = entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString() : "--:--:--";
+      return `${time} ${entry.message}`;
+    })
+    .join("\n");
+}
+
 function renderList() {
   taskCount.textContent = `${tasks.length} 个文件`;
   taskList.replaceChildren();
@@ -168,6 +177,9 @@ function renderRecommendationRun() {
   const output = document.createElement("pre");
   output.className = "recommendation-output";
   const chunks = [];
+  if (recommendationRun.progress?.length > 0) {
+    chunks.push(`运行进度\n${formatProgress(recommendationRun.progress)}`);
+  }
   if (recommendationRun.stdout) chunks.push(`结构化产物(stdout)\n${stripAnsi(recommendationRun.stdout)}`);
   if (recommendationRun.stderr) chunks.push(`运行日志(stderr)\n${stripAnsi(recommendationRun.stderr)}`);
   if (recommendationRun.error) chunks.push(`错误(error)\n${stripAnsi(recommendationRun.error)}`);

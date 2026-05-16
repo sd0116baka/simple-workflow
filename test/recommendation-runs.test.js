@@ -58,6 +58,37 @@ test("workflow service captures a successful recommendation run", async () => {
   assert.equal(service.getLatestRecommendationRun().status, "succeeded");
 });
 
+test("workflow service emits running progress for recommendation runs", async () => {
+  const promptPath = await writePrompt("recommendation-progress");
+  const service = createWorkflowService({
+    tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks"),
+    recommendationPromptPath: promptPath,
+    runRecommendationCommand: async ({ onProgress }) => {
+      onProgress({ type: "step_start", message: "开始运行 opencode" });
+      return {
+        stdout: "建议先做 task-001",
+        stderr: "",
+        exitCode: 0,
+        error: null,
+      };
+    },
+  });
+
+  const progressEvent = new Promise((resolve) => {
+    service.onEvent((event) => {
+      if (event.type === "recommendation-run-changed" && event.run.progress.length > 0) {
+        resolve(event.run);
+      }
+    });
+  });
+
+  await service.createRecommendationRun();
+  const running = await progressEvent;
+
+  assert.equal(running.status, "running");
+  assert.equal(running.progress[0].message, "开始运行 opencode");
+});
+
 test("workflow service marks non-zero recommendation exits as failed", async () => {
   const promptPath = await writePrompt("recommendation-failure");
   const service = createWorkflowService({
@@ -121,6 +152,7 @@ test("POST /api/recommendation-runs starts a run and latest returns the snapshot
     finishedAt: null,
     command: "opencode",
     args: ["run", "--format", "json"],
+    progress: [],
     stdout: "",
     stderr: "",
     exitCode: null,

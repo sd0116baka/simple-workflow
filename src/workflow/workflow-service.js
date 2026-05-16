@@ -38,7 +38,13 @@ export function createWorkflowService({
   }
 
   function toRecommendationSnapshot(run) {
-    return run ? { ...run, args: [...run.args] } : null;
+    return run
+      ? {
+          ...run,
+          args: [...run.args],
+          progress: run.progress.map((entry) => ({ ...entry })),
+        }
+      : null;
   }
 
   function emitRecommendationChanged(run) {
@@ -93,6 +99,7 @@ export function createWorkflowService({
         finishedAt: null,
         command: "opencode",
         args: OPENCODE_RECOMMENDATION_ARGS,
+        progress: [],
         stdout: "",
         stderr: "",
         exitCode: null,
@@ -100,8 +107,20 @@ export function createWorkflowService({
       };
       latestRecommendationRun = run;
       emitRecommendationChanged(run);
+      const appendProgress = (progress) => {
+        run.progress.push({
+          ...progress,
+          timestamp: new Date().toISOString(),
+        });
+        run.progress = run.progress.slice(-20);
+        emitRecommendationChanged(run);
+      };
       const startedCommand = Promise.resolve().then(() =>
-        runRecommendationCommand({ prompt, run: toRecommendationSnapshot(run) }),
+        runRecommendationCommand({
+          prompt,
+          run: toRecommendationSnapshot(run),
+          onProgress: appendProgress,
+        }),
       );
       finishRecommendationRun(run, startedCommand);
       return toRecommendationSnapshot(run);
