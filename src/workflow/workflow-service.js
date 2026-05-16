@@ -1,6 +1,7 @@
 import { watch } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
+import { evaluateExecutionAdmission } from "./execution-admission.js";
 import { getRepositoryStatus as readRepositoryStatus } from "./repository-status.js";
 import { parseRecommendationIntent } from "./recommendation-intent.js";
 import { OPENCODE_RECOMMENDATION_ARGS, runOpencodeRecommendation } from "./recommendation-runner.js";
@@ -56,6 +57,16 @@ export function createWorkflowService({
                 observedTasks: run.executionIntent.observedTasks.map((task) => ({ ...task })),
               }
             : null,
+          executionAdmission: run.executionAdmission
+            ? {
+                ...run.executionAdmission,
+                reasons: [...run.executionAdmission.reasons],
+                recommendedTask: run.executionAdmission.recommendedTask
+                  ? { ...run.executionAdmission.recommendedTask }
+                  : undefined,
+                task: run.executionAdmission.task ? { ...run.executionAdmission.task } : null,
+              }
+            : null,
         }
       : null;
   }
@@ -75,6 +86,15 @@ export function createWorkflowService({
       const parsed = failed
         ? { intent: null, error: null }
         : parseRecommendationIntent(result.stdout ?? "");
+      const taskPool = failed ? null : await buildTaskPool(await listRawTasks(tasksDir));
+      const runtimeStatus = failed ? null : evaluateRuntime(taskPool, await getRepositoryStatus());
+      const admission = failed
+        ? null
+        : evaluateExecutionAdmission({
+            executionIntent: parsed.intent,
+            taskPool,
+            runtimeStatus,
+          });
       Object.assign(run, {
         status: failed ? "failed" : "succeeded",
         finishedAt: new Date().toISOString(),
@@ -84,6 +104,7 @@ export function createWorkflowService({
         error: result.error ?? null,
         executionIntent: parsed.intent,
         executionIntentError: parsed.error,
+        executionAdmission: admission,
       });
     } catch (error) {
       Object.assign(run, {
@@ -120,6 +141,7 @@ export function createWorkflowService({
         progress: [],
         executionIntent: null,
         executionIntentError: null,
+        executionAdmission: null,
         stdout: "",
         stderr: "",
         exitCode: null,

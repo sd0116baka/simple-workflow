@@ -19,6 +19,9 @@ const taskPoolRaw = document.querySelector("#taskPoolRaw");
 const runtimeRaw = document.querySelector("#runtimeRaw");
 const recommendationRaw = document.querySelector("#recommendationRaw");
 const recommendationIntentPanel = document.querySelector("#recommendationIntentPanel");
+const admissionStatus = document.querySelector("#admissionStatus");
+const admissionRaw = document.querySelector("#admissionRaw");
+const admissionPanel = document.querySelector("#admissionPanel");
 
 let tasks = [];
 let poolEntries = [];
@@ -75,6 +78,36 @@ function createIntentPanel(intent) {
       .map((task) => `${task.id}:${task.priority}${task.status ? `:${task.status}` : ""}`)
       .join(", ")}`;
     panel.append(observed);
+  }
+
+  return panel;
+}
+
+function createAdmissionPanel(admission) {
+  const panel = document.createElement("div");
+  panel.className = `admission-panel ${admission.status}`;
+
+  const title = document.createElement("div");
+  title.className = "admission-title";
+  title.textContent = admission.canExecute
+    ? `可以进入执行：${admission.taskId}`
+    : `暂不能执行：${admission.taskId ?? "无任务"}`;
+
+  const meta = document.createElement("div");
+  meta.className = "admission-meta";
+  meta.textContent = `status: ${admission.status} · requiresConfirmation: ${String(admission.requiresConfirmation)}`;
+
+  panel.append(title, meta);
+
+  if (admission.reasons?.length > 0) {
+    const list = document.createElement("ul");
+    list.className = "admission-reasons";
+    for (const reason of admission.reasons) {
+      const item = document.createElement("li");
+      item.textContent = reason;
+      list.append(item);
+    }
+    panel.append(list);
   }
 
   return panel;
@@ -214,13 +247,19 @@ function buildRecommendationRaw(run) {
 function renderRecommendationRun() {
   recommendationResult?.replaceChildren();
   recommendationIntentPanel.replaceChildren();
+  admissionPanel.replaceChildren();
   recommendationRaw.textContent = buildRecommendationRaw(recommendationRun);
+  admissionRaw.textContent = recommendationRun?.executionIntent
+    ? JSON.stringify(recommendationRun.executionIntent, null, 2)
+    : "尚未生成执行意图。";
   runRecommendationButton.disabled = recommendationRun?.status === "running";
 
   if (!recommendationRun) {
     recommendationStatus.textContent = "未运行";
+    admissionStatus.textContent = "等待输入";
     if (recommendationResult) recommendationResult.textContent = "尚未触发推荐器。";
     recommendationIntentPanel.textContent = "尚未解析。";
+    admissionPanel.textContent = "等待推荐器输出。";
     return;
   }
 
@@ -244,6 +283,14 @@ function renderRecommendationRun() {
     recommendationIntentPanel.textContent = recommendationRun.executionIntentError
       ? `解析失败：${recommendationRun.executionIntentError}`
       : "尚未解析出执行意图。";
+  }
+
+  if (recommendationRun.executionAdmission) {
+    admissionStatus.textContent = recommendationRun.executionAdmission.status;
+    admissionPanel.append(createAdmissionPanel(recommendationRun.executionAdmission));
+  } else {
+    admissionStatus.textContent = "等待输入";
+    admissionPanel.textContent = "尚未计算准入结果。";
   }
 
   const output = document.createElement("pre");

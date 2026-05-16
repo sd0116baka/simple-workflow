@@ -339,6 +339,43 @@ h2 {
   margin-top: 6px;
 }
 
+.admission-panel {
+  padding: 12px;
+  border: 1px solid #dbe1ec;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.admission-panel.ready {
+  border-color: #b8dec7;
+  background: #f4fbf6;
+}
+
+.admission-panel.blocked {
+  border-color: #f2b8ae;
+  background: #fff7f5;
+}
+
+.admission-title {
+  font-weight: 700;
+}
+
+.admission-meta {
+  margin-top: 5px;
+  color: #607089;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+
+.admission-reasons {
+  margin: 10px 0 0;
+  padding-left: 18px;
+}
+
+.admission-reasons li + li {
+  margin-top: 6px;
+}
+
 .recommendation-output {
   max-height: 220px;
   margin: 10px 0 0;

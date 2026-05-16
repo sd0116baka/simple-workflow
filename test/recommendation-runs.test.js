@@ -76,6 +76,8 @@ test("workflow service captures a successful recommendation run", async () => {
   assert.match(finished.stdout, /task-001/);
   assert.equal(finished.executionIntent.recommendedTask.id, "task-001");
   assert.equal(finished.executionIntentError, null);
+  assert.equal(finished.executionAdmission.status, "blocked");
+  assert.match(finished.executionAdmission.reasons[0], /not in the task pool/);
   assert.equal(finished.exitCode, 0);
   assert.equal(service.getLatestRecommendationRun().status, "succeeded");
 });
