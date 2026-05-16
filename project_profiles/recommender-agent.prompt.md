@@ -4,7 +4,6 @@
 
 输出要求：
 - 只输出一个 fenced JSON 代码块，不要在代码块前后添加解释文字。
-- JSON 暂时只用于界面展示，不会被程序解析；仍然要保持有效 JSON。
 - 字段固定为：
   - `schemaVersion`: 数字，当前为 `1`。
   - `recommendedTask`: 对象，包含 `id`、`sourceFile`、`title`、`priority`。
