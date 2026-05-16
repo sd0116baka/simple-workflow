@@ -1,0 +1,10 @@
+id: task-001
+title: 展示任务真源
+type: feature
+priority: normal
+description: |
+  从 tasks 目录读取原始任务文件。
+  第一版不解析 YAML 或 JSON，只在界面展示原始文本。
+acceptance:
+  - 界面能列出任务文件
+  - 点击任务能看到原始 YAML 文本

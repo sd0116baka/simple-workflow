@@ -1,0 +1,14 @@
+{
+  "name": "simple-workflow",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server/server.js",
+    "start": "node src/server/server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "yaml": "^2.9.0"
+  }
+}

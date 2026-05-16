@@ -1,0 +1,260 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  background: #f5f7fb;
+  color: #1b2333;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px 32px;
+  border-bottom: 1px solid #dbe1ec;
+  background: #ffffff;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: #607089;
+  font-size: 13px;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 26px;
+  font-weight: 700;
+}
+
+h2 {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.secondary-button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid #c8d2e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1b2333;
+  cursor: pointer;
+}
+
+.secondary-button:hover {
+  background: #f0f4fa;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 20px;
+  padding: 24px 32px 32px;
+}
+
+.task-list-panel,
+.raw-panel {
+  min-height: calc(100vh - 130px);
+  border: 1px solid #dbe1ec;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid #e4e9f2;
+}
+
+.panel-heading span,
+.panel-heading p {
+  color: #607089;
+  font-size: 13px;
+}
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  gap: 8px;
+}
+
+.task-item {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1b2333;
+  text-align: left;
+  cursor: pointer;
+}
+
+.task-item:hover,
+.task-item.active {
+  border-color: #9db0cc;
+  background: #f3f6fb;
+}
+
+.task-file {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.task-format {
+  color: #607089;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(240px, 0.7fr);
+  min-height: calc(100vh - 184px);
+}
+
+.detail-block {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.detail-block + .detail-block {
+  border-left: 1px solid #e4e9f2;
+}
+
+.detail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e4e9f2;
+}
+
+.detail-heading h3 {
+  font-size: 14px;
+}
+
+.detail-heading span {
+  color: #607089;
+  font-size: 12px;
+}
+
+.code-block {
+  flex: 1;
+  min-height: calc(100vh - 232px);
+  margin: 0;
+  padding: 18px;
+  overflow: auto;
+  background: #111827;
+  color: #e5edf8;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.code-block.parsed {
+  background: #f8fafc;
+  color: #172033;
+}
+
+.parse-error {
+  color: #b42318;
+}
+
+.validation-result {
+  flex: 1;
+  min-height: calc(100vh - 232px);
+  padding: 18px;
+  overflow: auto;
+  color: #172033;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.validation-summary {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-weight: 650;
+}
+
+.validation-summary.valid {
+  background: #e8f7ef;
+  color: #17663a;
+}
+
+.validation-summary.invalid {
+  background: #fff0ed;
+  color: #b42318;
+}
+
+.validation-errors {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.validation-errors li + li {
+  margin-top: 8px;
+}
+
+.empty-state {
+  padding: 18px;
+  color: #607089;
+}
+
+@media (max-width: 800px) {
+  .app-header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 20px;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .task-list-panel,
+  .raw-panel {
+    min-height: auto;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-block + .detail-block {
+    border-left: 0;
+    border-top: 1px solid #e4e9f2;
+  }
+
+  .code-block,
+  .validation-result {
+    min-height: 360px;
+  }
+}

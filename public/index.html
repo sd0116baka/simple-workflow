@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>simple-workflow</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">simple-workflow</p>
+        <h1>任务真源</h1>
+      </div>
+      <button id="refreshButton" class="secondary-button" type="button">刷新</button>
+    </header>
+
+    <main class="layout">
+      <aside class="task-list-panel" aria-label="任务文件列表">
+        <div class="panel-heading">
+          <h2>tasks/</h2>
+          <span id="taskCount">0 个文件</span>
+        </div>
+        <div id="taskList" class="task-list"></div>
+      </aside>
+
+      <section class="raw-panel" aria-label="任务详情">
+        <div class="panel-heading">
+          <div>
+            <h2 id="selectedTitle">未选择任务</h2>
+            <p id="selectedMeta">从左侧选择一个任务文件查看原始文本、解析结果和校验结果。</p>
+          </div>
+        </div>
+        <div class="detail-grid">
+          <div class="detail-block">
+            <div class="detail-heading">
+              <h3>原始 YAML</h3>
+            </div>
+            <pre id="rawText" class="code-block">等待载入...</pre>
+          </div>
+          <div class="detail-block">
+            <div class="detail-heading">
+              <h3>解析结果</h3>
+              <span id="parseStatus">等待载入</span>
+            </div>
+            <pre id="parsedText" class="code-block parsed">等待载入...</pre>
+          </div>
+          <div class="detail-block">
+            <div class="detail-heading">
+              <h3>校验结果</h3>
+              <span id="validationStatus">等待载入</span>
+            </div>
+            <div id="validationResult" class="validation-result">等待载入...</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
