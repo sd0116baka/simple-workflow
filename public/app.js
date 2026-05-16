@@ -22,6 +22,7 @@ const recommendationIntentPanel = document.querySelector("#recommendationIntentP
 const admissionStatus = document.querySelector("#admissionStatus");
 const admissionRaw = document.querySelector("#admissionRaw");
 const admissionPanel = document.querySelector("#admissionPanel");
+const taskContextPackagePanel = document.querySelector("#taskContextPackagePanel");
 const taskSourceInputs = document.querySelector("#taskSourceInputs");
 const taskPoolInputs = document.querySelector("#taskPoolInputs");
 const runtimeInputs = document.querySelector("#runtimeInputs");
@@ -110,6 +111,57 @@ function createAdmissionPanel(admission) {
     for (const reason of admission.reasons) {
       const item = document.createElement("li");
       item.textContent = reason;
+      list.append(item);
+    }
+    panel.append(list);
+  }
+
+  return panel;
+}
+
+function createTaskContextPackagePanel(taskContextPackage) {
+  const panel = document.createElement("div");
+  panel.className = `context-package ${taskContextPackage.status}`;
+
+  const title = document.createElement("div");
+  title.className = "context-package-title";
+  title.textContent = `${taskContextPackage.taskId} · ${taskContextPackage.status}`;
+
+  const meta = document.createElement("div");
+  meta.className = "context-package-meta";
+  meta.textContent = [
+    `currentStage: ${taskContextPackage.currentStage}`,
+    `sourceFile: ${taskContextPackage.sourceFile ?? "unknown"}`,
+  ].join(" · ");
+
+  panel.append(title, meta);
+
+  const artifacts = document.createElement("div");
+  artifacts.className = "context-package-artifacts";
+  artifacts.innerHTML = `
+    <span>基础包</span><strong></strong>
+    <span>执行意图</span><strong></strong>
+    <span>执行授权</span><strong></strong>
+  `;
+  const values = artifacts.querySelectorAll("strong");
+  values[0].textContent = taskContextPackage.task?.status ?? "missing";
+  values[1].textContent = taskContextPackage.appended.executionIntent ? "已追加" : "未追加";
+  values[2].textContent = taskContextPackage.appended.executionAuthorization
+    ? "已追加"
+    : taskContextPackage.appended.admissionBlock
+      ? "未授权"
+      : "未追加";
+  panel.append(artifacts);
+
+  if (taskContextPackage.records?.length > 0) {
+    const list = document.createElement("ol");
+    list.className = "context-package-records";
+    for (const record of taskContextPackage.records) {
+      const item = document.createElement("li");
+      item.innerHTML = "<strong></strong><span></span><em></em>";
+      item.querySelector("strong").textContent = `${record.stage} / ${record.artifact}`;
+      item.querySelector("span").textContent = record.status;
+      item.querySelector("em").textContent = record.summary;
       list.append(item);
     }
     panel.append(list);
@@ -284,6 +336,7 @@ function renderRecommendationRun() {
   recommendationResult?.replaceChildren();
   recommendationIntentPanel.replaceChildren();
   admissionPanel.replaceChildren();
+  taskContextPackagePanel.replaceChildren();
   recommendationRaw.textContent = buildRecommendationRaw(recommendationRun);
   admissionRaw.textContent = recommendationRun?.executionIntent
     ? JSON.stringify(recommendationRun.executionIntent, null, 2)
@@ -307,6 +360,7 @@ function renderRecommendationRun() {
     if (recommendationResult) recommendationResult.textContent = "尚未触发推荐器。";
     recommendationIntentPanel.textContent = "尚未解析。";
     admissionPanel.textContent = "等待推荐器输出。";
+    taskContextPackagePanel.textContent = "等待执行准入器输出。";
     return;
   }
 
@@ -338,6 +392,12 @@ function renderRecommendationRun() {
   } else {
     admissionStatus.textContent = "等待输入";
     admissionPanel.textContent = "尚未计算执行授权。";
+  }
+
+  if (recommendationRun.taskContextPackage) {
+    taskContextPackagePanel.append(createTaskContextPackagePanel(recommendationRun.taskContextPackage));
+  } else {
+    taskContextPackagePanel.textContent = "尚未生成任务上下文包快照。";
   }
 
   const output = document.createElement("pre");

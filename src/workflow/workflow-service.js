@@ -6,6 +6,7 @@ import { getRepositoryStatus as readRepositoryStatus } from "./repository-status
 import { parseRecommendationIntent } from "./recommendation-intent.js";
 import { OPENCODE_RECOMMENDATION_ARGS, runOpencodeRecommendation } from "./recommendation-runner.js";
 import { evaluateRuntime } from "./runtime-scheduler.js";
+import { buildTaskContextPackage } from "./task-context-package.js";
 import { buildTaskPool } from "./task-pool.js";
 import { listRawTasks } from "./task-source.js";
 
@@ -67,6 +68,32 @@ export function createWorkflowService({
                 task: run.executionAdmission.task ? { ...run.executionAdmission.task } : null,
               }
             : null,
+          taskContextPackage: run.taskContextPackage
+            ? {
+                ...run.taskContextPackage,
+                task: run.taskContextPackage.task ? { ...run.taskContextPackage.task } : null,
+                appended: {
+                  executionIntent: run.taskContextPackage.appended.executionIntent
+                    ? {
+                        ...run.taskContextPackage.appended.executionIntent,
+                        recommendedTask: {
+                          ...run.taskContextPackage.appended.executionIntent.recommendedTask,
+                        },
+                      }
+                    : null,
+                  executionAuthorization: run.taskContextPackage.appended.executionAuthorization
+                    ? { ...run.taskContextPackage.appended.executionAuthorization }
+                    : null,
+                  admissionBlock: run.taskContextPackage.appended.admissionBlock
+                    ? {
+                        ...run.taskContextPackage.appended.admissionBlock,
+                        reasons: [...run.taskContextPackage.appended.admissionBlock.reasons],
+                      }
+                    : null,
+                },
+                records: run.taskContextPackage.records.map((record) => ({ ...record })),
+              }
+            : null,
         }
       : null;
   }
@@ -95,6 +122,13 @@ export function createWorkflowService({
             taskPool,
             runtimeStatus,
           });
+      const taskContextPackage = failed
+        ? null
+        : buildTaskContextPackage({
+            taskPool,
+            executionIntent: parsed.intent,
+            executionAdmission: admission,
+          });
       Object.assign(run, {
         status: failed ? "failed" : "succeeded",
         finishedAt: new Date().toISOString(),
@@ -105,6 +139,7 @@ export function createWorkflowService({
         executionIntent: parsed.intent,
         executionIntentError: parsed.error,
         executionAdmission: admission,
+        taskContextPackage,
       });
     } catch (error) {
       Object.assign(run, {
@@ -142,6 +177,7 @@ export function createWorkflowService({
         executionIntent: null,
         executionIntentError: null,
         executionAdmission: null,
+        taskContextPackage: null,
         stdout: "",
         stderr: "",
         exitCode: null,

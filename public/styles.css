@@ -346,7 +346,7 @@ h2 {
   background: #ffffff;
 }
 
-.admission-panel.ready {
+.admission-panel.authorized {
   border-color: #b8dec7;
   background: #f4fbf6;
 }
@@ -374,6 +374,96 @@ h2 {
 
 .admission-reasons li + li {
   margin-top: 6px;
+}
+
+.package-heading {
+  border-top: 1px solid #e4e9f2;
+}
+
+.context-package-panel {
+  min-height: 190px;
+  max-height: 360px;
+  padding: 18px;
+  overflow: auto;
+  color: #172033;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.context-package {
+  padding: 12px;
+  border: 1px solid #dbe1ec;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.context-package.authorization-appended {
+  border-color: #b8dec7;
+  background: #f4fbf6;
+}
+
+.context-package.authorization-blocked {
+  border-color: #f2b8ae;
+  background: #fff7f5;
+}
+
+.context-package-title {
+  font-weight: 700;
+}
+
+.context-package-meta {
+  margin-top: 5px;
+  color: #607089;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+
+.context-package-artifacts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #dbe1ec;
+}
+
+.context-package-artifacts span {
+  color: #607089;
+  font-size: 12px;
+}
+
+.context-package-artifacts strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.context-package-records {
+  margin: 12px 0 0;
+  padding-left: 20px;
+}
+
+.context-package-records li + li {
+  margin-top: 10px;
+}
+
+.context-package-records strong,
+.context-package-records span,
+.context-package-records em {
+  display: block;
+}
+
+.context-package-records span {
+  margin-top: 3px;
+  color: #607089;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+
+.context-package-records em {
+  margin-top: 3px;
+  color: #44536a;
+  font-style: normal;
 }
 
 .recommendation-output {
