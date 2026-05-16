@@ -2,6 +2,7 @@ import { watch } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { getRepositoryStatus as readRepositoryStatus } from "./repository-status.js";
+import { parseRecommendationIntent } from "./recommendation-intent.js";
 import { OPENCODE_RECOMMENDATION_ARGS, runOpencodeRecommendation } from "./recommendation-runner.js";
 import { evaluateRuntime } from "./runtime-scheduler.js";
 import { buildTaskPool } from "./task-pool.js";
@@ -43,6 +44,18 @@ export function createWorkflowService({
           ...run,
           args: [...run.args],
           progress: run.progress.map((entry) => ({ ...entry })),
+          executionIntent: run.executionIntent
+            ? {
+                ...run.executionIntent,
+                recommendedTask: { ...run.executionIntent.recommendedTask },
+                rationale: [...run.executionIntent.rationale],
+                repoStatus: {
+                  ...run.executionIntent.repoStatus,
+                  changedFiles: [...run.executionIntent.repoStatus.changedFiles],
+                },
+                observedTasks: run.executionIntent.observedTasks.map((task) => ({ ...task })),
+              }
+            : null,
         }
       : null;
   }
@@ -59,6 +72,9 @@ export function createWorkflowService({
     try {
       const result = await startedCommand;
       const failed = result.error || result.exitCode !== 0;
+      const parsed = failed
+        ? { intent: null, error: null }
+        : parseRecommendationIntent(result.stdout ?? "");
       Object.assign(run, {
         status: failed ? "failed" : "succeeded",
         finishedAt: new Date().toISOString(),
@@ -66,6 +82,8 @@ export function createWorkflowService({
         stderr: result.stderr ?? "",
         exitCode: result.exitCode ?? null,
         error: result.error ?? null,
+        executionIntent: parsed.intent,
+        executionIntentError: parsed.error,
       });
     } catch (error) {
       Object.assign(run, {
@@ -100,6 +118,8 @@ export function createWorkflowService({
         command: "opencode",
         args: OPENCODE_RECOMMENDATION_ARGS,
         progress: [],
+        executionIntent: null,
+        executionIntentError: null,
         stdout: "",
         stderr: "",
         exitCode: null,

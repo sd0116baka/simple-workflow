@@ -35,6 +35,47 @@ function formatProgress(progress) {
     .join("\n");
 }
 
+function createIntentPanel(intent) {
+  const panel = document.createElement("div");
+  panel.className = "recommendation-intent";
+
+  const title = document.createElement("div");
+  title.className = "recommendation-intent-title";
+  title.textContent = intent.recommendedTask.title || intent.recommendedTask.id;
+
+  const meta = document.createElement("div");
+  meta.className = "recommendation-intent-meta";
+  meta.textContent = `${intent.recommendedTask.id} · ${intent.recommendedTask.priority} · confidence: ${intent.confidence}`;
+
+  const nextAction = document.createElement("div");
+  nextAction.className = "recommendation-intent-next";
+  nextAction.textContent = intent.nextAction;
+
+  panel.append(title, meta, nextAction);
+
+  if (intent.rationale?.length > 0) {
+    const list = document.createElement("ul");
+    list.className = "recommendation-intent-list";
+    for (const reason of intent.rationale) {
+      const item = document.createElement("li");
+      item.textContent = reason;
+      list.append(item);
+    }
+    panel.append(list);
+  }
+
+  if (intent.observedTasks?.length > 0) {
+    const observed = document.createElement("div");
+    observed.className = "recommendation-observed";
+    observed.textContent = `observedTasks: ${intent.observedTasks
+      .map((task) => `${task.id}:${task.priority}${task.status ? `:${task.status}` : ""}`)
+      .join(", ")}`;
+    panel.append(observed);
+  }
+
+  return panel;
+}
+
 function renderList() {
   taskCount.textContent = `${tasks.length} 个文件`;
   taskList.replaceChildren();
@@ -174,9 +215,18 @@ function renderRecommendationRun() {
   meta.className = "recommendation-meta";
   meta.textContent = `${recommendationRun.command} ${recommendationRun.args?.join(" ") ?? ""}`;
 
+  if (recommendationRun.executionIntent) {
+    recommendationResult.append(summary, meta, createIntentPanel(recommendationRun.executionIntent));
+  } else {
+    recommendationResult.append(summary, meta);
+  }
+
   const output = document.createElement("pre");
   output.className = "recommendation-output";
   const chunks = [];
+  if (recommendationRun.executionIntentError) {
+    chunks.push(`解析失败\n${recommendationRun.executionIntentError}`);
+  }
   if (recommendationRun.progress?.length > 0) {
     chunks.push(`运行进度\n${formatProgress(recommendationRun.progress)}`);
   }
@@ -185,7 +235,7 @@ function renderRecommendationRun() {
   if (recommendationRun.error) chunks.push(`错误(error)\n${stripAnsi(recommendationRun.error)}`);
   output.textContent = chunks.join("\n\n") || "等待输出...";
 
-  recommendationResult.append(summary, meta, output);
+  recommendationResult.append(output);
 }
 
 function selectTask(fileName) {

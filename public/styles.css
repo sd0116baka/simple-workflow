@@ -295,6 +295,41 @@ h2 {
   font-size: 12px;
 }
 
+.recommendation-intent {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #d7e2f0;
+  border-radius: 6px;
+  background: #f8fbff;
+}
+
+.recommendation-intent-title {
+  color: #172033;
+  font-weight: 700;
+}
+
+.recommendation-intent-meta,
+.recommendation-observed {
+  margin-top: 5px;
+  color: #607089;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+
+.recommendation-intent-next {
+  margin-top: 10px;
+  font-weight: 650;
+}
+
+.recommendation-intent-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+}
+
+.recommendation-intent-list li + li {
+  margin-top: 6px;
+}
+
 .recommendation-output {
   max-height: 220px;
   margin: 10px 0 0;

@@ -14,6 +14,26 @@ async function writePrompt(name) {
   return promptPath;
 }
 
+function buildIntentJson(taskId = "task-001") {
+  return JSON.stringify({
+    schemaVersion: 1,
+    recommendedTask: {
+      id: taskId,
+      sourceFile: `tasks/${taskId}.yaml`,
+      title: "展示任务真源",
+      priority: "normal",
+    },
+    confidence: "medium",
+    rationale: ["任务可执行"],
+    repoStatus: {
+      clean: true,
+      changedFiles: [],
+    },
+    observedTasks: [],
+    nextAction: `优先实现 ${taskId}。`,
+  });
+}
+
 test("recommender prompt asks for a structured JSON artifact", async () => {
   const prompt = await readFile(join(process.cwd(), "project_profiles", "recommender-agent.prompt.md"), "utf8");
 
@@ -32,7 +52,7 @@ test("workflow service captures a successful recommendation run", async () => {
     runRecommendationCommand: async ({ prompt }) => {
       assert.match(prompt, /不要修改文件/);
       return {
-        stdout: "建议先做 task-001",
+        stdout: `\`\`\`json\n${buildIntentJson()}\n\`\`\``,
         stderr: "",
         exitCode: 0,
         error: null,
@@ -53,9 +73,40 @@ test("workflow service captures a successful recommendation run", async () => {
 
   assert.equal(running.status, "running");
   assert.equal(finished.status, "succeeded");
-  assert.equal(finished.stdout, "建议先做 task-001");
+  assert.match(finished.stdout, /task-001/);
+  assert.equal(finished.executionIntent.recommendedTask.id, "task-001");
+  assert.equal(finished.executionIntentError, null);
   assert.equal(finished.exitCode, 0);
   assert.equal(service.getLatestRecommendationRun().status, "succeeded");
+});
+
+test("workflow service keeps successful runs when recommendation intent parsing fails", async () => {
+  const promptPath = await writePrompt("recommendation-parse-failure");
+  const service = createWorkflowService({
+    tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks"),
+    recommendationPromptPath: promptPath,
+    runRecommendationCommand: async () => ({
+      stdout: "不是 JSON",
+      stderr: "",
+      exitCode: 0,
+      error: null,
+    }),
+  });
+
+  const completed = new Promise((resolve) => {
+    service.onEvent((event) => {
+      if (event.type === "recommendation-run-changed" && event.run.status === "succeeded") {
+        resolve(event.run);
+      }
+    });
+  });
+
+  await service.createRecommendationRun();
+  const finished = await completed;
+
+  assert.equal(finished.status, "succeeded");
+  assert.equal(finished.executionIntent, null);
+  assert.match(finished.executionIntentError, /Unexpected token|JSON/);
 });
 
 test("workflow service emits running progress for recommendation runs", async () => {
