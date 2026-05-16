@@ -347,10 +347,16 @@ h2 {
 .stage-list {
   display: flex;
   flex-direction: column;
+  gap: 18px;
+  padding: 18px;
+  background: #f5f7fb;
 }
 
-.stage-row + .stage-row {
-  border-top: 1px solid #dbe1ec;
+.stage-row {
+  overflow: hidden;
+  border: 1px solid #dbe1ec;
+  border-radius: 8px;
+  background: #ffffff;
 }
 
 .stage-heading {
