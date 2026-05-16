@@ -15,6 +15,12 @@ const refreshButton = document.querySelector("#refreshButton");
 const recommendationStatus = document.querySelector("#recommendationStatus");
 const recommendationResult = document.querySelector("#recommendationResult");
 const runRecommendationButton = document.querySelector("#runRecommendationButton");
+const taskPoolRaw = document.querySelector("#taskPoolRaw");
+const taskPoolDebug = document.querySelector("#taskPoolDebug");
+const runtimeRaw = document.querySelector("#runtimeRaw");
+const runtimeDebug = document.querySelector("#runtimeDebug");
+const recommendationRaw = document.querySelector("#recommendationRaw");
+const recommendationIntentPanel = document.querySelector("#recommendationIntentPanel");
 
 let tasks = [];
 let poolEntries = [];
@@ -76,6 +82,26 @@ function createIntentPanel(intent) {
   return panel;
 }
 
+function createMetric(label, value) {
+  const metric = document.createElement("div");
+  metric.className = "runtime-metric";
+  metric.innerHTML = "<span></span><strong></strong>";
+  metric.querySelector("span").textContent = label;
+  metric.querySelector("strong").textContent = String(value);
+  return metric;
+}
+
+function renderDebugList(container, items, renderItem, emptyText) {
+  container.replaceChildren();
+  if (!items || items.length === 0) {
+    container.textContent = emptyText;
+    return;
+  }
+  for (const item of items) {
+    container.append(renderItem(item));
+  }
+}
+
 function renderList() {
   taskCount.textContent = `${tasks.length} 个文件`;
   taskList.replaceChildren();
@@ -106,6 +132,25 @@ function renderList() {
 function renderTaskPool() {
   poolCount.textContent = `${poolEntries.length} 个条目`;
   taskPool.replaceChildren();
+  taskPoolRaw.textContent = JSON.stringify(poolEntries, null, 2);
+  renderDebugList(
+    taskPoolDebug,
+    poolEntries,
+    (entry) => {
+      const item = document.createElement("div");
+      item.className = `debug-card ${entry.status}`;
+      item.innerHTML = `
+        <strong></strong>
+        <span></span>
+        <em></em>
+      `;
+      item.querySelector("strong").textContent = entry.title || entry.id;
+      item.querySelector("span").textContent = `${entry.sourceFile} · ${entry.type || "unknown"}`;
+      item.querySelector("em").textContent = entry.status;
+      return item;
+    },
+    "还没有解析成功的任务进入任务池。",
+  );
 
   if (poolEntries.length === 0) {
     const empty = document.createElement("p");
@@ -132,9 +177,12 @@ function renderTaskPool() {
 
 function renderRuntime() {
   runtimePanel.replaceChildren();
+  runtimeDebug.replaceChildren();
+  runtimeRaw.textContent = JSON.stringify(runtime, null, 2);
   if (!runtime) {
     runtimeStatus.textContent = "未载入";
     runtimePanel.textContent = "未返回运行时状态。";
+    runtimeDebug.textContent = "未返回运行时状态。";
     return;
   }
 
@@ -167,6 +215,14 @@ function renderRuntime() {
   gitChanges.querySelector("strong").textContent = String(repositoryStatus.entries?.length ?? 0);
 
   runtimePanel.append(summary, canStart, runnableCount, gitStatus, gitChanges);
+  const debugSummary = summary.cloneNode(true);
+  runtimeDebug.append(
+    debugSummary,
+    createMetric("canStartNewTask", runtime.canStartNewTask),
+    createMetric("runnableTasks", runtime.runnableTasks?.length ?? 0),
+    createMetric("git", repositoryStatus.clean ? "clean" : "dirty"),
+    createMetric("git changes", repositoryStatus.entries?.length ?? 0),
+  );
 
   const reasons = runtime.blockingReasons ?? [];
   if (reasons.length > 0) {
@@ -178,6 +234,7 @@ function renderRuntime() {
       list.append(item);
     }
     runtimePanel.append(list);
+    runtimeDebug.append(list.cloneNode(true));
   }
 
   const repositoryEntries = repositoryStatus.entries ?? [];
@@ -190,16 +247,32 @@ function renderRuntime() {
       list.append(item);
     }
     runtimePanel.append(list);
+    runtimeDebug.append(list.cloneNode(true));
   }
+}
+
+function buildRecommendationRaw(run) {
+  if (!run) return "尚未触发推荐器。";
+  const chunks = [];
+  if (run.progress?.length > 0) {
+    chunks.push(`运行进度\n${formatProgress(run.progress)}`);
+  }
+  if (run.stdout) chunks.push(`结构化产物(stdout)\n${stripAnsi(run.stdout)}`);
+  if (run.stderr) chunks.push(`运行日志(stderr)\n${stripAnsi(run.stderr)}`);
+  if (run.error) chunks.push(`错误(error)\n${stripAnsi(run.error)}`);
+  return chunks.join("\n\n") || "等待输出...";
 }
 
 function renderRecommendationRun() {
   recommendationResult.replaceChildren();
+  recommendationIntentPanel.replaceChildren();
+  recommendationRaw.textContent = buildRecommendationRaw(recommendationRun);
   runRecommendationButton.disabled = recommendationRun?.status === "running";
 
   if (!recommendationRun) {
     recommendationStatus.textContent = "未运行";
     recommendationResult.textContent = "尚未触发推荐器。";
+    recommendationIntentPanel.textContent = "尚未解析。";
     return;
   }
 
@@ -217,8 +290,12 @@ function renderRecommendationRun() {
 
   if (recommendationRun.executionIntent) {
     recommendationResult.append(summary, meta, createIntentPanel(recommendationRun.executionIntent));
+    recommendationIntentPanel.append(createIntentPanel(recommendationRun.executionIntent));
   } else {
     recommendationResult.append(summary, meta);
+    recommendationIntentPanel.textContent = recommendationRun.executionIntentError
+      ? `解析失败：${recommendationRun.executionIntentError}`
+      : "尚未解析出执行意图。";
   }
 
   const output = document.createElement("pre");
@@ -227,13 +304,7 @@ function renderRecommendationRun() {
   if (recommendationRun.executionIntentError) {
     chunks.push(`解析失败\n${recommendationRun.executionIntentError}`);
   }
-  if (recommendationRun.progress?.length > 0) {
-    chunks.push(`运行进度\n${formatProgress(recommendationRun.progress)}`);
-  }
-  if (recommendationRun.stdout) chunks.push(`结构化产物(stdout)\n${stripAnsi(recommendationRun.stdout)}`);
-  if (recommendationRun.stderr) chunks.push(`运行日志(stderr)\n${stripAnsi(recommendationRun.stderr)}`);
-  if (recommendationRun.error) chunks.push(`错误(error)\n${stripAnsi(recommendationRun.error)}`);
-  output.textContent = chunks.join("\n\n") || "等待输出...";
+  output.textContent = chunks.concat(buildRecommendationRaw(recommendationRun)).join("\n\n") || "等待输出...";
 
   recommendationResult.append(output);
 }

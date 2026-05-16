@@ -16,7 +16,7 @@
     </header>
 
     <main class="layout">
-      <aside class="task-list-panel" aria-label="任务文件列表">
+      <aside class="task-list-panel" aria-label="任务控制面板">
         <div class="sidebar-section">
           <div class="panel-heading">
             <h2>tasks/</h2>
@@ -50,34 +50,85 @@
         </div>
       </aside>
 
-      <section class="raw-panel" aria-label="任务详情">
+      <section class="workflow-debug-panel" aria-label="工作流环节调试视图">
         <div class="panel-heading">
           <div>
             <h2 id="selectedTitle">未选择任务</h2>
-            <p id="selectedMeta">从左侧选择一个任务文件查看原始文本、解析结果和校验结果。</p>
+            <p id="selectedMeta">按环节纵向排列，每行左侧是原始内容，右侧是解析结果。</p>
           </div>
         </div>
-        <div class="detail-grid">
-          <div class="detail-block">
-            <div class="detail-heading">
-              <h3>原始 YAML</h3>
-            </div>
-            <pre id="rawText" class="code-block">等待载入...</pre>
-          </div>
-          <div class="detail-block">
-            <div class="detail-heading">
-              <h3>解析结果</h3>
+        <div class="stage-list">
+          <section class="stage-row">
+            <div class="stage-heading">
+              <h3>任务真源</h3>
               <span id="parseStatus">等待载入</span>
             </div>
-            <pre id="parsedText" class="code-block parsed">等待载入...</pre>
-          </div>
-          <div class="detail-block">
-            <div class="detail-heading">
-              <h3>校验结果</h3>
-              <span id="validationStatus">等待载入</span>
+            <div class="stage-columns">
+              <div class="stage-cell">
+                <div class="detail-heading"><h3>原始 YAML</h3></div>
+                <pre id="rawText" class="code-block">等待载入...</pre>
+              </div>
+              <div class="stage-cell">
+                <div class="detail-heading">
+                  <h3>解析结果 / 校验结果</h3>
+                  <span id="validationStatus">等待载入</span>
+                </div>
+                <pre id="parsedText" class="code-block parsed">等待载入...</pre>
+                <div id="validationResult" class="validation-result">等待载入...</div>
+              </div>
             </div>
-            <div id="validationResult" class="validation-result">等待载入...</div>
-          </div>
+          </section>
+
+          <section class="stage-row">
+            <div class="stage-heading">
+              <h3>任务池</h3>
+              <span>pool model</span>
+            </div>
+            <div class="stage-columns">
+              <div class="stage-cell">
+                <div class="detail-heading"><h3>原始任务池 JSON</h3></div>
+                <pre id="taskPoolRaw" class="code-block parsed">等待载入...</pre>
+              </div>
+              <div class="stage-cell">
+                <div class="detail-heading"><h3>解析视图</h3></div>
+                <div id="taskPoolDebug" class="debug-result">等待载入...</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="stage-row">
+            <div class="stage-heading">
+              <h3>运行时</h3>
+              <span>runtime decision</span>
+            </div>
+            <div class="stage-columns">
+              <div class="stage-cell">
+                <div class="detail-heading"><h3>原始运行时 JSON</h3></div>
+                <pre id="runtimeRaw" class="code-block parsed">等待载入...</pre>
+              </div>
+              <div class="stage-cell">
+                <div class="detail-heading"><h3>解析视图</h3></div>
+                <div id="runtimeDebug" class="debug-result">等待载入...</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="stage-row">
+            <div class="stage-heading">
+              <h3>任务推荐器</h3>
+              <span>agent output</span>
+            </div>
+            <div class="stage-columns">
+              <div class="stage-cell">
+                <div class="detail-heading"><h3>原始输出</h3></div>
+                <pre id="recommendationRaw" class="code-block">尚未触发推荐器。</pre>
+              </div>
+              <div class="stage-cell">
+                <div class="detail-heading"><h3>解析执行意图</h3></div>
+                <div id="recommendationIntentPanel" class="debug-result">尚未解析。</div>
+              </div>
+            </div>
+          </section>
         </div>
       </section>
     </main>
