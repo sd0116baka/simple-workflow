@@ -38,18 +38,37 @@ test("recommender prompt asks for a structured JSON artifact", async () => {
   const prompt = await readFile(join(process.cwd(), "project_profiles", "recommender-agent.prompt.md"), "utf8");
 
   assert.match(prompt, /fenced JSON/);
+  assert.match(prompt, /candidateTasks/);
   assert.match(prompt, /schemaVersion/);
   assert.match(prompt, /recommendedTask/);
   assert.match(prompt, /observedTasks/);
+  assert.match(prompt, /不要读取 `tasks\/` 原始目录/);
   assert.match(prompt, /不要修改任何文件/);
 });
 
 test("workflow service captures a successful recommendation run", async () => {
   const promptPath = await writePrompt("recommendation-success");
+  const tasksDir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks");
+  await mkdir(tasksDir, { recursive: true });
+  await writeFile(
+    join(tasksDir, "task-001.yaml"),
+    [
+      "id: task-001",
+      "title: 展示任务真源",
+      "type: feature",
+      "description: 展示任务",
+      "acceptance:",
+      "  - 可以看到任务",
+      "",
+    ].join("\n"),
+  );
   const service = createWorkflowService({
-    tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks"),
+    tasksDir,
     recommendationPromptPath: promptPath,
+    getRepositoryStatus: async () => ({ clean: true, entries: [] }),
     runRecommendationCommand: async ({ prompt }) => {
+      assert.match(prompt, /candidateTasks/);
+      assert.match(prompt, /task-001/);
       assert.match(prompt, /不要修改文件/);
       return {
         stdout: `\`\`\`json\n${buildIntentJson()}\n\`\`\``,
@@ -76,12 +95,69 @@ test("workflow service captures a successful recommendation run", async () => {
   assert.match(finished.stdout, /task-001/);
   assert.equal(finished.executionIntent.recommendedTask.id, "task-001");
   assert.equal(finished.executionIntentError, null);
-  assert.equal(finished.executionAdmission.status, "blocked");
-  assert.match(finished.executionAdmission.reasons[0], /not in the task pool/);
-  assert.equal(finished.taskContextPackage.status, "authorization-blocked");
-  assert.equal(finished.taskContextPackage.appended.admissionBlock.taskId, "task-001");
+  assert.equal(finished.executionAdmission.status, "authorized");
+  assert.equal(finished.taskContextPackage.status, "authorization-appended");
+  assert.equal(finished.taskContextPackage.appended.executionAuthorization.taskId, "task-001");
   assert.equal(finished.exitCode, 0);
   assert.equal(service.getLatestRecommendationRun().status, "succeeded");
+});
+
+test("workflow service does not expose invalid tasks to the recommender prompt", async () => {
+  const promptPath = await writePrompt("recommendation-candidates");
+  const tasksDir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "candidate-tasks");
+  await mkdir(tasksDir, { recursive: true });
+  await writeFile(
+    join(tasksDir, "task-ready.yaml"),
+    [
+      "id: task-ready",
+      "title: 可推荐任务",
+      "type: feature",
+      "description: 已通过校验",
+      "acceptance:",
+      "  - 推荐器能看到它",
+      "",
+    ].join("\n"),
+  );
+  await writeFile(
+    join(tasksDir, "task-invalid.yaml"),
+    [
+      "id: task-invalid",
+      "type: feature",
+      "description: 缺少 title",
+      "acceptance:",
+      "  - 推荐器不能看到它",
+      "",
+    ].join("\n"),
+  );
+
+  const service = createWorkflowService({
+    tasksDir,
+    recommendationPromptPath: promptPath,
+    getRepositoryStatus: async () => ({ clean: true, entries: [] }),
+    runRecommendationCommand: async ({ prompt }) => {
+      assert.match(prompt, /task-ready/);
+      assert.doesNotMatch(prompt, /task-invalid/);
+      return {
+        stdout: `\`\`\`json\n${buildIntentJson("task-ready")}\n\`\`\``,
+        stderr: "",
+        exitCode: 0,
+        error: null,
+      };
+    },
+  });
+
+  const completed = new Promise((resolve) => {
+    service.onEvent((event) => {
+      if (event.type === "recommendation-run-changed" && event.run.status === "succeeded") {
+        resolve(event.run);
+      }
+    });
+  });
+
+  await service.createRecommendationRun();
+  const finished = await completed;
+
+  assert.equal(finished.executionAdmission.status, "authorized");
 });
 
 test("workflow service keeps successful runs when recommendation intent parsing fails", async () => {

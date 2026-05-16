@@ -4,6 +4,7 @@ import { extname, join } from "node:path";
 import { evaluateExecutionAdmission } from "./execution-admission.js";
 import { getRepositoryStatus as readRepositoryStatus } from "./repository-status.js";
 import { parseRecommendationIntent } from "./recommendation-intent.js";
+import { buildRecommendationPrompt } from "./recommendation-prompt.js";
 import { OPENCODE_RECOMMENDATION_ARGS, runOpencodeRecommendation } from "./recommendation-runner.js";
 import { evaluateRuntime } from "./runtime-scheduler.js";
 import { buildTaskContextPackage } from "./task-context-package.js";
@@ -165,7 +166,10 @@ export function createWorkflowService({
     },
 
     async createRecommendationRun() {
-      const prompt = await readFile(recommendationPromptPath, "utf8");
+      const basePrompt = await readFile(recommendationPromptPath, "utf8");
+      const taskPool = await this.listTaskPool();
+      const runtimeStatus = evaluateRuntime(taskPool, await getRepositoryStatus());
+      const prompt = buildRecommendationPrompt({ basePrompt, runtimeStatus });
       const run = {
         id: `recommendation-run-${(recommendationRunSequence += 1)}`,
         status: "running",
