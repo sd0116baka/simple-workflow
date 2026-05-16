@@ -69,12 +69,22 @@ async function serveStatic(request, response) {
 }
 
 export function createApp({
-  workflowService = createWorkflowService({ tasksDir }),
+  workflowService = createWorkflowService({ tasksDir, repositoryDir: rootDir }),
 } = {}) {
   return createServer(async (request, response) => {
     try {
       if (request.url?.startsWith("/api/events")) {
         serveEvents(request, response, workflowService);
+        return;
+      }
+
+      if (request.method === "POST" && request.url?.startsWith("/api/recommendation-runs")) {
+        sendJson(response, 201, { recommendationRun: await workflowService.createRecommendationRun() });
+        return;
+      }
+
+      if (request.method === "GET" && request.url?.startsWith("/api/recommendation-runs/latest")) {
+        sendJson(response, 200, { recommendationRun: workflowService.getLatestRecommendationRun() });
         return;
       }
 
@@ -106,7 +116,7 @@ export function isDirectRun(moduleUrl, argvPath) {
 }
 
 if (isDirectRun(import.meta.url, process.argv[1])) {
-  const workflowService = createWorkflowService({ tasksDir });
+  const workflowService = createWorkflowService({ tasksDir, repositoryDir: rootDir });
   await workflowService.startWatching();
   createApp({ workflowService }).listen(port, () => {
     console.log(`simple-workflow running at http://localhost:${port}`);

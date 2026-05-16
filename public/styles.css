@@ -57,6 +57,28 @@ h2 {
   cursor: pointer;
 }
 
+.primary-button {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid #285ea8;
+  border-radius: 6px;
+  background: #2f6fbd;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.primary-button:hover {
+  background: #285ea8;
+}
+
+.primary-button:disabled {
+  border-color: #aab8ce;
+  background: #aab8ce;
+  cursor: not-allowed;
+}
+
 .secondary-button:hover {
   background: #f0f4fa;
 }
@@ -86,7 +108,8 @@ h2 {
 }
 
 .pool-section,
-.runtime-section {
+.runtime-section,
+.recommender-section {
   min-height: 220px;
 }
 
@@ -232,6 +255,58 @@ h2 {
   color: #607089;
   font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
   font-size: 12px;
+}
+
+.recommendation-panel {
+  padding: 14px;
+}
+
+.recommendation-result {
+  margin-top: 12px;
+  color: #172033;
+  font-size: 13px;
+}
+
+.recommendation-summary {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-weight: 650;
+}
+
+.recommendation-summary.running {
+  background: #eef5ff;
+  color: #285ea8;
+}
+
+.recommendation-summary.succeeded {
+  background: #e8f7ef;
+  color: #17663a;
+}
+
+.recommendation-summary.failed {
+  background: #fff0ed;
+  color: #b42318;
+}
+
+.recommendation-meta {
+  color: #607089;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+
+.recommendation-output {
+  max-height: 220px;
+  margin: 10px 0 0;
+  padding: 12px;
+  overflow: auto;
+  border-radius: 6px;
+  background: #111827;
+  color: #e5edf8;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
 }
 
 .detail-grid {

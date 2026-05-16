@@ -1,0 +1,145 @@
+import { once } from "node:events";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { createApp } from "../src/server/server.js";
+import { createWorkflowService } from "../src/workflow/workflow-service.js";
+
+async function writePrompt(name) {
+  const dir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), name);
+  await mkdir(dir, { recursive: true });
+  const promptPath = join(dir, "recommender-agent.prompt.md");
+  await writeFile(promptPath, "推荐一个任务，但不要修改文件。");
+  return promptPath;
+}
+
+test("workflow service captures a successful recommendation run", async () => {
+  const promptPath = await writePrompt("recommendation-success");
+  const service = createWorkflowService({
+    tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks"),
+    recommendationPromptPath: promptPath,
+    runRecommendationCommand: async ({ prompt }) => {
+      assert.match(prompt, /不要修改文件/);
+      return {
+        stdout: "建议先做 task-001",
+        stderr: "",
+        exitCode: 0,
+        error: null,
+      };
+    },
+  });
+
+  const completed = new Promise((resolve) => {
+    service.onEvent((event) => {
+      if (event.type === "recommendation-run-changed" && event.run.status === "succeeded") {
+        resolve(event.run);
+      }
+    });
+  });
+
+  const running = await service.createRecommendationRun();
+  const finished = await completed;
+
+  assert.equal(running.status, "running");
+  assert.equal(finished.status, "succeeded");
+  assert.equal(finished.stdout, "建议先做 task-001");
+  assert.equal(finished.exitCode, 0);
+  assert.equal(service.getLatestRecommendationRun().status, "succeeded");
+});
+
+test("workflow service marks non-zero recommendation exits as failed", async () => {
+  const promptPath = await writePrompt("recommendation-failure");
+  const service = createWorkflowService({
+    tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks"),
+    recommendationPromptPath: promptPath,
+    runRecommendationCommand: async () => ({
+      stdout: "",
+      stderr: "模型调用失败",
+      exitCode: 2,
+      error: null,
+    }),
+  });
+
+  const completed = new Promise((resolve) => {
+    service.onEvent((event) => {
+      if (event.type === "recommendation-run-changed" && event.run.status === "failed") {
+        resolve(event.run);
+      }
+    });
+  });
+
+  await service.createRecommendationRun();
+  const finished = await completed;
+
+  assert.equal(finished.status, "failed");
+  assert.equal(finished.stderr, "模型调用失败");
+  assert.equal(finished.exitCode, 2);
+});
+
+test("workflow service marks thrown recommendation commands as failed", async () => {
+  const promptPath = await writePrompt("recommendation-throw");
+  const service = createWorkflowService({
+    tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks"),
+    recommendationPromptPath: promptPath,
+    runRecommendationCommand: () => {
+      throw new Error("命令启动失败");
+    },
+  });
+
+  const completed = new Promise((resolve) => {
+    service.onEvent((event) => {
+      if (event.type === "recommendation-run-changed" && event.run.status === "failed") {
+        resolve(event.run);
+      }
+    });
+  });
+
+  const running = await service.createRecommendationRun();
+  const finished = await completed;
+
+  assert.equal(running.status, "running");
+  assert.equal(finished.status, "failed");
+  assert.equal(finished.error, "命令启动失败");
+});
+
+test("POST /api/recommendation-runs starts a run and latest returns the snapshot", async (t) => {
+  const latestRun = {
+    id: "recommendation-run-test",
+    status: "running",
+    startedAt: "2026-05-16T00:00:00.000Z",
+    finishedAt: null,
+    command: "opencode",
+    args: ["run"],
+    stdout: "",
+    stderr: "",
+    exitCode: null,
+    error: null,
+  };
+  const workflowService = {
+    async createRecommendationRun() {
+      return latestRun;
+    },
+    getLatestRecommendationRun() {
+      return latestRun;
+    },
+    onEvent() {
+      return () => {};
+    },
+  };
+  const server = createApp({ workflowService });
+  server.listen(0);
+  t.after(() => server.close());
+  await once(server, "listening");
+
+  const baseUrl = `http://localhost:${server.address().port}`;
+  const createResponse = await fetch(`${baseUrl}/api/recommendation-runs`, { method: "POST" });
+  const createPayload = await createResponse.json();
+  const latestResponse = await fetch(`${baseUrl}/api/recommendation-runs/latest`);
+  const latestPayload = await latestResponse.json();
+
+  assert.equal(createResponse.status, 201);
+  assert.equal(createPayload.recommendationRun.status, "running");
+  assert.equal(latestResponse.status, 200);
+  assert.equal(latestPayload.recommendationRun.id, "recommendation-run-test");
+});

@@ -12,11 +12,19 @@ const parseStatus = document.querySelector("#parseStatus");
 const validationResult = document.querySelector("#validationResult");
 const validationStatus = document.querySelector("#validationStatus");
 const refreshButton = document.querySelector("#refreshButton");
+const recommendationStatus = document.querySelector("#recommendationStatus");
+const recommendationResult = document.querySelector("#recommendationResult");
+const runRecommendationButton = document.querySelector("#runRecommendationButton");
 
 let tasks = [];
 let poolEntries = [];
 let runtime = null;
+let recommendationRun = null;
 let selectedFileName = null;
+
+function stripAnsi(text) {
+  return String(text ?? "").replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
+}
 
 function renderList() {
   taskCount.textContent = `${tasks.length} 个文件`;
@@ -135,6 +143,39 @@ function renderRuntime() {
   }
 }
 
+function renderRecommendationRun() {
+  recommendationResult.replaceChildren();
+  runRecommendationButton.disabled = recommendationRun?.status === "running";
+
+  if (!recommendationRun) {
+    recommendationStatus.textContent = "未运行";
+    recommendationResult.textContent = "尚未触发推荐器。";
+    return;
+  }
+
+  recommendationStatus.textContent = recommendationRun.status;
+  const summary = document.createElement("div");
+  summary.className = `recommendation-summary ${recommendationRun.status}`;
+  summary.textContent =
+    recommendationRun.status === "running"
+      ? "探针正在运行..."
+      : `exitCode: ${String(recommendationRun.exitCode)}`;
+
+  const meta = document.createElement("div");
+  meta.className = "recommendation-meta";
+  meta.textContent = `${recommendationRun.command} ${recommendationRun.args?.join(" ") ?? ""}`;
+
+  const output = document.createElement("pre");
+  output.className = "recommendation-output";
+  const chunks = [];
+  if (recommendationRun.stdout) chunks.push(`stdout\n${stripAnsi(recommendationRun.stdout)}`);
+  if (recommendationRun.stderr) chunks.push(`stderr\n${stripAnsi(recommendationRun.stderr)}`);
+  if (recommendationRun.error) chunks.push(`error\n${stripAnsi(recommendationRun.error)}`);
+  output.textContent = chunks.join("\n\n") || "等待输出...";
+
+  recommendationResult.append(summary, meta, output);
+}
+
 function selectTask(fileName) {
   selectedFileName = fileName;
   const task = tasks.find((item) => item.fileName === fileName);
@@ -235,8 +276,35 @@ async function loadTasks() {
   }
 }
 
+async function loadRecommendationRun() {
+  const response = await fetch("/api/recommendation-runs/latest");
+  if (!response.ok) {
+    throw new Error(`读取推荐器失败：${response.status}`);
+  }
+  const payload = await response.json();
+  recommendationRun = payload.recommendationRun ?? null;
+  renderRecommendationRun();
+}
+
+async function createRecommendationRun() {
+  runRecommendationButton.disabled = true;
+  recommendationStatus.textContent = "启动中";
+  recommendationResult.textContent = "正在启动推荐器...";
+  const response = await fetch("/api/recommendation-runs", { method: "POST" });
+  if (!response.ok) {
+    throw new Error(`启动推荐器失败：${response.status}`);
+  }
+  const payload = await response.json();
+  recommendationRun = payload.recommendationRun ?? null;
+  renderRecommendationRun();
+}
+
 refreshButton.addEventListener("click", () => {
-  loadTasks().catch(showError);
+  Promise.all([loadTasks(), loadRecommendationRun()]).catch(showError);
+});
+
+runRecommendationButton.addEventListener("click", () => {
+  createRecommendationRun().catch(showError);
 });
 
 function connectWorkflowEvents() {
@@ -244,6 +312,9 @@ function connectWorkflowEvents() {
   const events = new EventSource("/api/events");
   events.addEventListener("tasks-changed", () => {
     loadTasks().catch(showError);
+  });
+  events.addEventListener("recommendation-run-changed", () => {
+    loadRecommendationRun().catch(showError);
   });
 }
 
@@ -257,7 +328,10 @@ function showError(error) {
   parseStatus.textContent = "失败";
   validationStatus.textContent = "失败";
   runtimeStatus.textContent = "失败";
+  recommendationStatus.textContent = "失败";
+  recommendationResult.textContent = error.message;
+  runRecommendationButton.disabled = false;
 }
 
-loadTasks().catch(showError);
+Promise.all([loadTasks(), loadRecommendationRun()]).catch(showError);
 connectWorkflowEvents();
