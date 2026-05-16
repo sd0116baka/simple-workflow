@@ -120,7 +120,7 @@ test("POST /api/recommendation-runs starts a run and latest returns the snapshot
     startedAt: "2026-05-16T00:00:00.000Z",
     finishedAt: null,
     command: "opencode",
-    args: ["run"],
+    args: ["run", "--format", "json"],
     stdout: "",
     stderr: "",
     exitCode: null,

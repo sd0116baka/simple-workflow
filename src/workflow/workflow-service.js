@@ -2,7 +2,7 @@ import { watch } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { getRepositoryStatus as readRepositoryStatus } from "./repository-status.js";
-import { runOpencodeRecommendation } from "./recommendation-runner.js";
+import { OPENCODE_RECOMMENDATION_ARGS, runOpencodeRecommendation } from "./recommendation-runner.js";
 import { evaluateRuntime } from "./runtime-scheduler.js";
 import { buildTaskPool } from "./task-pool.js";
 import { listRawTasks } from "./task-source.js";
@@ -92,7 +92,7 @@ export function createWorkflowService({
         startedAt: new Date().toISOString(),
         finishedAt: null,
         command: "opencode",
-        args: ["run"],
+        args: OPENCODE_RECOMMENDATION_ARGS,
         stdout: "",
         stderr: "",
         exitCode: null,

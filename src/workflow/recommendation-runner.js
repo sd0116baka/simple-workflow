@@ -1,9 +1,32 @@
 import { spawn } from "node:child_process";
 
+export const OPENCODE_RECOMMENDATION_ARGS = ["run", "--format", "json"];
+
+export function extractTextFromJsonEvents(output) {
+  const lines = String(output ?? "")
+    .split(/\r?\n/)
+    .filter((line) => line.trim().length > 0);
+  const textParts = [];
+
+  for (const line of lines) {
+    let event;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      return output;
+    }
+    if (event?.type === "text" && typeof event.part?.text === "string") {
+      textParts.push(event.part.text);
+    }
+  }
+
+  return textParts.length > 0 ? textParts.join("\n") : output;
+}
+
 export function runOpencodeRecommendation({
   prompt,
   command = "opencode",
-  args = ["run"],
+  args = OPENCODE_RECOMMENDATION_ARGS,
   cwd = process.cwd(),
   env = process.env,
 } = {}) {
@@ -36,7 +59,7 @@ export function runOpencodeRecommendation({
 
     child.on("error", (error) => {
       finish({
-        stdout,
+        stdout: extractTextFromJsonEvents(stdout),
         stderr,
         exitCode: null,
         error: error.message,
@@ -45,7 +68,7 @@ export function runOpencodeRecommendation({
 
     child.on("close", (exitCode) => {
       finish({
-        stdout,
+        stdout: extractTextFromJsonEvents(stdout),
         stderr,
         exitCode,
         error: null,
