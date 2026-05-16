@@ -1,0 +1,11 @@
+id: task-004
+title: 任务池状态模型
+type: design
+priority: normal
+description: |
+  设计任务进入任务池后的状态集合，
+  包括 raw、parsed、blocked、ready 等早期状态。
+acceptance:
+  - 定义最小状态集合
+  - 说明每个状态的进入条件
+  - 说明状态变化时需要追加到上下文包的记录

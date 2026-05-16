@@ -1,5 +1,9 @@
 const taskList = document.querySelector("#taskList");
 const taskCount = document.querySelector("#taskCount");
+const taskPool = document.querySelector("#taskPool");
+const poolCount = document.querySelector("#poolCount");
+const runtimePanel = document.querySelector("#runtimePanel");
+const runtimeStatus = document.querySelector("#runtimeStatus");
 const selectedTitle = document.querySelector("#selectedTitle");
 const selectedMeta = document.querySelector("#selectedMeta");
 const rawText = document.querySelector("#rawText");
@@ -10,6 +14,8 @@ const validationStatus = document.querySelector("#validationStatus");
 const refreshButton = document.querySelector("#refreshButton");
 
 let tasks = [];
+let poolEntries = [];
+let runtime = null;
 let selectedFileName = null;
 
 function renderList() {
@@ -36,6 +42,96 @@ function renderList() {
     button.querySelector(".task-format").textContent = task.format;
     button.addEventListener("click", () => selectTask(task.fileName));
     taskList.append(button);
+  }
+}
+
+function renderTaskPool() {
+  poolCount.textContent = `${poolEntries.length} 个条目`;
+  taskPool.replaceChildren();
+
+  if (poolEntries.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "还没有解析成功的任务进入任务池。";
+    taskPool.append(empty);
+    return;
+  }
+
+  for (const entry of poolEntries) {
+    const item = document.createElement("div");
+    item.className = `pool-item ${entry.status}`;
+    item.innerHTML = `
+      <span class="pool-title"></span>
+      <span class="pool-meta"></span>
+      <span class="pool-status"></span>
+    `;
+    item.querySelector(".pool-title").textContent = entry.title || entry.id;
+    item.querySelector(".pool-meta").textContent = `${entry.sourceFile} · ${entry.type || "unknown"}`;
+    item.querySelector(".pool-status").textContent = entry.status;
+    taskPool.append(item);
+  }
+}
+
+function renderRuntime() {
+  runtimePanel.replaceChildren();
+  if (!runtime) {
+    runtimeStatus.textContent = "未载入";
+    runtimePanel.textContent = "未返回运行时状态。";
+    return;
+  }
+
+  runtimeStatus.textContent = runtime.status;
+  const summary = document.createElement("div");
+  summary.className = `runtime-summary ${runtime.status}`;
+  summary.textContent = runtime.canStartNewTask
+    ? "当前可以启动新任务。"
+    : "当前不能启动新任务。";
+
+  const canStart = document.createElement("div");
+  canStart.className = "runtime-metric";
+  canStart.innerHTML = "<span>canStartNewTask</span><strong></strong>";
+  canStart.querySelector("strong").textContent = String(runtime.canStartNewTask);
+
+  const runnableCount = document.createElement("div");
+  runnableCount.className = "runtime-metric";
+  runnableCount.innerHTML = "<span>runnableTasks</span><strong></strong>";
+  runnableCount.querySelector("strong").textContent = String(runtime.runnableTasks?.length ?? 0);
+
+  const repositoryStatus = runtime.repositoryStatus ?? { clean: false, entries: [] };
+  const gitStatus = document.createElement("div");
+  gitStatus.className = "runtime-metric";
+  gitStatus.innerHTML = "<span>git</span><strong></strong>";
+  gitStatus.querySelector("strong").textContent = repositoryStatus.clean ? "clean" : "dirty";
+
+  const gitChanges = document.createElement("div");
+  gitChanges.className = "runtime-metric";
+  gitChanges.innerHTML = "<span>git changes</span><strong></strong>";
+  gitChanges.querySelector("strong").textContent = String(repositoryStatus.entries?.length ?? 0);
+
+  runtimePanel.append(summary, canStart, runnableCount, gitStatus, gitChanges);
+
+  const reasons = runtime.blockingReasons ?? [];
+  if (reasons.length > 0) {
+    const list = document.createElement("ul");
+    list.className = "runtime-list";
+    for (const reason of reasons) {
+      const item = document.createElement("li");
+      item.textContent = reason;
+      list.append(item);
+    }
+    runtimePanel.append(list);
+  }
+
+  const repositoryEntries = repositoryStatus.entries ?? [];
+  if (repositoryEntries.length > 0) {
+    const list = document.createElement("ul");
+    list.className = "runtime-list git-list";
+    for (const entry of repositoryEntries.slice(0, 6)) {
+      const item = document.createElement("li");
+      item.textContent = `${entry.code} ${entry.path}`;
+      list.append(item);
+    }
+    runtimePanel.append(list);
   }
 }
 
@@ -95,18 +191,36 @@ async function loadTasks() {
   validationResult.textContent = "正在读取 tasks/ ...";
   parseStatus.textContent = "等待载入";
   validationStatus.textContent = "等待载入";
-  const response = await fetch("/api/tasks");
-  if (!response.ok) {
-    throw new Error(`读取失败：${response.status}`);
+  runtimePanel.textContent = "正在读取运行时状态...";
+  runtimeStatus.textContent = "等待载入";
+  const [tasksResponse, poolResponse, runtimeResponse] = await Promise.all([
+    fetch("/api/tasks"),
+    fetch("/api/task-pool"),
+    fetch("/api/runtime"),
+  ]);
+  if (!tasksResponse.ok) {
+    throw new Error(`读取任务失败：${tasksResponse.status}`);
+  }
+  if (!poolResponse.ok) {
+    throw new Error(`读取任务池失败：${poolResponse.status}`);
+  }
+  if (!runtimeResponse.ok) {
+    throw new Error(`读取运行时失败：${runtimeResponse.status}`);
   }
 
-  const payload = await response.json();
-  tasks = payload.tasks ?? [];
+  const tasksPayload = await tasksResponse.json();
+  const poolPayload = await poolResponse.json();
+  const runtimePayload = await runtimeResponse.json();
+  tasks = tasksPayload.tasks ?? [];
+  poolEntries = poolPayload.taskPool?.entries ?? [];
+  runtime = runtimePayload.runtimeStatus ?? null;
   selectedFileName = tasks.some((task) => task.fileName === selectedFileName)
     ? selectedFileName
     : tasks[0]?.fileName ?? null;
 
   renderList();
+  renderTaskPool();
+  renderRuntime();
 
   if (selectedFileName) {
     selectTask(selectedFileName);
@@ -139,8 +253,10 @@ function showError(error) {
   rawText.textContent = error.message;
   parsedText.textContent = "";
   validationResult.textContent = "";
+  runtimePanel.textContent = "";
   parseStatus.textContent = "失败";
   validationStatus.textContent = "失败";
+  runtimeStatus.textContent = "失败";
 }
 
 loadTasks().catch(showError);

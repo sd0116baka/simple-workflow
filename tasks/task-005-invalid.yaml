@@ -1,0 +1,6 @@
+id: task-005-invalid
+type: feature
+priority: low
+description: |
+  这是一个故意不完整的示例任务，用来观察校验失败状态。
+acceptance: []

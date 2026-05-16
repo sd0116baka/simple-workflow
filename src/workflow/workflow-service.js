@@ -1,6 +1,9 @@
 import { watch } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { extname } from "node:path";
+import { getRepositoryStatus as readRepositoryStatus } from "./repository-status.js";
+import { evaluateRuntime } from "./runtime-scheduler.js";
+import { buildTaskPool } from "./task-pool.js";
 import { listRawTasks } from "./task-source.js";
 
 const TASK_EXTENSIONS = new Set([".yaml", ".yml"]);
@@ -9,7 +12,12 @@ function isTaskFile(fileName) {
   return fileName && TASK_EXTENSIONS.has(extname(String(fileName)).toLowerCase());
 }
 
-export function createWorkflowService({ tasksDir, watchDebounceMs = 100 }) {
+export function createWorkflowService({
+  tasksDir,
+  repositoryDir = process.cwd(),
+  getRepositoryStatus = () => readRepositoryStatus({ cwd: repositoryDir }),
+  watchDebounceMs = 100,
+}) {
   const listeners = new Set();
   let watcher = null;
   let debounceTimer = null;
@@ -23,6 +31,14 @@ export function createWorkflowService({ tasksDir, watchDebounceMs = 100 }) {
   return {
     listTasks() {
       return listRawTasks(tasksDir);
+    },
+
+    async listTaskPool() {
+      return buildTaskPool(await listRawTasks(tasksDir));
+    },
+
+    async getRuntimeStatus() {
+      return evaluateRuntime(await this.listTaskPool(), await getRepositoryStatus());
     },
 
     onEvent(listener) {

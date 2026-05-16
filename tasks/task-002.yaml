@@ -1,0 +1,11 @@
+id: task-002
+title: 显示解析结果
+type: feature
+priority: normal
+description: |
+  在任务详情中展示 YAML 解析后的结构化对象，
+  帮助观察任务真源如何变成后续流程可消费的数据。
+acceptance:
+  - 选择任务后能看到解析结果面板
+  - 解析结果使用格式化 JSON 展示
+  - YAML 解析失败时显示错误信息

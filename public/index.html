@@ -17,11 +17,27 @@
 
     <main class="layout">
       <aside class="task-list-panel" aria-label="任务文件列表">
-        <div class="panel-heading">
-          <h2>tasks/</h2>
-          <span id="taskCount">0 个文件</span>
+        <div class="sidebar-section">
+          <div class="panel-heading">
+            <h2>tasks/</h2>
+            <span id="taskCount">0 个文件</span>
+          </div>
+          <div id="taskList" class="task-list"></div>
         </div>
-        <div id="taskList" class="task-list"></div>
+        <div class="sidebar-section pool-section">
+          <div class="panel-heading">
+            <h2>任务池</h2>
+            <span id="poolCount">0 个条目</span>
+          </div>
+          <div id="taskPool" class="pool-list"></div>
+        </div>
+        <div class="sidebar-section runtime-section">
+          <div class="panel-heading">
+            <h2>运行时</h2>
+            <span id="runtimeStatus">等待载入</span>
+          </div>
+          <div id="runtimePanel" class="runtime-panel">等待载入...</div>
+        </div>
       </aside>
 
       <section class="raw-panel" aria-label="任务详情">

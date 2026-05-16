@@ -23,6 +23,59 @@ test("workflow service lists task source files with raw text and parsed data", a
   assert.equal(tasks[0].validation.status, "invalid");
 });
 
+test("workflow service exposes a task pool built from parsed tasks", async () => {
+  const tasksDir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "pool");
+  await mkdir(tasksDir, { recursive: true });
+  await writeFile(
+    join(tasksDir, "task.yaml"),
+    [
+      "id: task-pool",
+      "title: 任务池",
+      "type: feature",
+      "description: 容纳解析后的任务",
+      "acceptance:",
+      "  - 池内能看到该任务",
+      "",
+    ].join("\n"),
+  );
+
+  const service = createWorkflowService({ tasksDir });
+  const pool = await service.listTaskPool();
+
+  assert.equal(pool.entries.length, 1);
+  assert.equal(pool.entries[0].id, "task-pool");
+  assert.equal(pool.entries[0].sourceFile, "task.yaml");
+  assert.equal(pool.entries[0].status, "ready");
+});
+
+test("workflow service exposes runtime status from the task pool", async () => {
+  const tasksDir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "runtime");
+  await mkdir(tasksDir, { recursive: true });
+  await writeFile(
+    join(tasksDir, "task.yaml"),
+    [
+      "id: task-runtime",
+      "title: 运行时调度器",
+      "type: feature",
+      "description: 计算 ready 任务",
+      "acceptance:",
+      "  - 可以看到 runnableTasks",
+      "",
+    ].join("\n"),
+  );
+
+  const service = createWorkflowService({
+    tasksDir,
+    getRepositoryStatus: async () => ({ clean: true, entries: [] }),
+  });
+  const runtime = await service.getRuntimeStatus();
+
+  assert.equal(runtime.status, "idle");
+  assert.equal(runtime.canStartNewTask, true);
+  assert.deepEqual(runtime.runnableTasks.map((task) => task.id), ["task-runtime"]);
+  assert.equal(runtime.repositoryStatus.clean, true);
+});
+
 test("workflow service emits tasks-changed when a YAML task file changes", async (t) => {
   const tasksDir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "events");
   await mkdir(tasksDir, { recursive: true });

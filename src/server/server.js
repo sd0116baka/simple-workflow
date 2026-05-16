@@ -78,6 +78,16 @@ export function createApp({
         return;
       }
 
+      if (request.url?.startsWith("/api/task-pool")) {
+        sendJson(response, 200, { taskPool: await workflowService.listTaskPool() });
+        return;
+      }
+
+      if (request.url?.startsWith("/api/runtime")) {
+        sendJson(response, 200, { runtimeStatus: await workflowService.getRuntimeStatus() });
+        return;
+      }
+
       if (request.url?.startsWith("/api/tasks")) {
         sendJson(response, 200, { tasks: await workflowService.listTasks() });
         return;
