@@ -98,6 +98,18 @@ h2 {
   background: #ffffff;
 }
 
+.workflow-debug-panel {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.workflow-debug-panel > .panel-heading {
+  padding: 0 0 14px;
+  border-bottom: 0;
+  background: transparent;
+}
+
 .task-list-panel {
   display: flex;
   flex-direction: column;
