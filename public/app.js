@@ -50,6 +50,17 @@ function formatProgress(progress) {
     .join("\n");
 }
 
+function formatElapsed(startedAt, finishedAt = null) {
+  if (!startedAt) return "--:--";
+  const start = new Date(startedAt).getTime();
+  const end = finishedAt ? new Date(finishedAt).getTime() : Date.now();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return "--:--";
+  const totalSeconds = Math.floor((end - start) / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 function createIntentPanel(intent) {
   const panel = document.createElement("div");
   panel.className = "recommendation-intent";
@@ -404,10 +415,10 @@ function renderRecommendationRun() {
   summary.className = `recommendation-summary ${recommendationRun.status}`;
   summary.textContent =
     recommendationRun.status === "running"
-      ? "探针正在运行..."
+      ? `探针正在运行... ${formatElapsed(recommendationRun.startedAt)}`
       : recommendationRun.status === "blocked"
         ? "启动检查未通过，推荐器未运行。"
-      : `exitCode: ${String(recommendationRun.exitCode)}`;
+      : `exitCode: ${String(recommendationRun.exitCode)} · 用时 ${formatElapsed(recommendationRun.startedAt, recommendationRun.finishedAt)}`;
 
   const meta = document.createElement("div");
   meta.className = "recommendation-meta";
@@ -613,3 +624,8 @@ function showError(error) {
 
 Promise.all([loadTasks(), loadRecommendationRun()]).catch(showError);
 connectWorkflowEvents();
+setInterval(() => {
+  if (recommendationRun?.status === "running") {
+    renderRecommendationRun();
+  }
+}, 1000);
