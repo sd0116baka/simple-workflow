@@ -56,22 +56,22 @@ function createIntentPanel(intent) {
 
   const title = document.createElement("div");
   title.className = "recommendation-intent-title";
-  title.textContent = intent.recommendedTask.title || intent.recommendedTask.id;
+  title.textContent = intent.recommendedPackageId;
 
   const meta = document.createElement("div");
   meta.className = "recommendation-intent-meta";
-  meta.textContent = `${intent.recommendedTask.id} · 任务优先级：${intent.recommendedTask.priority} · 推荐置信度：${intent.confidence}`;
+  meta.textContent = `推荐置信度：${intent.confidence}`;
 
-  const nextAction = document.createElement("div");
-  nextAction.className = "recommendation-intent-next";
-  nextAction.textContent = intent.nextAction;
+  const goal = document.createElement("div");
+  goal.className = "recommendation-intent-next";
+  goal.textContent = intent.executionBrief?.goalInterpretation ?? "";
 
-  panel.append(title, meta, nextAction);
+  panel.append(title, meta, goal);
 
-  if (intent.rationale?.length > 0) {
+  if (intent.selectionReasoning?.length > 0) {
     const list = document.createElement("ul");
     list.className = "recommendation-intent-list";
-    for (const reason of intent.rationale) {
+    for (const reason of intent.selectionReasoning) {
       const item = document.createElement("li");
       item.textContent = reason;
       list.append(item);
@@ -79,11 +79,11 @@ function createIntentPanel(intent) {
     panel.append(list);
   }
 
-  if (intent.observedTasks?.length > 0) {
+  if (intent.candidateComparison?.length > 0) {
     const observed = document.createElement("div");
     observed.className = "recommendation-observed";
-    observed.textContent = `observedTasks: ${intent.observedTasks
-      .map((task) => `${task.id}:${task.priority}${task.status ? `:${task.status}` : ""}`)
+    observed.textContent = `candidateComparison: ${intent.candidateComparison
+      .map((item) => `${item.packageId}:${item.decision}`)
       .join(", ")}`;
     panel.append(observed);
   }
@@ -168,7 +168,7 @@ function createTaskContextPackagePanel(taskContextPackage) {
       item.innerHTML = "<strong></strong><span></span><em></em>";
       item.querySelector("strong").textContent = artifactType;
       item.querySelector("span").textContent = artifact.authorizedAt ?? artifact.rejectedAt ?? artifact.requestedAt ?? "已追加";
-      item.querySelector("em").textContent = artifact.reason ?? artifact.nextAction ?? "";
+      item.querySelector("em").textContent = artifact.reason ?? artifact.executionBrief?.goalInterpretation ?? "";
       list.append(item);
     }
     panel.append(list);
@@ -349,10 +349,10 @@ function renderRecommendationRun() {
     { label: "prompt", value: "project_profiles/recommender-agent.prompt.md" },
     { label: "命令", value: "opencode run --format json" },
     { label: "工作目录", value: "仓库根目录" },
-    { label: "读取范围", value: "启动检查通过后注入的 candidateTasks + repoStatus" },
+    { label: "读取范围", value: "启动检查通过后注入的 candidateTasks" },
   ]);
   renderInputs(admissionInputs, [
-    { label: "执行意图", value: recommendationRun?.executionIntent ? recommendationRun.executionIntent.recommendedTask.id : "未生成" },
+    { label: "执行意图", value: recommendationRun?.executionIntent ? recommendationRun.executionIntent.recommendedPackageId : "未生成" },
     { label: "任务池", value: `${poolEntries.length} 个条目` },
     { label: "启动检查", value: startupCheck ? String(startupCheck.canStartWork) : "未载入" },
   ]);

@@ -3,39 +3,33 @@ import assert from "node:assert/strict";
 import { parseRecommendationIntent } from "../src/workflow/recommendation-intent.js";
 
 const validIntent = {
-  schemaVersion: 1,
-  recommendedTask: {
-    id: "task-003",
-    sourceFile: "tasks/task-003.yaml",
-    title: "监听任务文件变化",
-    priority: "high",
-  },
+  recommendedPackageId: "task-context-package:tasks/task-003.yaml",
   confidence: "high",
-  rationale: ["优先级最高"],
-  repoStatus: {
-    clean: true,
-    changedFiles: [],
-  },
-  observedTasks: [
+  selectionReasoning: ["优先级最高"],
+  candidateComparison: [
     {
-      id: "task-003",
-      sourceFile: "tasks/task-003.yaml",
-      title: "监听任务文件变化",
-      priority: "high",
-      status: "unspecified",
+      packageId: "task-context-package:tasks/task-003.yaml",
+      decision: "selected",
+      reason: "优先级最高",
     },
   ],
-  nextAction: "优先实现 task-003。",
+  executionBrief: {
+    goalInterpretation: "监听 tasks 目录变化",
+    expectedOutcome: ["界面自动刷新"],
+    implementationHints: ["检查 /api/events"],
+    riskSignals: ["文件事件可能重复触发"],
+    openQuestions: [],
+  },
 };
 
 test("parses a fenced recommendation intent", () => {
   const result = parseRecommendationIntent(`\`\`\`json\n${JSON.stringify(validIntent)}\n\`\`\``);
 
   assert.equal(result.error, null);
-  assert.equal(result.intent.recommendedTask.id, "task-003");
+  assert.equal(result.intent.recommendedPackageId, "task-context-package:tasks/task-003.yaml");
   assert.equal(result.intent.confidence, "high");
-  assert.equal(result.intent.repoStatus.clean, true);
-  assert.equal(result.intent.observedTasks[0].status, "unspecified");
+  assert.equal(result.intent.candidateComparison[0].decision, "selected");
+  assert.equal(result.intent.executionBrief.openQuestions.length, 0);
 });
 
 test("returns an error for invalid recommendation intent JSON", () => {
@@ -46,8 +40,8 @@ test("returns an error for invalid recommendation intent JSON", () => {
 });
 
 test("returns an error when required fields are missing", () => {
-  const result = parseRecommendationIntent(JSON.stringify({ ...validIntent, recommendedTask: null }));
+  const result = parseRecommendationIntent(JSON.stringify({ ...validIntent, recommendedPackageId: null }));
 
   assert.equal(result.intent, null);
-  assert.match(result.error, /recommendedTask/);
+  assert.match(result.error, /recommendedPackageId/);
 });

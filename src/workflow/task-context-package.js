@@ -38,11 +38,11 @@ function toQualityGate(task) {
 function toExecutionIntentArtifact(executionIntent, packageId) {
   return executionIntent
     ? {
-        recommendedPackageId: packageId,
-        recommendedTask: { ...executionIntent.recommendedTask },
+        recommendedPackageId: executionIntent.recommendedPackageId ?? packageId,
         confidence: executionIntent.confidence,
-        rationale: [...(executionIntent.rationale ?? [])],
-        nextAction: executionIntent.nextAction,
+        selectionReasoning: [...(executionIntent.selectionReasoning ?? [])],
+        candidateComparison: clone(executionIntent.candidateComparison ?? []),
+        executionBrief: clone(executionIntent.executionBrief),
       }
     : null;
 }
@@ -57,20 +57,12 @@ export function buildTaskContextPackage({
   executionIntent,
   appendRequest,
 } = {}) {
-  const taskId =
-    executionIntent?.recommendedTask?.id ??
-    appendRequest?.packageId?.replace(/^task-context-package:tasks\//, "").replace(/\.ya?ml$/, "") ??
-    null;
-  if (!taskId) return null;
-
-  const task = taskPool?.entries?.find((entry) => entry.id === taskId) ?? null;
   const packageId =
-    task?.packageId ??
+    executionIntent?.recommendedPackageId ??
     appendRequest?.packageId ??
-    (executionIntent?.recommendedTask?.sourceFile
-      ? `task-context-package:${executionIntent.recommendedTask.sourceFile}`
-      : null);
+    null;
   if (!packageId) return null;
+  const task = taskPool?.entries?.find((entry) => entry.packageId === packageId) ?? null;
 
   const artifacts = {};
   const executionIntentArtifact = toExecutionIntentArtifact(executionIntent, packageId);
@@ -80,7 +72,6 @@ export function buildTaskContextPackage({
   applyAppendRequest(artifacts, appendRequest);
 
   return {
-    schemaVersion: 1,
     packageId,
     currentWorkStage: appendRequest ? "execution-admission" : "task-recommender",
     source: {

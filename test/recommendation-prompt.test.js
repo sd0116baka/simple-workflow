@@ -8,29 +8,22 @@ test("recommendation prompt injects only task pool candidates", () => {
     candidateTasks: [
       {
         packageId: "task-context-package:tasks/task-003.yaml",
-        id: "task-003",
-        title: "监听任务文件变化",
-        type: "feature",
-        priority: "high",
-        sourceFile: "task-003.yaml",
-      },
-    ],
-    startupCheck: {
-      canStartWork: true,
-      findings: [],
-      runtimeSnapshot: {
-        activeWork: null,
-        worktree: {
-          clean: true,
-          changedFiles: [],
+        taskDraft: {
+          id: "task-003",
+          name: "监听任务文件变化",
+          kind: "feature",
+          priority: "high",
+          goal: "监听 tasks 目录变化",
+          acceptanceCriteria: ["修改任务源文件后界面自动刷新"],
+          maxIterations: "default",
         },
       },
-    },
+    ],
   });
 
   assert.match(prompt, /candidateTasks/);
   assert.match(prompt, /task-003/);
   assert.doesNotMatch(prompt, /task-005-invalid/);
   assert.match(prompt, /只能使用这段 JSON 中的 candidateTasks/);
-  assert.match(prompt, /canStartWork/);
+  assert.doesNotMatch(prompt, /canStartWork/);
 });

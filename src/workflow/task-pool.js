@@ -1,3 +1,17 @@
+function toTaskDraft(entry) {
+  return {
+    id: entry.parsed?.id ?? entry.id,
+    name: entry.parsed?.title ?? entry.title,
+    kind: entry.parsed?.type ?? "default",
+    priority: entry.parsed?.priority ?? "default",
+    goal: entry.parsed?.description ?? "default",
+    acceptanceCriteria: Array.isArray(entry.parsed?.acceptance)
+      ? [...entry.parsed.acceptance]
+      : "default",
+    maxIterations: "default",
+  };
+}
+
 export function buildTaskPool(tasks) {
   const entries = tasks
     .filter((task) => task.parseError === null && task.parsed)
@@ -20,11 +34,7 @@ export function buildTaskPool(tasks) {
         .filter((entry) => entry.status === "ready")
         .map((entry) => ({
           packageId: entry.packageId,
-          id: entry.id,
-          title: entry.title,
-          type: entry.type,
-          priority: entry.priority,
-          sourceFile: entry.sourceFile,
+          taskDraft: toTaskDraft(entry),
         })),
       needsAttention: entries
         .filter((entry) => entry.status !== "ready")

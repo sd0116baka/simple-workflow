@@ -26,15 +26,23 @@ const taskPool = {
 };
 
 const executionIntent = {
-  recommendedTask: {
-    id: "task-003",
-    sourceFile: "tasks/task-003.yaml",
-    title: "监听任务文件变化",
-    priority: "high",
-  },
+  recommendedPackageId: "task-context-package:tasks/task-003.yaml",
   confidence: "high",
-  rationale: ["唯一 high 优先级任务"],
-  nextAction: "优先实现 task-003。",
+  selectionReasoning: ["唯一 high 优先级任务"],
+  candidateComparison: [
+    {
+      packageId: "task-context-package:tasks/task-003.yaml",
+      decision: "selected",
+      reason: "优先级最高",
+    },
+  ],
+  executionBrief: {
+    goalInterpretation: "监听 tasks 目录变化",
+    expectedOutcome: ["修改任务源文件后界面自动刷新"],
+    implementationHints: ["检查文件监听链路"],
+    riskSignals: ["文件事件可能重复触发"],
+    openQuestions: [],
+  },
 };
 
 test("builds a task context package with execution intent artifact", () => {

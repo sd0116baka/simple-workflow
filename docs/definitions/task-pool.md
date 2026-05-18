@@ -151,6 +151,20 @@ qualityGate
 
 后续工作流环节会向对应任务上下文包追加产物。追加产物的具体结构后续按流程逐步定义。
 
+追加请求负责说明追加目标和产物类型：
+
+```json
+{
+  "appendRequest": {
+    "packageId": "task-context-package:tasks/task-003.yaml",
+    "artifactType": "executionIntent",
+    "artifact": {}
+  }
+}
+```
+
+任务池执行追加后，产物类型由 `artifacts` 的 key 表达，artifact 本体不重复保存 `artifactType`。
+
 ## 派生视图
 
 `views` 是从 `taskContextPackages` 派生出来的视图，不是新的事实来源。

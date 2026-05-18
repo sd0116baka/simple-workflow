@@ -126,9 +126,17 @@
       "executionIntent": {
         "recommendedPackageId": "task-context-package:tasks/task-003.yaml",
         "confidence": "high",
-        "rationale": [
-          "当前候选任务中优先级最高。"
-        ]
+        "selectionReasoning": [
+          "这是当前候选任务中唯一 high 优先级任务。"
+        ],
+        "candidateComparison": [],
+        "executionBrief": {
+          "goalInterpretation": "让任务真源变化能自动推动界面和任务池刷新。",
+          "expectedOutcome": [],
+          "implementationHints": [],
+          "riskSignals": [],
+          "openQuestions": []
+        }
       }
     }
   },
@@ -242,6 +250,8 @@
 ## 与任务推荐器的边界
 
 任务推荐器只负责在 `canStartWork` 为 `true` 时，从任务池 `candidateTasks` 中选择当前建议执行的任务，并请求追加执行意图。
+
+执行意图本体不包含 `artifactType`。`artifactType` 属于追加请求，由系统包装时提供。
 
 任务推荐器不生成执行授权。
 

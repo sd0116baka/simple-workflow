@@ -73,11 +73,15 @@ test("task pool contains parsed tasks with minimal pool metadata", () => {
       candidateTasks: [
         {
           packageId: "task-context-package:tasks/task-001.yaml",
-          id: "task-001",
-          title: "展示任务真源",
-          type: "feature",
-          priority: "normal",
-          sourceFile: "task-001.yaml",
+          taskDraft: {
+            id: "task-001",
+            name: "展示任务真源",
+            kind: "feature",
+            priority: "normal",
+            goal: "default",
+            acceptanceCriteria: "default",
+            maxIterations: "default",
+          },
         },
       ],
       needsAttention: ["task-context-package:tasks/task-002.yaml"],

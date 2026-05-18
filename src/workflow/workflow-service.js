@@ -52,16 +52,7 @@ export function createWorkflowService({
           startupCheck: run.startupCheck ? JSON.parse(JSON.stringify(run.startupCheck)) : null,
           progress: run.progress.map((entry) => ({ ...entry })),
           executionIntent: run.executionIntent
-            ? {
-                ...run.executionIntent,
-                recommendedTask: { ...run.executionIntent.recommendedTask },
-                rationale: [...run.executionIntent.rationale],
-                repoStatus: {
-                  ...run.executionIntent.repoStatus,
-                  changedFiles: [...run.executionIntent.repoStatus.changedFiles],
-                },
-                observedTasks: run.executionIntent.observedTasks.map((task) => ({ ...task })),
-              }
+            ? JSON.parse(JSON.stringify(run.executionIntent))
             : null,
           executionAdmission: run.executionAdmission
             ? JSON.parse(JSON.stringify(run.executionAdmission))
@@ -187,7 +178,6 @@ export function createWorkflowService({
       const prompt = buildRecommendationPrompt({
         basePrompt,
         candidateTasks: taskPool.views.candidateTasks,
-        startupCheck,
       });
       const run = {
         id: `recommendation-run-${(recommendationRunSequence += 1)}`,
