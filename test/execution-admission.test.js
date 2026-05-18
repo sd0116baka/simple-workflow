@@ -19,8 +19,12 @@ function taskContextPackage(overrides = {}) {
     },
     artifacts: {
       executionIntent: {
-        recommendedPackageId: "task-context-package:tasks/task-001.yaml",
-        confidence: "medium",
+        artifactId: "executionIntent",
+        body: {
+          recommendedPackageId: "task-context-package:tasks/task-001.yaml",
+          confidence: "medium",
+        },
+        appendedAt: "2026-05-18T09:00:00.000Z",
       },
     },
     ...overrides,

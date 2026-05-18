@@ -115,9 +115,9 @@ test("recommendation flow applies module append requests through the task pool",
   assert.equal(completed.status, "succeeded");
   assert.equal(completed.executionIntentAppendRequest.artifactType, "executionIntent");
   assert.equal(completed.executionAdmission.appendRequest.artifactType, "executionAuthorization");
-  assert.equal(completed.taskContextPackage.artifacts.executionIntent.confidence, "high");
+  assert.equal(completed.taskContextPackage.artifacts.executionIntent.body.confidence, "high");
   assert.equal(
-    completed.taskContextPackage.artifacts.executionAuthorization.termination.maxIterations,
+    completed.taskContextPackage.artifacts.executionAuthorization.body.termination.maxIterations,
     3,
   );
 });

@@ -2,6 +2,12 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+const MULTI_ARTIFACT_TYPES = new Set([
+  "executionReport",
+  "reviewReport",
+  "convergenceAdvice",
+]);
+
 function toTaskDraft(entry) {
   return {
     id: entry.parsed?.id ?? entry.id,
@@ -46,7 +52,7 @@ function toTaskContextPackage(entry, existingPackage = null) {
     taskDraft: toTaskDraft(entry),
     qualityGate: toQualityGate(entry),
     artifacts: clone(existingPackage?.artifacts ?? {}),
-    agents: clone(existingPackage?.agents ?? {}),
+    agentRuns: clone(existingPackage?.agentRuns ?? []),
     timeline: clone(existingPackage?.timeline ?? []),
   };
 }
@@ -105,15 +111,98 @@ export function findTaskContextPackage(taskPool, packageId) {
   return taskPool?.taskContextPackages?.find((taskPackage) => taskPackage.packageId === packageId) ?? null;
 }
 
+function artifactRecord({ artifactId, artifact, appendedAt }) {
+  return {
+    artifactId,
+    body: clone(artifact),
+    appendedAt,
+  };
+}
+
+function nextMultiArtifactId(artifacts, artifactType) {
+  const existing = Array.isArray(artifacts?.[artifactType])
+    ? artifacts[artifactType]
+    : [];
+  return `${artifactType}:${String(existing.length + 1).padStart(3, "0")}`;
+}
+
+function appendArtifact(artifacts, appendRequest, appendedAt) {
+  if (!appendRequest.artifactType) return { artifacts, artifactId: null };
+
+  const artifactType = appendRequest.artifactType;
+  const artifactId = MULTI_ARTIFACT_TYPES.has(artifactType)
+    ? nextMultiArtifactId(artifacts, artifactType)
+    : artifactType;
+  const record = artifactRecord({
+    artifactId,
+    artifact: appendRequest.artifact,
+    appendedAt,
+  });
+
+  if (MULTI_ARTIFACT_TYPES.has(artifactType)) {
+    return {
+      artifactId,
+      artifacts: {
+        ...artifacts,
+        [artifactType]: [
+          ...(Array.isArray(artifacts?.[artifactType]) ? artifacts[artifactType] : []),
+          record,
+        ],
+      },
+    };
+  }
+
+  return {
+    artifactId,
+    artifacts: {
+      ...artifacts,
+      [artifactType]: record,
+    },
+  };
+}
+
+function normalizeAgentRun(agentRun, artifactId) {
+  if (!agentRun) return null;
+  return {
+    ...clone(agentRun),
+    outputArtifactRefs: artifactId ? [artifactId] : [],
+  };
+}
+
+function validateAgentRun(agentRun) {
+  for (const field of ["runId", "role", "sessionId", "status", "startedAt", "finishedAt"]) {
+    if (!agentRun[field]) {
+      throw new Error(`appendRequest.agentRun.${field} is required`);
+    }
+  }
+  if (!["main", "execution", "review"].includes(agentRun.role)) {
+    throw new Error("appendRequest.agentRun.role must be main, execution, or review");
+  }
+  if (!Array.isArray(agentRun.inputArtifactRefs)) {
+    throw new Error("appendRequest.agentRun.inputArtifactRefs must be an array");
+  }
+  if (!Array.isArray(agentRun.outputArtifactRefs)) {
+    throw new Error("appendRequest.agentRun.outputArtifactRefs must be an array");
+  }
+}
+
 export function applyAppendRequest(taskPool, appendRequest, { currentWorkStage } = {}) {
   if (!appendRequest?.packageId) {
     throw new Error("appendRequest.packageId is required");
   }
-  if (!appendRequest?.artifactType) {
-    throw new Error("appendRequest.artifactType is required");
+  const hasArtifact = Boolean(appendRequest.artifactType);
+  const hasAgentRun = Boolean(appendRequest.agentRun);
+  if (!hasArtifact && !hasAgentRun) {
+    throw new Error("appendRequest requires artifact or agentRun");
   }
-  if (!appendRequest || typeof appendRequest.artifact !== "object" || appendRequest.artifact === null) {
+  if (hasArtifact && (typeof appendRequest.artifact !== "object" || appendRequest.artifact === null)) {
     throw new Error("appendRequest.artifact must be an object");
+  }
+  if (hasAgentRun && (typeof appendRequest.agentRun !== "object" || appendRequest.agentRun === null)) {
+    throw new Error("appendRequest.agentRun must be an object");
+  }
+  if (hasAgentRun) {
+    validateAgentRun(appendRequest.agentRun);
   }
 
   const target = findTaskContextPackage(taskPool, appendRequest.packageId);
@@ -123,18 +212,29 @@ export function applyAppendRequest(taskPool, appendRequest, { currentWorkStage }
 
   const updatedPackages = taskPool.taskContextPackages.map((taskPackage) => {
     if (taskPackage.packageId !== appendRequest.packageId) return taskPackage;
+    const appendedAt = appendRequest.artifact?.appendedAt
+      ?? appendRequest.agentRun?.finishedAt
+      ?? new Date().toISOString();
+    const { artifacts, artifactId } = appendArtifact(
+      taskPackage.artifacts,
+      appendRequest,
+      appendedAt,
+    );
+    const agentRun = normalizeAgentRun(appendRequest.agentRun, artifactId);
     return {
       ...taskPackage,
       currentWorkStage: currentWorkStage ?? taskPackage.currentWorkStage,
-      artifacts: {
-        ...taskPackage.artifacts,
-        [appendRequest.artifactType]: clone(appendRequest.artifact),
-      },
+      artifacts,
+      agentRuns: agentRun
+        ? [...taskPackage.agentRuns, agentRun]
+        : taskPackage.agentRuns,
       timeline: [
         ...taskPackage.timeline,
         {
-          artifactType: appendRequest.artifactType,
-          appendedAt: appendRequest.artifact.appendedAt ?? new Date().toISOString(),
+          artifactType: appendRequest.artifactType ?? null,
+          artifactId,
+          agentRunId: agentRun?.runId ?? null,
+          appendedAt,
         },
       ],
     };

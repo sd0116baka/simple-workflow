@@ -39,6 +39,10 @@ function buildAppendRequest(packageId, artifactType, artifact) {
   };
 }
 
+function artifactBody(record) {
+  return record?.body ?? null;
+}
+
 function findDefault(defaults, fieldName) {
   return Object.prototype.hasOwnProperty.call(defaults, fieldName)
     ? defaults[fieldName]
@@ -118,7 +122,7 @@ export function evaluateExecutionAdmission({
     });
   }
 
-  const executionIntent = taskContextPackage.artifacts?.executionIntent ?? null;
+  const executionIntent = artifactBody(taskContextPackage.artifacts?.executionIntent);
   if (!executionIntent) {
     findings.push(
       blockingFinding(

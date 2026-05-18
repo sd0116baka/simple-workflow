@@ -125,6 +125,11 @@ function createAdmissionPanel(admission) {
   return panel;
 }
 
+function artifactRecords(artifactValue) {
+  if (Array.isArray(artifactValue)) return artifactValue;
+  return artifactValue ? [artifactValue] : [];
+}
+
 function createTaskContextPackagePanel(taskContextPackage) {
   const panel = document.createElement("div");
   panel.className = `context-package ${taskContextPackage.currentWorkStage}`;
@@ -163,13 +168,16 @@ function createTaskContextPackagePanel(taskContextPackage) {
   if (artifactEntries.length > 0) {
     const list = document.createElement("ul");
     list.className = "context-package-records";
-    for (const [artifactType, artifact] of artifactEntries) {
-      const item = document.createElement("li");
-      item.innerHTML = "<strong></strong><span></span><em></em>";
-      item.querySelector("strong").textContent = artifactType;
-      item.querySelector("span").textContent = artifact.authorizedAt ?? artifact.rejectedAt ?? artifact.requestedAt ?? "已追加";
-      item.querySelector("em").textContent = artifact.reason ?? artifact.executionBrief?.goalInterpretation ?? "";
-      list.append(item);
+    for (const [artifactType, artifactValue] of artifactEntries) {
+      for (const artifact of artifactRecords(artifactValue)) {
+        const body = artifact.body ?? {};
+        const item = document.createElement("li");
+        item.innerHTML = "<strong></strong><span></span><em></em>";
+        item.querySelector("strong").textContent = artifact.artifactId ?? artifactType;
+        item.querySelector("span").textContent = body.authorizedAt ?? body.rejectedAt ?? body.requestedAt ?? artifact.appendedAt ?? "已追加";
+        item.querySelector("em").textContent = body.reason ?? body.executionBrief?.goalInterpretation ?? "";
+        list.append(item);
+      }
     }
     panel.append(list);
   }
