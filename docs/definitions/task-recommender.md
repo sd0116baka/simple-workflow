@@ -2,11 +2,11 @@
 
 ## 职责
 
-任务推荐器负责在启动检查通过后，从任务池 `candidateTasks` 中选择一个建议执行的任务，并产出执行意图。
+任务推荐器负责在启动检查通过后，从任务池 `candidateTasks` 中选择一个建议执行的任务，并产出执行意图追加请求。
 
-任务推荐器只产出执行意图 artifact 本体。它不直接写任务上下文包，也不把产物类型写进 artifact 本体。
+任务推荐器不直接写任务上下文包。它把执行意图 artifact 本体放进追加请求，由任务池执行追加。
 
-系统会把执行意图包装成追加请求，再交给任务池追加到对应任务上下文包。
+执行意图 artifact 本体不保存 `artifactType`。`artifactType` 只属于追加请求外层。
 
 ## 输入
 
@@ -39,43 +39,7 @@
 
 ## 输出
 
-任务推荐器输出执行意图 artifact 本体。
-
-```json
-{
-  "recommendedPackageId": "task-context-package:tasks/task-003.yaml",
-  "confidence": "high",
-  "selectionReasoning": [
-    "这是当前候选任务中唯一 high 优先级任务。",
-    "它能增强 tasks 目录作为任务真源的反馈闭环。"
-  ],
-  "candidateComparison": [
-    {
-      "packageId": "task-context-package:tasks/task-003.yaml",
-      "decision": "selected",
-      "reason": "优先级最高且能改善后续调试体验。"
-    }
-  ],
-  "executionBrief": {
-    "goalInterpretation": "让任务真源变化能自动推动界面和任务池刷新，减少手动刷新带来的状态错觉。",
-    "expectedOutcome": [
-      "新增任务文件后任务列表自动出现。",
-      "修改任务文件后解析结果和任务池视图自动更新。"
-    ],
-    "implementationHints": [
-      "围绕任务真源变化到界面刷新的反馈链路展开实现。"
-    ],
-    "riskSignals": [
-      "文件系统事件可能重复触发，需要防抖。"
-    ],
-    "openQuestions": []
-  }
-}
-```
-
-## 追加请求
-
-系统收到执行意图后，把它包装成追加请求。
+任务推荐器输出执行意图追加请求。
 
 ```json
 {
@@ -86,14 +50,28 @@
       "recommendedPackageId": "task-context-package:tasks/task-003.yaml",
       "confidence": "high",
       "selectionReasoning": [
-        "这是当前候选任务中唯一 high 优先级任务。"
+        "这是当前候选任务中唯一 high 优先级任务。",
+        "它能增强 tasks 目录作为任务真源的反馈闭环。"
       ],
-      "candidateComparison": [],
+      "candidateComparison": [
+        {
+          "packageId": "task-context-package:tasks/task-003.yaml",
+          "decision": "selected",
+          "reason": "优先级最高且能改善后续调试体验。"
+        }
+      ],
       "executionBrief": {
-        "goalInterpretation": "让任务真源变化能自动推动界面和任务池刷新。",
-        "expectedOutcome": [],
-        "implementationHints": [],
-        "riskSignals": [],
+        "goalInterpretation": "让任务真源变化能自动推动界面和任务池刷新，减少手动刷新带来的状态错觉。",
+        "expectedOutcome": [
+          "新增任务文件后任务列表自动出现。",
+          "修改任务文件后解析结果和任务池视图自动更新。"
+        ],
+        "implementationHints": [
+          "围绕任务真源变化到界面刷新的反馈链路展开实现。"
+        ],
+        "riskSignals": [
+          "文件系统事件可能重复触发，需要防抖。"
+        ],
         "openQuestions": []
       }
     }
@@ -101,7 +79,9 @@
 }
 ```
 
-任务池执行追加后，任务上下文包中只保存 artifact 本体。
+## 追加结果
+
+任务池执行追加请求后，任务上下文包中只保存 artifact 本体。
 
 ```json
 {
@@ -117,17 +97,25 @@
 }
 ```
 
-`artifactType` 属于追加请求，不属于执行意图 artifact 本体。
+`artifactType` 属于追加请求，不属于执行意图 artifact 本体。任务池执行追加后，产物类型由 `artifacts.executionIntent` 表达。
 
 ## 字段规则
 
-`recommendedPackageId` 是唯一必要的机器选择字段。
+`appendRequest.packageId` 是追加目标。
+
+`appendRequest.artifactType` 固定为：
+
+```text
+executionIntent
+```
+
+`artifact.recommendedPackageId` 是执行意图选中的任务包，必须与 `appendRequest.packageId` 一致。
 
 任务摘要、任务名称、优先级、源路径等能由 `recommendedPackageId` 从任务上下文包推导出来，不应由任务推荐器重复输出。
 
 仓库状态、启动检查结果等由系统掌握，不应由任务推荐器重复输出。
 
-`confidence` 表示推荐器对本次选择的确信程度，只能是：
+`artifact.confidence` 表示推荐器对本次选择的确信程度，只能是：
 
 ```text
 high
@@ -135,16 +123,16 @@ medium
 low
 ```
 
-`selectionReasoning` 解释为什么选择该任务。
+`artifact.selectionReasoning` 解释为什么选择该任务。
 
-`candidateComparison` 解释候选任务之间的取舍。第一版 `decision` 只使用：
+`artifact.candidateComparison` 解释候选任务之间的取舍。第一版 `decision` 只使用：
 
 ```text
 selected
 deferred
 ```
 
-`candidateComparison` 必须包含 `recommendedPackageId` 对应的 `selected` 项。
+`artifact.candidateComparison` 必须包含 `recommendedPackageId` 对应的 `selected` 项。
 
 如果候选任务很多，`candidateComparison` 不需要全量列出。第一版要求：
 
@@ -154,9 +142,9 @@ deferred
 没有值得比较的其他任务时，可以只有 selected
 ```
 
-`executionBrief` 是给后续执行 Agent 的执行前上下文，不参与执行准入器的确定性授权判断。
+`artifact.executionBrief` 是给后续执行 Agent 的执行前上下文，不参与执行准入器的确定性授权判断。
 
-`executionBrief` 只能基于系统注入的 `candidateTasks` 推理。
+`artifact.executionBrief` 只能基于系统注入的 `candidateTasks` 推理。
 
 任务推荐器不能假装知道具体代码文件、函数名、接口或文档内容。如果需要代码或文档上下文才能确定，应写入 `openQuestions`。
 
@@ -176,6 +164,8 @@ deferred
 
 任务推荐器不直接写任务上下文包。
 
-任务推荐器不输出 `artifactType`。
+任务推荐器输出追加请求，但不执行追加请求。
+
+任务推荐器不在 artifact 本体中输出 `artifactType`。
 
 任务推荐器不生成执行授权。
