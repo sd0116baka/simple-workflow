@@ -78,7 +78,7 @@
         "outcome": "pass"
       },
       "artifacts": {},
-      "agents": {},
+      "agentRuns": [],
       "timeline": []
     }
   ],
@@ -168,6 +168,41 @@ qualityGate
 任务池不负责为其他模块包装追加请求。
 
 任务池只负责校验并执行收到的追加请求。
+
+Agent 调用也通过同一个追加请求接口进入任务池。
+
+```json
+{
+  "appendRequest": {
+    "packageId": "task-context-package:tasks/task-003.yaml",
+    "artifactType": "executionReport",
+    "artifact": {},
+    "agentRun": {
+      "runId": "agent-run-002",
+      "role": "execution",
+      "sessionId": "opencode-session-execution-002",
+      "inputArtifactRefs": [
+        "taskDraft",
+        "executionAuthorization"
+      ],
+      "outputArtifactRefs": [],
+      "status": "succeeded",
+      "startedAt": "2026-05-18T10:00:00.000Z",
+      "finishedAt": "2026-05-18T10:10:00.000Z"
+    }
+  }
+}
+```
+
+任务池执行 Agent 追加请求时：
+
+```text
+有 artifactType + artifact 时，追加 artifact。
+有 agentRun 时，追加 agentRuns。
+如果同一次追加请求同时包含 artifact 和 agentRun，任务池生成 artifactId 并补全 agentRun.outputArtifactRefs。
+```
+
+执行前产物是单例。Agent loop 产物是多例。
 
 ## 派生视图
 
