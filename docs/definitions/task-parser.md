@@ -47,9 +47,6 @@
           "修改任务源文件后界面自动刷新",
           "新增任务源文件后列表自动出现"
         ],
-        "allowedPaths": "default",
-        "testCommands": "default",
-        "reviewPolicy": "default",
         "maxIterations": "default"
       },
       "qualityGate": {
