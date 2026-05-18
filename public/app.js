@@ -177,6 +177,10 @@ function createTaskContextPackagePanel(taskContextPackage) {
   return panel;
 }
 
+function formatJsonBlock(value) {
+  return value ? JSON.stringify(value, null, 2) : "未生成。";
+}
+
 function renderInputs(container, inputs) {
   container.replaceChildren();
   const list = document.createElement("ul");
@@ -342,9 +346,7 @@ function renderRecommendationRun() {
     ? JSON.stringify(recommendationRun.taskContextPackage, null, 2)
     : "尚未生成任务上下文包。";
   recommendationRaw.textContent = buildRecommendationRaw(recommendationRun);
-  admissionRaw.textContent = recommendationRun?.executionIntent
-    ? JSON.stringify(recommendationRun.executionIntent, null, 2)
-    : "尚未生成执行意图。";
+  admissionRaw.textContent = formatJsonBlock(recommendationRun?.executionIntentAppendRequest);
   renderInputs(recommendationInputs, [
     { label: "prompt", value: "project_profiles/recommender-agent.prompt.md" },
     { label: "命令", value: "opencode run --format json" },

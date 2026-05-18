@@ -16,22 +16,28 @@ async function writePrompt(name) {
 
 function buildIntentJson(taskId = "task-001") {
   return JSON.stringify({
-    recommendedPackageId: `task-context-package:tasks/${taskId}.yaml`,
-    confidence: "medium",
-    selectionReasoning: ["任务可执行"],
-    candidateComparison: [
-      {
-        packageId: `task-context-package:tasks/${taskId}.yaml`,
-        decision: "selected",
-        reason: "当前最适合执行",
+    appendRequest: {
+      packageId: `task-context-package:tasks/${taskId}.yaml`,
+      artifactType: "executionIntent",
+      artifact: {
+        recommendedPackageId: `task-context-package:tasks/${taskId}.yaml`,
+        confidence: "medium",
+        selectionReasoning: ["任务可执行"],
+        candidateComparison: [
+          {
+            packageId: `task-context-package:tasks/${taskId}.yaml`,
+            decision: "selected",
+            reason: "当前最适合执行",
+          },
+        ],
+        executionBrief: {
+          goalInterpretation: `优先实现 ${taskId}。`,
+          expectedOutcome: ["任务完成后满足验收标准"],
+          implementationHints: ["先阅读现有实现"],
+          riskSignals: [],
+          openQuestions: [],
+        },
       },
-    ],
-    executionBrief: {
-      goalInterpretation: `优先实现 ${taskId}。`,
-      expectedOutcome: ["任务完成后满足验收标准"],
-      implementationHints: ["先阅读现有实现"],
-      riskSignals: [],
-      openQuestions: [],
     },
   });
 }
@@ -96,6 +102,7 @@ test("workflow service captures a successful recommendation run", async () => {
   assert.equal(finished.status, "succeeded");
   assert.match(finished.stdout, /task-001/);
   assert.equal(finished.executionIntent.recommendedPackageId, "task-context-package:tasks/task-001.yaml");
+  assert.equal(finished.executionIntentAppendRequest.artifactType, "executionIntent");
   assert.equal(finished.executionIntentError, null);
   assert.equal(finished.executionAdmission.appendRequest.artifactType, "executionAuthorization");
   assert.equal(finished.taskContextPackage.currentWorkStage, "execution-admission");

@@ -28,39 +28,39 @@ function requireStringArray(value, name) {
   return value;
 }
 
-function normalizeCandidateComparison(value) {
+function normalizeCandidateComparison(value, name = "candidateComparison") {
   if (!Array.isArray(value)) {
-    throw new Error("candidateComparison must be an array");
+    throw new Error(`${name} must be an array`);
   }
 
   return value.map((item, index) => {
-    const comparison = requireObject(item, `candidateComparison.${index}`);
-    const decision = requireString(comparison.decision, `candidateComparison.${index}.decision`);
+    const comparison = requireObject(item, `${name}.${index}`);
+    const decision = requireString(comparison.decision, `${name}.${index}.decision`);
     if (!CANDIDATE_DECISIONS.has(decision)) {
-      throw new Error(`candidateComparison.${index}.decision must be selected or deferred`);
+      throw new Error(`${name}.${index}.decision must be selected or deferred`);
     }
     return {
-      packageId: requireString(comparison.packageId, `candidateComparison.${index}.packageId`),
+      packageId: requireString(comparison.packageId, `${name}.${index}.packageId`),
       decision,
-      reason: requireString(comparison.reason, `candidateComparison.${index}.reason`),
+      reason: requireString(comparison.reason, `${name}.${index}.reason`),
     };
   });
 }
 
-function normalizeExecutionBrief(value) {
-  const brief = requireObject(value, "executionBrief");
+function normalizeExecutionBrief(value, name = "executionBrief") {
+  const brief = requireObject(value, name);
   return {
     goalInterpretation: requireString(
       brief.goalInterpretation,
-      "executionBrief.goalInterpretation",
+      `${name}.goalInterpretation`,
     ),
-    expectedOutcome: requireStringArray(brief.expectedOutcome, "executionBrief.expectedOutcome"),
+    expectedOutcome: requireStringArray(brief.expectedOutcome, `${name}.expectedOutcome`),
     implementationHints: requireStringArray(
       brief.implementationHints,
-      "executionBrief.implementationHints",
+      `${name}.implementationHints`,
     ),
-    riskSignals: requireStringArray(brief.riskSignals, "executionBrief.riskSignals"),
-    openQuestions: requireStringArray(brief.openQuestions, "executionBrief.openQuestions"),
+    riskSignals: requireStringArray(brief.riskSignals, `${name}.riskSignals`),
+    openQuestions: requireStringArray(brief.openQuestions, `${name}.openQuestions`),
   };
 }
 
@@ -77,33 +77,57 @@ function validateCandidateComparison(recommendedPackageId, candidateComparison) 
 export function parseRecommendationIntent(output) {
   try {
     const payload = requireObject(JSON.parse(extractJsonText(output)), "recommendation intent");
+    const appendRequest = requireObject(payload.appendRequest, "appendRequest");
+    const packageId = requireString(appendRequest.packageId, "appendRequest.packageId");
+    const artifactType = requireString(appendRequest.artifactType, "appendRequest.artifactType");
+    if (artifactType !== "executionIntent") {
+      throw new Error("appendRequest.artifactType must be executionIntent");
+    }
+    const artifact = requireObject(appendRequest.artifact, "appendRequest.artifact");
     const recommendedPackageId = requireString(
-      payload.recommendedPackageId,
-      "recommendedPackageId",
+      artifact.recommendedPackageId,
+      "appendRequest.artifact.recommendedPackageId",
     );
-    if (!CONFIDENCE_LEVELS.has(payload.confidence)) {
+    if (recommendedPackageId !== packageId) {
+      throw new Error("appendRequest.artifact.recommendedPackageId must match appendRequest.packageId");
+    }
+    if (!CONFIDENCE_LEVELS.has(artifact.confidence)) {
       throw new Error("confidence must be high, medium, or low");
     }
 
     const selectionReasoning = requireStringArray(
-      payload.selectionReasoning,
-      "selectionReasoning",
+      artifact.selectionReasoning,
+      "appendRequest.artifact.selectionReasoning",
     );
-    const candidateComparison = normalizeCandidateComparison(payload.candidateComparison);
+    const candidateComparison = normalizeCandidateComparison(
+      artifact.candidateComparison,
+      "appendRequest.artifact.candidateComparison",
+    );
     validateCandidateComparison(recommendedPackageId, candidateComparison);
 
+    const normalizedArtifact = {
+      recommendedPackageId,
+      confidence: artifact.confidence,
+      selectionReasoning,
+      candidateComparison,
+      executionBrief: normalizeExecutionBrief(
+        artifact.executionBrief,
+        "appendRequest.artifact.executionBrief",
+      ),
+    };
+
     return {
-      intent: {
-        recommendedPackageId,
-        confidence: payload.confidence,
-        selectionReasoning,
-        candidateComparison,
-        executionBrief: normalizeExecutionBrief(payload.executionBrief),
+      appendRequest: {
+        packageId,
+        artifactType,
+        artifact: normalizedArtifact,
       },
+      intent: normalizedArtifact,
       error: null,
     };
   } catch (error) {
     return {
+      appendRequest: null,
       intent: null,
       error: error.message,
     };
