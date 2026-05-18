@@ -1,12 +1,15 @@
 import { watch } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
-import { evaluateExecutionAdmission } from "./execution-admission.js";
+import {
+  evaluateExecutionAdmission,
+  evaluateStartupCheck,
+  runtimeSnapshotFromRepositoryStatus,
+} from "./execution-admission.js";
 import { getRepositoryStatus as readRepositoryStatus } from "./repository-status.js";
 import { parseRecommendationIntent } from "./recommendation-intent.js";
 import { buildRecommendationPrompt } from "./recommendation-prompt.js";
 import { OPENCODE_RECOMMENDATION_ARGS, runOpencodeRecommendation } from "./recommendation-runner.js";
-import { evaluateRuntime } from "./runtime-scheduler.js";
 import { buildTaskContextPackage } from "./task-context-package.js";
 import { buildTaskPool } from "./task-pool.js";
 import { listRawTasks } from "./task-source.js";
@@ -46,6 +49,7 @@ export function createWorkflowService({
       ? {
           ...run,
           args: [...run.args],
+          startupCheck: run.startupCheck ? JSON.parse(JSON.stringify(run.startupCheck)) : null,
           progress: run.progress.map((entry) => ({ ...entry })),
           executionIntent: run.executionIntent
             ? {
@@ -60,43 +64,19 @@ export function createWorkflowService({
               }
             : null,
           executionAdmission: run.executionAdmission
-            ? {
-                ...run.executionAdmission,
-                reasons: [...run.executionAdmission.reasons],
-                recommendedTask: run.executionAdmission.recommendedTask
-                  ? { ...run.executionAdmission.recommendedTask }
-                  : undefined,
-                task: run.executionAdmission.task ? { ...run.executionAdmission.task } : null,
-              }
+            ? JSON.parse(JSON.stringify(run.executionAdmission))
             : null,
           taskContextPackage: run.taskContextPackage
-            ? {
-                ...run.taskContextPackage,
-                task: run.taskContextPackage.task ? { ...run.taskContextPackage.task } : null,
-                appended: {
-                  executionIntent: run.taskContextPackage.appended.executionIntent
-                    ? {
-                        ...run.taskContextPackage.appended.executionIntent,
-                        recommendedTask: {
-                          ...run.taskContextPackage.appended.executionIntent.recommendedTask,
-                        },
-                      }
-                    : null,
-                  executionAuthorization: run.taskContextPackage.appended.executionAuthorization
-                    ? { ...run.taskContextPackage.appended.executionAuthorization }
-                    : null,
-                  admissionBlock: run.taskContextPackage.appended.admissionBlock
-                    ? {
-                        ...run.taskContextPackage.appended.admissionBlock,
-                        reasons: [...run.taskContextPackage.appended.admissionBlock.reasons],
-                      }
-                    : null,
-                },
-                records: run.taskContextPackage.records.map((record) => ({ ...record })),
-              }
+            ? JSON.parse(JSON.stringify(run.taskContextPackage))
             : null,
         }
       : null;
+  }
+
+  async function getStartupCheck() {
+    return evaluateStartupCheck({
+      runtimeSnapshot: runtimeSnapshotFromRepositoryStatus(await getRepositoryStatus()),
+    });
   }
 
   function emitRecommendationChanged(run) {
@@ -115,20 +95,31 @@ export function createWorkflowService({
         ? { intent: null, error: null }
         : parseRecommendationIntent(result.stdout ?? "");
       const taskPool = failed ? null : await buildTaskPool(await listRawTasks(tasksDir));
-      const runtimeStatus = failed ? null : evaluateRuntime(taskPool, await getRepositoryStatus());
-      const admission = failed
-        ? null
-        : evaluateExecutionAdmission({
-            executionIntent: parsed.intent,
-            taskPool,
-            runtimeStatus,
-          });
-      const taskContextPackage = failed
+      const startupCheck = failed || !parsed.intent ? null : await getStartupCheck();
+      const intentPackage = failed || !parsed.intent
         ? null
         : buildTaskContextPackage({
             taskPool,
             executionIntent: parsed.intent,
-            executionAdmission: admission,
+          });
+      const admission = failed || !parsed.intent
+        ? null
+        : evaluateExecutionAdmission({
+            taskContextPackage: intentPackage,
+            candidateTasks: taskPool.views.candidateTasks,
+            runtimeSnapshot: startupCheck.runtimeSnapshot,
+            projectProfile: {
+              defaults: {
+                maxIterations: 3,
+              },
+            },
+          });
+      const taskContextPackage = failed || !parsed.intent
+        ? null
+        : buildTaskContextPackage({
+            taskPool,
+            executionIntent: parsed.intent,
+            appendRequest: admission.appendRequest,
           });
       Object.assign(run, {
         status: failed ? "failed" : "succeeded",
@@ -161,15 +152,43 @@ export function createWorkflowService({
       return buildTaskPool(await listRawTasks(tasksDir));
     },
 
-    async getRuntimeStatus() {
-      return evaluateRuntime(await this.listTaskPool(), await getRepositoryStatus());
+    async getStartupCheck() {
+      return getStartupCheck();
     },
 
     async createRecommendationRun() {
-      const basePrompt = await readFile(recommendationPromptPath, "utf8");
       const taskPool = await this.listTaskPool();
-      const runtimeStatus = evaluateRuntime(taskPool, await getRepositoryStatus());
-      const prompt = buildRecommendationPrompt({ basePrompt, runtimeStatus });
+      const startupCheck = await getStartupCheck();
+      if (!startupCheck.canStartWork) {
+        const run = {
+          id: `recommendation-run-${(recommendationRunSequence += 1)}`,
+          status: "blocked",
+          startedAt: new Date().toISOString(),
+          finishedAt: new Date().toISOString(),
+          command: null,
+          args: [],
+          startupCheck,
+          progress: [],
+          executionIntent: null,
+          executionIntentError: null,
+          executionAdmission: null,
+          taskContextPackage: null,
+          stdout: "",
+          stderr: "",
+          exitCode: null,
+          error: "启动检查未通过，任务推荐器未运行。",
+        };
+        latestRecommendationRun = run;
+        emitRecommendationChanged(run);
+        return toRecommendationSnapshot(run);
+      }
+
+      const basePrompt = await readFile(recommendationPromptPath, "utf8");
+      const prompt = buildRecommendationPrompt({
+        basePrompt,
+        candidateTasks: taskPool.views.candidateTasks,
+        startupCheck,
+      });
       const run = {
         id: `recommendation-run-${(recommendationRunSequence += 1)}`,
         status: "running",
@@ -177,6 +196,7 @@ export function createWorkflowService({
         finishedAt: null,
         command: "opencode",
         args: OPENCODE_RECOMMENDATION_ARGS,
+        startupCheck,
         progress: [],
         executionIntent: null,
         executionIntentError: null,

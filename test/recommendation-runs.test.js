@@ -95,9 +95,9 @@ test("workflow service captures a successful recommendation run", async () => {
   assert.match(finished.stdout, /task-001/);
   assert.equal(finished.executionIntent.recommendedTask.id, "task-001");
   assert.equal(finished.executionIntentError, null);
-  assert.equal(finished.executionAdmission.status, "authorized");
-  assert.equal(finished.taskContextPackage.status, "authorization-appended");
-  assert.equal(finished.taskContextPackage.appended.executionAuthorization.taskId, "task-001");
+  assert.equal(finished.executionAdmission.appendRequest.artifactType, "executionAuthorization");
+  assert.equal(finished.taskContextPackage.currentWorkStage, "execution-admission");
+  assert.equal(finished.taskContextPackage.artifacts.executionAuthorization.termination.maxIterations, 3);
   assert.equal(finished.exitCode, 0);
   assert.equal(service.getLatestRecommendationRun().status, "succeeded");
 });
@@ -157,7 +157,29 @@ test("workflow service does not expose invalid tasks to the recommender prompt",
   await service.createRecommendationRun();
   const finished = await completed;
 
-  assert.equal(finished.executionAdmission.status, "authorized");
+  assert.equal(finished.executionAdmission.appendRequest.artifactType, "executionAuthorization");
+});
+
+test("workflow service does not run recommender when startup check fails", async () => {
+  const promptPath = await writePrompt("recommendation-startup-blocked");
+  const service = createWorkflowService({
+    tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks"),
+    recommendationPromptPath: promptPath,
+    getRepositoryStatus: async () => ({
+      clean: false,
+      entries: [{ code: "M", path: "public/app.js" }],
+    }),
+    runRecommendationCommand: async () => {
+      throw new Error("should not run");
+    },
+  });
+
+  const run = await service.createRecommendationRun();
+
+  assert.equal(run.status, "blocked");
+  assert.equal(run.command, null);
+  assert.equal(run.startupCheck.canStartWork, false);
+  assert.match(run.error, /启动检查未通过/);
 });
 
 test("workflow service keeps successful runs when recommendation intent parsing fails", async () => {
@@ -165,6 +187,7 @@ test("workflow service keeps successful runs when recommendation intent parsing 
   const service = createWorkflowService({
     tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks"),
     recommendationPromptPath: promptPath,
+    getRepositoryStatus: async () => ({ clean: true, entries: [] }),
     runRecommendationCommand: async () => ({
       stdout: "不是 JSON",
       stderr: "",
@@ -194,6 +217,7 @@ test("workflow service emits running progress for recommendation runs", async ()
   const service = createWorkflowService({
     tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks"),
     recommendationPromptPath: promptPath,
+    getRepositoryStatus: async () => ({ clean: true, entries: [] }),
     runRecommendationCommand: async ({ onProgress }) => {
       onProgress({ type: "step_start", message: "开始运行 opencode" });
       return {
@@ -225,6 +249,7 @@ test("workflow service marks non-zero recommendation exits as failed", async () 
   const service = createWorkflowService({
     tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks"),
     recommendationPromptPath: promptPath,
+    getRepositoryStatus: async () => ({ clean: true, entries: [] }),
     runRecommendationCommand: async () => ({
       stdout: "",
       stderr: "模型调用失败",
@@ -254,6 +279,7 @@ test("workflow service marks thrown recommendation commands as failed", async ()
   const service = createWorkflowService({
     tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks"),
     recommendationPromptPath: promptPath,
+    getRepositoryStatus: async () => ({ clean: true, entries: [] }),
     runRecommendationCommand: () => {
       throw new Error("命令启动失败");
     },

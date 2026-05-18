@@ -36,6 +36,7 @@ test("task pool contains parsed tasks with minimal pool metadata", () => {
     entries: [
       {
         id: "task-001",
+        packageId: "task-context-package:tasks/task-001.yaml",
         sourceFile: "task-001.yaml",
         title: "展示任务真源",
         type: "feature",
@@ -51,6 +52,7 @@ test("task pool contains parsed tasks with minimal pool metadata", () => {
       },
       {
         id: "task-002",
+        packageId: "task-context-package:tasks/task-002.yaml",
         sourceFile: "task-002.yaml",
         title: "缺少验收标准",
         type: "feature",
@@ -67,6 +69,20 @@ test("task pool contains parsed tasks with minimal pool metadata", () => {
         },
       },
     ],
+    views: {
+      candidateTasks: [
+        {
+          packageId: "task-context-package:tasks/task-001.yaml",
+          id: "task-001",
+          title: "展示任务真源",
+          type: "feature",
+          priority: "normal",
+          sourceFile: "task-001.yaml",
+        },
+      ],
+      needsAttention: ["task-context-package:tasks/task-002.yaml"],
+      brokenContent: [],
+    },
   });
 });
 
@@ -84,5 +100,12 @@ test("task pool skips files that failed parsing", () => {
     },
   ]);
 
-  assert.deepEqual(pool, { entries: [] });
+  assert.deepEqual(pool, {
+    entries: [],
+    views: {
+      candidateTasks: [],
+      needsAttention: [],
+      brokenContent: [],
+    },
+  });
 });

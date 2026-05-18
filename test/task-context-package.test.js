@@ -6,11 +6,20 @@ const taskPool = {
   entries: [
     {
       id: "task-003",
+      packageId: "task-context-package:tasks/task-003.yaml",
       sourceFile: "task-003.yaml",
       title: "监听任务文件变化",
       type: "feature",
       priority: "high",
       status: "ready",
+      parsed: {
+        id: "task-003",
+        title: "监听任务文件变化",
+        type: "feature",
+        priority: "high",
+        description: "监听 tasks 目录变化",
+        acceptance: ["修改任务源文件后界面自动刷新"],
+      },
       validation: { status: "valid", errors: [] },
     },
   ],
@@ -28,52 +37,40 @@ const executionIntent = {
   nextAction: "优先实现 task-003。",
 };
 
-test("builds a task context package with appended execution authorization", () => {
+test("builds a task context package with execution intent artifact", () => {
   const taskContextPackage = buildTaskContextPackage({
     taskPool,
     executionIntent,
-    executionAdmission: {
-      status: "authorized",
-      authorized: true,
-      taskId: "task-003",
-      requiresConfirmation: true,
-      reasons: [],
-      runtimeStatus: "idle",
-    },
   });
 
-  assert.equal(taskContextPackage.id, "task-context-package:task-003");
-  assert.equal(taskContextPackage.status, "authorization-appended");
-  assert.equal(taskContextPackage.currentStage, "执行准入器");
-  assert.equal(taskContextPackage.task.validationStatus, "valid");
-  assert.equal(taskContextPackage.appended.executionIntent.confidence, "high");
-  assert.equal(taskContextPackage.appended.executionAuthorization.requiresConfirmation, true);
-  assert.equal(taskContextPackage.appended.admissionBlock, null);
-  assert.deepEqual(
-    taskContextPackage.records.map((record) => record.artifact),
-    ["任务上下文包", "执行意图", "执行授权"],
-  );
+  assert.equal(taskContextPackage.packageId, "task-context-package:tasks/task-003.yaml");
+  assert.equal(taskContextPackage.currentWorkStage, "task-recommender");
+  assert.equal(taskContextPackage.qualityGate.outcome, "pass");
+  assert.equal(taskContextPackage.taskDraft.name, "监听任务文件变化");
+  assert.equal(taskContextPackage.artifacts.executionIntent.confidence, "high");
 });
 
-test("keeps an authorization block in the task context package without adding authorization", () => {
+test("applies execution admission append request to the task context package", () => {
   const taskContextPackage = buildTaskContextPackage({
     taskPool,
     executionIntent,
-    executionAdmission: {
-      status: "blocked",
-      authorized: false,
-      taskId: "task-003",
-      requiresConfirmation: false,
-      reasons: ["Working tree has uncommitted changes"],
+    appendRequest: {
+      packageId: "task-context-package:tasks/task-003.yaml",
+      artifactType: "executionAuthorization",
+      artifact: {
+        authorizedAt: "2026-05-18T10:00:00.000Z",
+        termination: {
+          maxIterations: 3,
+        },
+      },
     },
   });
 
-  assert.equal(taskContextPackage.status, "authorization-blocked");
-  assert.equal(taskContextPackage.appended.executionAuthorization, null);
-  assert.deepEqual(taskContextPackage.appended.admissionBlock.reasons, [
-    "Working tree has uncommitted changes",
-  ]);
-  assert.equal(taskContextPackage.records.at(-1).artifact, "授权拒绝");
+  assert.equal(taskContextPackage.currentWorkStage, "execution-admission");
+  assert.equal(
+    taskContextPackage.artifacts.executionAuthorization.authorizedAt,
+    "2026-05-18T10:00:00.000Z",
+  );
 });
 
 test("returns null before an execution intent selects a task", () => {

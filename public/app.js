@@ -2,8 +2,8 @@ const taskList = document.querySelector("#taskList");
 const taskCount = document.querySelector("#taskCount");
 const taskPool = document.querySelector("#taskPool");
 const poolCount = document.querySelector("#poolCount");
-const runtimePanel = document.querySelector("#runtimePanel");
-const runtimeStatus = document.querySelector("#runtimeStatus");
+const startupCheckPanel = document.querySelector("#startupCheckPanel");
+const startupCheckStatus = document.querySelector("#startupCheckStatus");
 const selectedTitle = document.querySelector("#selectedTitle");
 const selectedMeta = document.querySelector("#selectedMeta");
 const rawText = document.querySelector("#rawText");
@@ -16,7 +16,7 @@ const recommendationStatus = document.querySelector("#recommendationStatus");
 const recommendationResult = document.querySelector("#recommendationResult");
 const runRecommendationButton = document.querySelector("#runRecommendationButton");
 const taskPoolRaw = document.querySelector("#taskPoolRaw");
-const runtimeRaw = document.querySelector("#runtimeRaw");
+const startupCheckRaw = document.querySelector("#startupCheckRaw");
 const recommendationRaw = document.querySelector("#recommendationRaw");
 const recommendationIntentPanel = document.querySelector("#recommendationIntentPanel");
 const admissionStatus = document.querySelector("#admissionStatus");
@@ -27,13 +27,13 @@ const taskContextPackagePanel = document.querySelector("#taskContextPackagePanel
 const taskContextPackageStatus = document.querySelector("#taskContextPackageStatus");
 const taskSourceInputs = document.querySelector("#taskSourceInputs");
 const taskPoolInputs = document.querySelector("#taskPoolInputs");
-const runtimeInputs = document.querySelector("#runtimeInputs");
+const startupCheckInputs = document.querySelector("#startupCheckInputs");
 const recommendationInputs = document.querySelector("#recommendationInputs");
 const admissionInputs = document.querySelector("#admissionInputs");
 
 let tasks = [];
 let poolEntries = [];
-let runtime = null;
+let startupCheck = null;
 let recommendationRun = null;
 let selectedFileName = null;
 
@@ -93,26 +93,30 @@ function createIntentPanel(intent) {
 
 function createAdmissionPanel(admission) {
   const panel = document.createElement("div");
-  panel.className = `admission-panel ${admission.status}`;
+  const appendRequest = admission.appendRequest;
+  const artifactType = appendRequest?.artifactType ?? "unknown";
+  panel.className = `admission-panel ${artifactType}`;
 
   const title = document.createElement("div");
   title.className = "admission-title";
-  title.textContent = admission.authorized
-    ? `已授权执行：${admission.taskId}`
-    : `未授权执行：${admission.taskId ?? "无任务"}`;
+  title.textContent =
+    artifactType === "executionAuthorization"
+      ? `已授权执行：${appendRequest.packageId}`
+      : `未授权执行：${appendRequest?.packageId ?? "无任务"}`;
 
   const meta = document.createElement("div");
   meta.className = "admission-meta";
-  meta.textContent = `status: ${admission.status} · requiresConfirmation: ${String(admission.requiresConfirmation)}`;
+  meta.textContent = `artifactType: ${artifactType}`;
 
   panel.append(title, meta);
 
-  if (admission.reasons?.length > 0) {
+  const findings = appendRequest?.artifact?.findings ?? [];
+  if (findings.length > 0) {
     const list = document.createElement("ul");
     list.className = "admission-reasons";
-    for (const reason of admission.reasons) {
+    for (const finding of findings) {
       const item = document.createElement("li");
-      item.textContent = reason;
+      item.textContent = `${finding.code}: ${finding.message}`;
       list.append(item);
     }
     panel.append(list);
@@ -123,17 +127,17 @@ function createAdmissionPanel(admission) {
 
 function createTaskContextPackagePanel(taskContextPackage) {
   const panel = document.createElement("div");
-  panel.className = `context-package ${taskContextPackage.status}`;
+  panel.className = `context-package ${taskContextPackage.currentWorkStage}`;
 
   const title = document.createElement("div");
   title.className = "context-package-title";
-  title.textContent = `${taskContextPackage.taskId} · ${taskContextPackage.status}`;
+  title.textContent = `${taskContextPackage.packageId}`;
 
   const meta = document.createElement("div");
   meta.className = "context-package-meta";
   meta.textContent = [
-    `currentStage: ${taskContextPackage.currentStage}`,
-    `sourceFile: ${taskContextPackage.sourceFile ?? "unknown"}`,
+    `currentWorkStage: ${taskContextPackage.currentWorkStage}`,
+    `source: ${taskContextPackage.source?.path ?? "unknown"}`,
   ].join(" · ");
 
   panel.append(title, meta);
@@ -146,24 +150,25 @@ function createTaskContextPackagePanel(taskContextPackage) {
     <span>执行授权</span><strong></strong>
   `;
   const values = artifacts.querySelectorAll("strong");
-  values[0].textContent = taskContextPackage.task?.status ?? "missing";
-  values[1].textContent = taskContextPackage.appended.executionIntent ? "已追加" : "未追加";
-  values[2].textContent = taskContextPackage.appended.executionAuthorization
+  values[0].textContent = taskContextPackage.qualityGate?.outcome ?? "missing";
+  values[1].textContent = taskContextPackage.artifacts?.executionIntent ? "已追加" : "未追加";
+  values[2].textContent = taskContextPackage.artifacts?.executionAuthorization
     ? "已追加"
-    : taskContextPackage.appended.admissionBlock
+    : taskContextPackage.artifacts?.admissionRejection
       ? "未授权"
       : "未追加";
   panel.append(artifacts);
 
-  if (taskContextPackage.records?.length > 0) {
-    const list = document.createElement("ol");
+  const artifactEntries = Object.entries(taskContextPackage.artifacts ?? {});
+  if (artifactEntries.length > 0) {
+    const list = document.createElement("ul");
     list.className = "context-package-records";
-    for (const record of taskContextPackage.records) {
+    for (const [artifactType, artifact] of artifactEntries) {
       const item = document.createElement("li");
       item.innerHTML = "<strong></strong><span></span><em></em>";
-      item.querySelector("strong").textContent = `${record.stage} / ${record.artifact}`;
-      item.querySelector("span").textContent = record.status;
-      item.querySelector("em").textContent = record.summary;
+      item.querySelector("strong").textContent = artifactType;
+      item.querySelector("span").textContent = artifact.authorizedAt ?? artifact.rejectedAt ?? artifact.requestedAt ?? "已追加";
+      item.querySelector("em").textContent = artifact.reason ?? artifact.nextAction ?? "";
       list.append(item);
     }
     panel.append(list);
@@ -252,73 +257,67 @@ function renderTaskPool() {
   }
 }
 
-function renderRuntime() {
-  runtimePanel.replaceChildren();
-  runtimeRaw.textContent = JSON.stringify(runtime, null, 2);
-  renderInputs(runtimeInputs, [
-    { label: "输入", value: "任务池 + 仓库状态" },
-    { label: "任务池条目", value: `${poolEntries.length}` },
-    { label: "ready 任务", value: poolEntries.filter((entry) => entry.status === "ready").map((entry) => entry.id).join(", ") || "无" },
-    { label: "git", value: runtime?.repositoryStatus?.clean ? "clean" : "dirty/unknown" },
+function renderStartupCheck() {
+  startupCheckPanel.replaceChildren();
+  startupCheckRaw.textContent = JSON.stringify(startupCheck, null, 2);
+  renderInputs(startupCheckInputs, [
+    { label: "输入", value: "当前运行环境快照" },
+    { label: "activeWork", value: startupCheck?.runtimeSnapshot?.activeWork ? "存在" : "无" },
+    { label: "git", value: startupCheck?.runtimeSnapshot?.worktree?.clean ? "clean" : "dirty/unknown" },
   ]);
-  if (!runtime) {
-    runtimeStatus.textContent = "未载入";
-    runtimePanel.textContent = "未返回运行时状态。";
+  if (!startupCheck) {
+    startupCheckStatus.textContent = "未载入";
+    startupCheckPanel.textContent = "未返回启动检查。";
     return;
   }
 
-  runtimeStatus.textContent = runtime.status;
+  startupCheckStatus.textContent = startupCheck.canStartWork ? "可启动" : "不可启动";
   const summary = document.createElement("div");
-  summary.className = `runtime-summary ${runtime.status}`;
-  summary.textContent = runtime.canStartNewTask
+  summary.className = `startup-check-summary ${startupCheck.canStartWork ? "pass" : "fail"}`;
+  summary.textContent = startupCheck.canStartWork
     ? "当前可以启动新任务。"
     : "当前不能启动新任务。";
 
   const canStart = document.createElement("div");
-  canStart.className = "runtime-metric";
-  canStart.innerHTML = "<span>canStartNewTask</span><strong></strong>";
-  canStart.querySelector("strong").textContent = String(runtime.canStartNewTask);
+  canStart.className = "startup-check-metric";
+  canStart.innerHTML = "<span>canStartWork</span><strong></strong>";
+  canStart.querySelector("strong").textContent = String(startupCheck.canStartWork);
 
-  const runnableCount = document.createElement("div");
-  runnableCount.className = "runtime-metric";
-  runnableCount.innerHTML = "<span>runnableTasks</span><strong></strong>";
-  runnableCount.querySelector("strong").textContent = String(runtime.runnableTasks?.length ?? 0);
-
-  const repositoryStatus = runtime.repositoryStatus ?? { clean: false, entries: [] };
+  const worktree = startupCheck.runtimeSnapshot?.worktree ?? { clean: false, changedFiles: [] };
   const gitStatus = document.createElement("div");
-  gitStatus.className = "runtime-metric";
+  gitStatus.className = "startup-check-metric";
   gitStatus.innerHTML = "<span>git</span><strong></strong>";
-  gitStatus.querySelector("strong").textContent = repositoryStatus.clean ? "clean" : "dirty";
+  gitStatus.querySelector("strong").textContent = worktree.clean ? "clean" : "dirty";
 
   const gitChanges = document.createElement("div");
-  gitChanges.className = "runtime-metric";
+  gitChanges.className = "startup-check-metric";
   gitChanges.innerHTML = "<span>git changes</span><strong></strong>";
-  gitChanges.querySelector("strong").textContent = String(repositoryStatus.entries?.length ?? 0);
+  gitChanges.querySelector("strong").textContent = String(worktree.changedFiles?.length ?? 0);
 
-  runtimePanel.append(summary, canStart, runnableCount, gitStatus, gitChanges);
+  startupCheckPanel.append(summary, canStart, gitStatus, gitChanges);
 
-  const reasons = runtime.blockingReasons ?? [];
-  if (reasons.length > 0) {
+  const findings = startupCheck.findings ?? [];
+  if (findings.length > 0) {
     const list = document.createElement("ul");
-    list.className = "runtime-list";
-    for (const reason of reasons) {
+    list.className = "startup-check-list";
+    for (const finding of findings) {
       const item = document.createElement("li");
-      item.textContent = reason;
+      item.textContent = `${finding.code}: ${finding.message}`;
       list.append(item);
     }
-    runtimePanel.append(list);
+    startupCheckPanel.append(list);
   }
 
-  const repositoryEntries = repositoryStatus.entries ?? [];
-  if (repositoryEntries.length > 0) {
+  const changedFiles = worktree.changedFiles ?? [];
+  if (changedFiles.length > 0) {
     const list = document.createElement("ul");
-    list.className = "runtime-list git-list";
-    for (const entry of repositoryEntries.slice(0, 6)) {
+    list.className = "startup-check-list git-list";
+    for (const filePath of changedFiles.slice(0, 6)) {
       const item = document.createElement("li");
-      item.textContent = `${entry.code} ${entry.path}`;
+      item.textContent = filePath;
       list.append(item);
     }
-    runtimePanel.append(list);
+    startupCheckPanel.append(list);
   }
 }
 
@@ -350,12 +349,12 @@ function renderRecommendationRun() {
     { label: "prompt", value: "project_profiles/recommender-agent.prompt.md" },
     { label: "命令", value: "opencode run --format json" },
     { label: "工作目录", value: "仓库根目录" },
-    { label: "读取范围", value: "运行时注入的 candidateTasks + repoStatus" },
+    { label: "读取范围", value: "启动检查通过后注入的 candidateTasks + repoStatus" },
   ]);
   renderInputs(admissionInputs, [
     { label: "执行意图", value: recommendationRun?.executionIntent ? recommendationRun.executionIntent.recommendedTask.id : "未生成" },
     { label: "任务池", value: `${poolEntries.length} 个条目` },
-    { label: "运行时", value: runtime?.status ?? "未载入" },
+    { label: "启动检查", value: startupCheck ? String(startupCheck.canStartWork) : "未载入" },
   ]);
   runRecommendationButton.disabled = recommendationRun?.status === "running";
 
@@ -377,11 +376,15 @@ function renderRecommendationRun() {
   summary.textContent =
     recommendationRun.status === "running"
       ? "探针正在运行..."
+      : recommendationRun.status === "blocked"
+        ? "启动检查未通过，推荐器未运行。"
       : `exitCode: ${String(recommendationRun.exitCode)}`;
 
   const meta = document.createElement("div");
   meta.className = "recommendation-meta";
-  meta.textContent = `${recommendationRun.command} ${recommendationRun.args?.join(" ") ?? ""}`;
+  meta.textContent = recommendationRun.command
+    ? `${recommendationRun.command} ${recommendationRun.args?.join(" ") ?? ""}`
+    : "未启动外部命令";
 
   if (recommendationRun.executionIntent) {
     recommendationResult?.append(summary, meta, createIntentPanel(recommendationRun.executionIntent));
@@ -394,7 +397,7 @@ function renderRecommendationRun() {
   }
 
   if (recommendationRun.executionAdmission) {
-    admissionStatus.textContent = recommendationRun.executionAdmission.status;
+    admissionStatus.textContent = recommendationRun.executionAdmission.appendRequest?.artifactType ?? "未知";
     admissionPanel.append(createAdmissionPanel(recommendationRun.executionAdmission));
   } else {
     admissionStatus.textContent = "等待输入";
@@ -402,7 +405,7 @@ function renderRecommendationRun() {
   }
 
   if (recommendationRun.taskContextPackage) {
-    taskContextPackageStatus.textContent = recommendationRun.taskContextPackage.status;
+    taskContextPackageStatus.textContent = recommendationRun.taskContextPackage.currentWorkStage;
     taskContextPackagePanel.append(createTaskContextPackagePanel(recommendationRun.taskContextPackage));
   } else {
     taskContextPackageStatus.textContent = "未生成";
@@ -476,12 +479,12 @@ async function loadTasks() {
   validationResult.textContent = "正在读取 tasks/ ...";
   parseStatus.textContent = "等待载入";
   validationStatus.textContent = "等待载入";
-  runtimePanel.textContent = "正在读取运行时状态...";
-  runtimeStatus.textContent = "等待载入";
-  const [tasksResponse, poolResponse, runtimeResponse] = await Promise.all([
+  startupCheckPanel.textContent = "正在读取启动检查...";
+  startupCheckStatus.textContent = "等待载入";
+  const [tasksResponse, poolResponse, startupCheckResponse] = await Promise.all([
     fetch("/api/tasks"),
     fetch("/api/task-pool"),
-    fetch("/api/runtime"),
+    fetch("/api/startup-check"),
   ]);
   if (!tasksResponse.ok) {
     throw new Error(`读取任务失败：${tasksResponse.status}`);
@@ -489,23 +492,23 @@ async function loadTasks() {
   if (!poolResponse.ok) {
     throw new Error(`读取任务池失败：${poolResponse.status}`);
   }
-  if (!runtimeResponse.ok) {
-    throw new Error(`读取运行时失败：${runtimeResponse.status}`);
+  if (!startupCheckResponse.ok) {
+    throw new Error(`读取启动检查失败：${startupCheckResponse.status}`);
   }
 
   const tasksPayload = await tasksResponse.json();
   const poolPayload = await poolResponse.json();
-  const runtimePayload = await runtimeResponse.json();
+  const startupCheckPayload = await startupCheckResponse.json();
   tasks = tasksPayload.tasks ?? [];
   poolEntries = poolPayload.taskPool?.entries ?? [];
-  runtime = runtimePayload.runtimeStatus ?? null;
+  startupCheck = startupCheckPayload.startupCheck ?? null;
   selectedFileName = tasks.some((task) => task.fileName === selectedFileName)
     ? selectedFileName
     : tasks[0]?.fileName ?? null;
 
   renderList();
   renderTaskPool();
-  renderRuntime();
+  renderStartupCheck();
 
   if (selectedFileName) {
     selectTask(selectedFileName);
@@ -570,10 +573,10 @@ function showError(error) {
   rawText.textContent = error.message;
   parsedText.textContent = "";
   validationResult.textContent = "";
-  runtimePanel.textContent = "";
+  startupCheckPanel.textContent = "";
   parseStatus.textContent = "失败";
   validationStatus.textContent = "失败";
-  runtimeStatus.textContent = "失败";
+  startupCheckStatus.textContent = "失败";
   recommendationStatus.textContent = "失败";
   if (recommendationResult) recommendationResult.textContent = error.message;
   runRecommendationButton.disabled = false;

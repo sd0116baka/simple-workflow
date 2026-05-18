@@ -1,101 +1,119 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { evaluateExecutionAdmission } from "../src/workflow/execution-admission.js";
+import {
+  evaluateExecutionAdmission,
+  evaluateStartupCheck,
+  runtimeSnapshotFromRepositoryStatus,
+} from "../src/workflow/execution-admission.js";
 
-function intent(taskId = "task-001") {
+function taskContextPackage(overrides = {}) {
   return {
-    recommendedTask: {
-      id: taskId,
-      sourceFile: `tasks/${taskId}.yaml`,
-      title: "展示任务真源",
-      priority: "normal",
+    packageId: "task-context-package:tasks/task-001.yaml",
+    currentWorkStage: "task-recommender",
+    taskDraft: {
+      id: "task-001",
+      name: "展示任务真源",
+      goal: "展示任务",
+      acceptanceCriteria: ["可以看到任务"],
+      maxIterations: "default",
     },
-  };
-}
-
-function taskPool(status = "ready") {
-  return {
-    entries: [
-      {
-        id: "task-001",
-        sourceFile: "tasks/task-001.yaml",
-        title: "展示任务真源",
-        type: "feature",
-        priority: "normal",
-        status,
+    artifacts: {
+      executionIntent: {
+        recommendedPackageId: "task-context-package:tasks/task-001.yaml",
+        confidence: "medium",
       },
-    ],
-  };
-}
-
-function runtime(overrides = {}) {
-  return {
-    status: "idle",
-    canStartNewTask: true,
-    runnableTasks: [{ id: "task-001" }],
-    blockingReasons: [],
+    },
     ...overrides,
   };
 }
 
-test("allows a ready recommended task when runtime can start", () => {
-  const admission = evaluateExecutionAdmission({
-    executionIntent: intent(),
-    taskPool: taskPool(),
-    runtimeStatus: runtime(),
-  });
+const candidateTasks = [{ packageId: "task-context-package:tasks/task-001.yaml" }];
+const cleanRuntimeSnapshot = {
+  activeWork: null,
+  worktree: {
+    clean: true,
+    changedFiles: [],
+  },
+};
+const projectProfile = {
+  defaults: {
+    maxIterations: 3,
+  },
+};
 
-  assert.equal(admission.status, "authorized");
-  assert.equal(admission.authorized, true);
-  assert.equal(admission.requiresConfirmation, true);
-  assert.equal(admission.taskId, "task-001");
+test("startup check passes when the global environment can start work", () => {
+  const startupCheck = evaluateStartupCheck({ runtimeSnapshot: cleanRuntimeSnapshot });
+
+  assert.equal(startupCheck.canStartWork, true);
+  assert.deepEqual(startupCheck.findings, []);
 });
 
-test("blocks when there is no execution intent", () => {
-  const admission = evaluateExecutionAdmission({
-    executionIntent: null,
-    taskPool: taskPool(),
-    runtimeStatus: runtime(),
+test("startup check blocks when the worktree is dirty", () => {
+  const startupCheck = evaluateStartupCheck({
+    runtimeSnapshot: {
+      activeWork: null,
+      worktree: {
+        clean: false,
+        changedFiles: ["public/app.js"],
+      },
+    },
   });
 
-  assert.equal(admission.status, "blocked");
-  assert.equal(admission.authorized, false);
-  assert.deepEqual(admission.reasons, ["No execution intent"]);
+  assert.equal(startupCheck.canStartWork, false);
+  assert.equal(startupCheck.findings[0].code, "WORKTREE_DIRTY");
 });
 
-test("blocks when the recommended task is not in the task pool", () => {
-  const admission = evaluateExecutionAdmission({
-    executionIntent: intent("task-404"),
-    taskPool: taskPool(),
-    runtimeStatus: runtime(),
-  });
-
-  assert.equal(admission.status, "blocked");
-  assert.match(admission.reasons[0], /not in the task pool/);
-});
-
-test("blocks when the recommended task is not ready", () => {
-  const admission = evaluateExecutionAdmission({
-    executionIntent: intent(),
-    taskPool: taskPool("blocked"),
-    runtimeStatus: runtime(),
-  });
-
-  assert.equal(admission.status, "blocked");
-  assert.match(admission.reasons[0], /is blocked/);
-});
-
-test("blocks when runtime cannot start a task", () => {
-  const admission = evaluateExecutionAdmission({
-    executionIntent: intent(),
-    taskPool: taskPool(),
-    runtimeStatus: runtime({
-      status: "blocked",
-      canStartNewTask: false,
-      blockingReasons: ["Working tree has uncommitted changes"],
+test("builds runtime snapshot from repository status", () => {
+  assert.deepEqual(
+    runtimeSnapshotFromRepositoryStatus({
+      clean: false,
+      entries: [{ code: "M", path: "docs/definitions/execution-admission.md" }],
     }),
+    {
+      activeWork: null,
+      worktree: {
+        clean: false,
+        changedFiles: ["docs/definitions/execution-admission.md"],
+      },
+    },
+  );
+});
+
+test("requests execution authorization when all deterministic checks pass", () => {
+  const admission = evaluateExecutionAdmission({
+    taskContextPackage: taskContextPackage(),
+    candidateTasks,
+    runtimeSnapshot: cleanRuntimeSnapshot,
+    projectProfile,
+    now: () => "2026-05-18T10:00:00.000Z",
   });
 
-  assert.equal(admission.status, "blocked");
-  assert.deepEqual(admission.reasons, ["Working tree has uncommitted changes"]);
+  assert.equal(admission.appendRequest.packageId, "task-context-package:tasks/task-001.yaml");
+  assert.equal(admission.appendRequest.artifactType, "executionAuthorization");
+  assert.equal(admission.appendRequest.artifact.authorizedAt, "2026-05-18T10:00:00.000Z");
+  assert.equal(admission.appendRequest.artifact.termination.maxIterations, 3);
+});
+
+test("requests admission rejection when execution intent is not a candidate", () => {
+  const admission = evaluateExecutionAdmission({
+    taskContextPackage: taskContextPackage(),
+    candidateTasks: [],
+    runtimeSnapshot: cleanRuntimeSnapshot,
+    projectProfile,
+  });
+
+  assert.equal(admission.appendRequest.artifactType, "admissionRejection");
+  assert.equal(admission.appendRequest.artifact.findings[0].code, "INTENT_NOT_CANDIDATE");
+});
+
+test("requests human decision when a required default cannot resolve", () => {
+  const admission = evaluateExecutionAdmission({
+    taskContextPackage: taskContextPackage(),
+    candidateTasks,
+    runtimeSnapshot: cleanRuntimeSnapshot,
+    projectProfile: { defaults: {} },
+  });
+
+  assert.equal(admission.appendRequest.artifactType, "humanDecisionRequest");
+  assert.equal(admission.appendRequest.artifact.findings[0].code, "DEFAULT_NOT_RESOLVED");
 });

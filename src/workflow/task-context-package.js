@@ -1,124 +1,98 @@
-function summarizeTask(task) {
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function toTaskDraft(task) {
   return task
     ? {
-        id: task.id,
-        sourceFile: task.sourceFile,
-        title: task.title,
-        type: task.type,
-        priority: task.priority,
-        status: task.status,
-        validationStatus: task.validation?.status ?? "unknown",
+        id: task.parsed?.id ?? task.id,
+        name: task.parsed?.title ?? task.title,
+        kind: task.parsed?.type ?? "default",
+        priority: task.parsed?.priority ?? "default",
+        goal: task.parsed?.description ?? "default",
+        acceptanceCriteria: Array.isArray(task.parsed?.acceptance)
+          ? [...task.parsed.acceptance]
+          : "default",
+        maxIterations: "default",
       }
     : null;
 }
 
-function summarizeExecutionIntent(executionIntent) {
+function toRecognition(task) {
+  return {
+    outcome: task?.status === "ready" ? "recognized" : "incomplete",
+    findings: task?.validation?.errors?.map((message) => ({
+      field: "taskDraft",
+      severity: "blocking",
+      message,
+    })) ?? [],
+  };
+}
+
+function toQualityGate(task) {
+  return {
+    outcome: task?.status === "ready" ? "pass" : "fail",
+  };
+}
+
+function toExecutionIntentArtifact(executionIntent, packageId) {
   return executionIntent
     ? {
+        recommendedPackageId: packageId,
         recommendedTask: { ...executionIntent.recommendedTask },
         confidence: executionIntent.confidence,
-        rationaleCount: executionIntent.rationale?.length ?? 0,
+        rationale: [...(executionIntent.rationale ?? [])],
         nextAction: executionIntent.nextAction,
       }
     : null;
 }
 
-function summarizeExecutionAuthorization(executionAdmission) {
-  return executionAdmission?.authorized
-    ? {
-        status: executionAdmission.status,
-        taskId: executionAdmission.taskId,
-        requiresConfirmation: executionAdmission.requiresConfirmation,
-        runtimeStatus: executionAdmission.runtimeStatus,
-      }
-    : null;
-}
-
-function summarizeAdmissionBlock(executionAdmission) {
-  return executionAdmission && !executionAdmission.authorized
-    ? {
-        status: executionAdmission.status,
-        taskId: executionAdmission.taskId,
-        reasons: [...(executionAdmission.reasons ?? [])],
-      }
-    : null;
-}
-
-function resolvePackageStatus({ task, executionIntent, executionAdmission }) {
-  if (executionAdmission?.authorized) return "authorization-appended";
-  if (executionAdmission && !executionAdmission.authorized) return "authorization-blocked";
-  if (executionIntent) return "intent-appended";
-  if (task?.status) return task.status;
-  return "missing-task";
-}
-
-function buildRecords({ task, executionIntent, executionAdmission }) {
-  const records = [];
-
-  if (task) {
-    records.push({
-      stage: "任务解析器",
-      artifact: "任务上下文包",
-      status: task.status,
-      summary: `由 ${task.sourceFile} 生成基础任务上下文包。`,
-    });
-  }
-
-  if (executionIntent) {
-    records.push({
-      stage: "任务推荐器",
-      artifact: "执行意图",
-      status: "appended",
-      summary: `推荐执行 ${executionIntent.recommendedTask.id}，confidence: ${executionIntent.confidence}。`,
-    });
-  }
-
-  if (executionAdmission?.authorized) {
-    records.push({
-      stage: "执行准入器",
-      artifact: "执行授权",
-      status: "appended",
-      summary: `已为 ${executionAdmission.taskId} 追加执行授权。`,
-    });
-  } else if (executionAdmission) {
-    records.push({
-      stage: "执行准入器",
-      artifact: "授权拒绝",
-      status: "blocked",
-      summary: `未追加执行授权：${executionAdmission.reasons?.join("; ") || "无原因"}`,
-    });
-  }
-
-  return records;
+function applyAppendRequest(artifacts, appendRequest) {
+  if (!appendRequest?.artifactType) return;
+  artifacts[appendRequest.artifactType] = clone(appendRequest.artifact);
 }
 
 export function buildTaskContextPackage({
   taskPool,
   executionIntent,
-  executionAdmission,
+  appendRequest,
 } = {}) {
   const taskId =
-    executionAdmission?.taskId ??
     executionIntent?.recommendedTask?.id ??
+    appendRequest?.packageId?.replace(/^task-context-package:tasks\//, "").replace(/\.ya?ml$/, "") ??
     null;
   if (!taskId) return null;
 
   const task = taskPool?.entries?.find((entry) => entry.id === taskId) ?? null;
-  const status = resolvePackageStatus({ task, executionIntent, executionAdmission });
+  const packageId =
+    task?.packageId ??
+    appendRequest?.packageId ??
+    (executionIntent?.recommendedTask?.sourceFile
+      ? `task-context-package:${executionIntent.recommendedTask.sourceFile}`
+      : null);
+  if (!packageId) return null;
+
+  const artifacts = {};
+  const executionIntentArtifact = toExecutionIntentArtifact(executionIntent, packageId);
+  if (executionIntentArtifact) {
+    artifacts.executionIntent = executionIntentArtifact;
+  }
+  applyAppendRequest(artifacts, appendRequest);
 
   return {
     schemaVersion: 1,
-    id: `task-context-package:${taskId}`,
-    taskId,
-    sourceFile: task?.sourceFile ?? executionIntent?.recommendedTask?.sourceFile ?? null,
-    status,
-    currentStage: "执行准入器",
-    task: summarizeTask(task),
-    appended: {
-      executionIntent: summarizeExecutionIntent(executionIntent),
-      executionAuthorization: summarizeExecutionAuthorization(executionAdmission),
-      admissionBlock: summarizeAdmissionBlock(executionAdmission),
+    packageId,
+    currentWorkStage: appendRequest ? "execution-admission" : "task-recommender",
+    source: {
+      path: packageId.replace(/^task-context-package:/, ""),
+      format: "yaml",
+      contentHash: "unavailable",
     },
-    records: buildRecords({ task, executionIntent, executionAdmission }),
+    recognition: toRecognition(task),
+    taskDraft: toTaskDraft(task),
+    qualityGate: toQualityGate(task),
+    artifacts,
+    agents: {},
+    timeline: [],
   };
 }

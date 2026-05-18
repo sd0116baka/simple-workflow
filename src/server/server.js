@@ -93,8 +93,8 @@ export function createApp({
         return;
       }
 
-      if (request.url?.startsWith("/api/runtime")) {
-        sendJson(response, 200, { runtimeStatus: await workflowService.getRuntimeStatus() });
+      if (request.url?.startsWith("/api/startup-check")) {
+        sendJson(response, 200, { startupCheck: await workflowService.getStartupCheck() });
         return;
       }
 

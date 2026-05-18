@@ -1,19 +1,14 @@
-function toChangedFiles(repositoryStatus) {
-  return (repositoryStatus?.entries ?? []).map((entry) => entry.path);
-}
-
-export function buildRecommendationPrompt({ basePrompt, runtimeStatus } = {}) {
+export function buildRecommendationPrompt({ basePrompt, candidateTasks = [], startupCheck } = {}) {
   const context = {
     schemaVersion: 1,
-    candidateTasks: runtimeStatus?.runnableTasks ?? [],
+    candidateTasks,
     repoStatus: {
-      clean: runtimeStatus?.repositoryStatus?.clean ?? false,
-      changedFiles: toChangedFiles(runtimeStatus?.repositoryStatus),
+      clean: startupCheck?.runtimeSnapshot?.worktree?.clean ?? false,
+      changedFiles: startupCheck?.runtimeSnapshot?.worktree?.changedFiles ?? [],
     },
-    runtime: {
-      status: runtimeStatus?.status ?? "unknown",
-      canStartNewTask: runtimeStatus?.canStartNewTask ?? false,
-      blockingReasons: runtimeStatus?.blockingReasons ?? [],
+    startupCheck: {
+      canStartWork: startupCheck?.canStartWork ?? false,
+      findings: startupCheck?.findings ?? [],
     },
   };
 

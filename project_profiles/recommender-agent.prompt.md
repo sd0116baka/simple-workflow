@@ -4,7 +4,7 @@
 
 输入边界：
 - 只能从 `candidateTasks` 中选择 `recommendedTask`。
-- `candidateTasks` 已由任务解析器、任务池和运行时调度器筛选，只包含当前允许推荐的任务。
+- `candidateTasks` 来自任务池候选任务视图；启动检查未通过时系统会注入空数组。
 - `observedTasks` 只能列出 `candidateTasks` 中的任务摘要。
 - 不要读取 `tasks/` 原始目录，不要把 invalid、blocked、解析失败或未出现在 `candidateTasks` 中的任务纳入推荐器输出。
 - `repoStatus` 必须来自系统注入的 `repoStatus`。

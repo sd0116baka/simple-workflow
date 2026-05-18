@@ -48,32 +48,31 @@ test("workflow service exposes a task pool built from parsed tasks", async () =>
   assert.equal(pool.entries[0].status, "ready");
 });
 
-test("workflow service exposes runtime status from the task pool", async () => {
-  const tasksDir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "runtime");
+test("workflow service exposes startup check from repository status", async () => {
+  const tasksDir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "startup-check");
   await mkdir(tasksDir, { recursive: true });
   await writeFile(
     join(tasksDir, "task.yaml"),
     [
-      "id: task-runtime",
-      "title: 运行时调度器",
+      "id: task-startup-check",
+      "title: 启动检查",
       "type: feature",
-      "description: 计算 ready 任务",
+      "description: 检查运行环境",
       "acceptance:",
-      "  - 可以看到 runnableTasks",
+      "  - 可以看到 canStartWork",
       "",
     ].join("\n"),
   );
 
   const service = createWorkflowService({
-    tasksDir,
-    getRepositoryStatus: async () => ({ clean: true, entries: [] }),
+      tasksDir,
+      getRepositoryStatus: async () => ({ clean: true, entries: [] }),
   });
-  const runtime = await service.getRuntimeStatus();
+  const startupCheck = await service.getStartupCheck();
 
-  assert.equal(runtime.status, "idle");
-  assert.equal(runtime.canStartNewTask, true);
-  assert.deepEqual(runtime.runnableTasks.map((task) => task.id), ["task-runtime"]);
-  assert.equal(runtime.repositoryStatus.clean, true);
+  assert.equal(startupCheck.canStartWork, true);
+  assert.deepEqual(startupCheck.findings, []);
+  assert.equal(startupCheck.runtimeSnapshot.worktree.clean, true);
 });
 
 test("workflow service emits tasks-changed when a YAML task file changes", async (t) => {

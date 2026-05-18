@@ -117,7 +117,7 @@ h2 {
 }
 
 .pool-section,
-.runtime-section,
+.startup-check-section,
 .recommender-section {
   min-height: 220px;
 }
@@ -220,30 +220,30 @@ h2 {
   color: #b42318;
 }
 
-.runtime-panel {
+.startup-check-panel {
   padding: 14px;
   color: #172033;
   font-size: 13px;
 }
 
-.runtime-summary {
+.startup-check-summary {
   margin-bottom: 12px;
   padding: 10px 12px;
   border-radius: 6px;
   font-weight: 650;
 }
 
-.runtime-summary.idle {
+.startup-check-summary.pass {
   background: #e8f7ef;
   color: #17663a;
 }
 
-.runtime-summary.blocked {
+.startup-check-summary.fail {
   background: #fff0ed;
   color: #b42318;
 }
 
-.runtime-metric {
+.startup-check-metric {
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -251,12 +251,12 @@ h2 {
   border-bottom: 1px solid #eef2f7;
 }
 
-.runtime-list {
+.startup-check-list {
   margin: 10px 0 0;
   padding-left: 18px;
 }
 
-.runtime-list li + li {
+.startup-check-list li + li {
   margin-top: 6px;
 }
 
@@ -294,6 +294,11 @@ h2 {
 }
 
 .recommendation-summary.failed {
+  background: #fff0ed;
+  color: #b42318;
+}
+
+.recommendation-summary.blocked {
   background: #fff0ed;
   color: #b42318;
 }
@@ -346,12 +351,13 @@ h2 {
   background: #ffffff;
 }
 
-.admission-panel.authorized {
+.admission-panel.executionAuthorization {
   border-color: #b8dec7;
   background: #f4fbf6;
 }
 
-.admission-panel.blocked {
+.admission-panel.admissionRejection,
+.admission-panel.humanDecisionRequest {
   border-color: #f2b8ae;
   background: #fff7f5;
 }
@@ -393,14 +399,9 @@ h2 {
   background: #ffffff;
 }
 
-.context-package.authorization-appended {
+.context-package.execution-admission {
   border-color: #b8dec7;
   background: #f4fbf6;
-}
-
-.context-package.authorization-blocked {
-  border-color: #f2b8ae;
-  background: #fff7f5;
 }
 
 .context-package-title {
