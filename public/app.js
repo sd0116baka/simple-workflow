@@ -410,7 +410,9 @@ function renderRecommendationRun() {
     return;
   }
 
-  recommendationStatus.textContent = recommendationRun.status;
+  recommendationStatus.textContent = recommendationRun.status === "running"
+    ? `${recommendationRun.status} · ${formatElapsed(recommendationRun.startedAt)}`
+    : `${recommendationRun.status} · 用时 ${formatElapsed(recommendationRun.startedAt, recommendationRun.finishedAt)}`;
   const summary = document.createElement("div");
   summary.className = `recommendation-summary ${recommendationRun.status}`;
   summary.textContent =
