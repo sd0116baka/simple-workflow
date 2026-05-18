@@ -109,6 +109,10 @@ test("recommendation flow applies module append requests through the task pool",
         maxIterations: 3,
       },
     },
+    runMainAgentSession: ({ role, packageId }) => ({
+      sessionId: `session:${role}:${packageId}`,
+      status: "succeeded",
+    }),
     now: () => "2026-05-18T10:00:01.000Z",
   });
 
@@ -120,4 +124,7 @@ test("recommendation flow applies module append requests through the task pool",
     completed.taskContextPackage.artifacts.executionAuthorization.body.termination.maxIterations,
     3,
   );
+  assert.equal(completed.mainAgentInitialization.appendRequest.agentRun.role, "main");
+  assert.equal(completed.taskContextPackage.currentWorkStage, "main-agent");
+  assert.equal(completed.taskContextPackage.agentRuns[0].sessionId, "session:main:task-context-package:tasks/task-001.yaml");
 });

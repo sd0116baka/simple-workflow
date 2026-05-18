@@ -105,8 +105,10 @@ test("workflow service captures a successful recommendation run", async () => {
   assert.equal(finished.executionIntentAppendRequest.artifactType, "executionIntent");
   assert.equal(finished.executionIntentError, null);
   assert.equal(finished.executionAdmission.appendRequest.artifactType, "executionAuthorization");
-  assert.equal(finished.taskContextPackage.currentWorkStage, "execution-admission");
+  assert.equal(finished.taskContextPackage.currentWorkStage, "main-agent");
   assert.equal(finished.taskContextPackage.artifacts.executionAuthorization.body.termination.maxIterations, 3);
+  assert.equal(finished.taskContextPackage.agentRuns[0].role, "main");
+  assert.match(finished.taskContextPackage.agentRuns[0].sessionId, /^stub-main-session:/);
   assert.equal(finished.exitCode, 0);
   assert.equal(service.getLatestRecommendationRun().status, "succeeded");
 });

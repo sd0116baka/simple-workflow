@@ -182,6 +182,25 @@ function createTaskContextPackagePanel(taskContextPackage) {
     panel.append(list);
   }
 
+  if (taskContextPackage.agentRuns?.length > 0) {
+    const title = document.createElement("div");
+    title.className = "context-package-section-title";
+    title.textContent = "Agent 调用";
+
+    const list = document.createElement("ul");
+    list.className = "context-package-records";
+    for (const agentRun of taskContextPackage.agentRuns) {
+      const item = document.createElement("li");
+      item.innerHTML = "<strong></strong><span></span><em></em>";
+      item.querySelector("strong").textContent = agentRun.runId;
+      item.querySelector("span").textContent = `${agentRun.role} · ${agentRun.status}`;
+      item.querySelector("em").textContent = agentRun.sessionId;
+      list.append(item);
+    }
+
+    panel.append(title, list);
+  }
+
   return panel;
 }
 
