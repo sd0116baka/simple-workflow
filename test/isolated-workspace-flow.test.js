@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { allocateIsolatedWorkspace } from "../src/workflow/isolated-workspace-flow.js";
@@ -98,12 +98,16 @@ test("reuses an existing registered git worktree for the same task", async (t) =
   });
 });
 
-test("records the actual worktree head when reusing an older registered worktree", async (t) => {
+test("cleans and resets a reused registered worktree to the current base branch", async (t) => {
   const repositoryDir = await createGitRepository(t);
   const first = allocateIsolatedWorkspace({
     taskContextPackage: authorizedPackage(),
     repositoryDir,
   });
+  const worktreeDir = join(repositoryDir, ".workflow", "worktrees", "tasks", "tasks-task-003");
+  await writeFile(join(worktreeDir, "README.md"), "dirty worktree\n");
+  await writeFile(join(worktreeDir, "scratch.txt"), "old execution output\n");
+
   await writeFile(join(repositoryDir, "CHANGELOG.md"), "main changed\n");
   runGit(["add", "CHANGELOG.md"], repositoryDir);
   runGit([
@@ -122,11 +126,17 @@ test("records the actual worktree head when reusing an older registered worktree
 
   assert.equal(first.error, null);
   assert.equal(second.error, null);
-  assert.equal(second.appendRequest.artifact.baseCommit, first.appendRequest.artifact.baseCommit);
-  assert.notEqual(second.appendRequest.artifact.baseCommit, runGit(["rev-parse", "HEAD"], repositoryDir));
+  assert.equal(second.appendRequest.artifact.baseCommit, runGit(["rev-parse", "HEAD"], repositoryDir));
+  assert.notEqual(second.appendRequest.artifact.baseCommit, first.appendRequest.artifact.baseCommit);
+  assert.equal(
+    (await readFile(join(worktreeDir, "README.md"), "utf8")).replace(/\r\n/g, "\n"),
+    "test repository\n",
+  );
+  assert.equal(existsSync(join(worktreeDir, "scratch.txt")), false);
+  assert.equal(runGit(["status", "--porcelain", "--untracked-files=all"], worktreeDir), "");
 });
 
-test("does not claim readiness when a registered worktree path is missing", async (t) => {
+test("prunes and recreates a registered worktree when its path is missing", async (t) => {
   const repositoryDir = await createGitRepository(t);
   const first = allocateIsolatedWorkspace({
     taskContextPackage: authorizedPackage(),
@@ -142,8 +152,31 @@ test("does not claim readiness when a registered worktree path is missing", asyn
   });
 
   assert.equal(first.error, null);
-  assert.equal(second.appendRequest, null);
-  assert.match(second.error, /路径不存在/);
+  assert.equal(second.error, null);
+  assert.equal(
+    existsSync(join(repositoryDir, ".workflow", "worktrees", "tasks", "tasks-task-003")),
+    true,
+  );
+  assert.equal(second.appendRequest.artifact.baseCommit, first.appendRequest.artifact.baseCommit);
+});
+
+test("removes residual unregistered worktree path before creating", async (t) => {
+  const repositoryDir = await createGitRepository(t);
+  const residualPath = join(repositoryDir, ".workflow", "worktrees", "tasks", "tasks-task-003");
+  await mkdir(residualPath, { recursive: true });
+  await writeFile(join(residualPath, "old-output.txt"), "old output\n");
+
+  const result = allocateIsolatedWorkspace({
+    taskContextPackage: authorizedPackage(),
+    repositoryDir,
+  });
+
+  assert.equal(result.error, null);
+  assert.equal(
+    runGit(["branch", "--show-current"], residualPath),
+    "workflow/tasks/tasks-task-003",
+  );
+  assert.equal(existsSync(join(residualPath, "old-output.txt")), false);
 });
 
 test("does not allocate isolated workspace before execution authorization", () => {

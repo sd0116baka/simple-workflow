@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 
 function safePackageIdFromSourcePath(sourcePath) {
@@ -49,6 +49,29 @@ function findRegisteredWorktree({ repositoryDir, absoluteWorktreePath }) {
     });
 }
 
+function resetAndCleanGitWorktree({ absoluteWorktreePath, baseBranch }) {
+  runGit(["reset", "--hard", baseBranch], { cwd: absoluteWorktreePath });
+  runGit(["clean", "-fdx"], { cwd: absoluteWorktreePath });
+  return runGit(["rev-parse", "HEAD"], { cwd: absoluteWorktreePath });
+}
+
+function managedWorktreeRoot(repositoryDir) {
+  return resolve(repositoryDir, ".workflow", "worktrees", "tasks");
+}
+
+function isPathInside(parentPath, childPath) {
+  const parent = resolve(parentPath).toLowerCase();
+  const child = resolve(childPath).toLowerCase();
+  return child === parent || child.startsWith(`${parent}\\`) || child.startsWith(`${parent}/`);
+}
+
+function removeResidualWorktreePath({ repositoryDir, absoluteWorktreePath, worktreePath }) {
+  if (!isPathInside(managedWorktreeRoot(repositoryDir), absoluteWorktreePath)) {
+    throw new Error(`拒绝清理非系统管理的隔离工作树路径：${worktreePath}`);
+  }
+  rmSync(absoluteWorktreePath, { recursive: true, force: true });
+}
+
 function ensureGitWorktree({
   repositoryDir,
   worktreePath,
@@ -65,16 +88,24 @@ function ensureGitWorktree({
   });
 
   if (worktreeIsRegistered) {
-    if (!existsSync(absoluteWorktreePath)) {
-      throw new Error(`隔离工作树已注册但路径不存在：${worktreePath}`);
+    if (existsSync(absoluteWorktreePath)) {
+      return {
+        baseCommit: resetAndCleanGitWorktree({
+          absoluteWorktreePath,
+          baseBranch,
+        }),
+      };
     }
-    return {
-      baseCommit: runGit(["rev-parse", "HEAD"], { cwd: absoluteWorktreePath }),
-    };
+
+    runGit(["worktree", "prune"], { cwd: repositoryDir });
   }
 
   if (existsSync(absoluteWorktreePath)) {
-    throw new Error(`隔离工作树路径已存在但未注册为 git worktree：${worktreePath}`);
+    removeResidualWorktreePath({
+      repositoryDir,
+      absoluteWorktreePath,
+      worktreePath,
+    });
   }
 
   mkdirSync(dirname(absoluteWorktreePath), { recursive: true });

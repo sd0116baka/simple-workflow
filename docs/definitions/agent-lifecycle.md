@@ -240,7 +240,22 @@ executionAuthorization
 
 准入通过后才创建 `isolatedWorkspace`。第一个 `execution` Agent 启动前，`isolatedWorkspace` 必须已经追加到任务上下文包。
 
+系统尝试创建任务 worktree 时，如果发现同一路径已有上次运行残留，先自动清理，再完成本次分配。
+
 如果同一任务的 worktree 已经存在且仍被 git 注册，系统复用它，不重复创建新工作树。
+
+复用前系统必须自动清理该 worktree：
+
+```text
+git reset --hard <baseBranch>
+git clean -fdx
+```
+
+这会丢弃该隔离工作树里的未提交变更和未跟踪文件，并把任务分支重新对齐当前 `baseBranch`。
+
+如果目标路径存在但不是 git 注册的 worktree，且路径位于 `.workflow/worktrees/tasks/` 系统管理目录下，系统删除该残留路径后重新创建 worktree。
+
+如果 git 记录里仍有该 worktree，但路径已经不存在，系统先 `git worktree prune`，再重新创建。
 
 第一版命名规则：
 
