@@ -89,12 +89,6 @@ export function createApp({
         return;
       }
 
-      if (request.method === "POST" && request.url?.startsWith("/api/auto-merge/plan")) {
-        const result = await workflowService.planAutoMerge();
-        sendJson(response, result.error ? 409 : 200, result);
-        return;
-      }
-
       if (request.method === "GET" && request.url?.startsWith("/api/recommendation-runs/latest")) {
         sendJson(response, 200, { recommendationRun: workflowService.getLatestRecommendationRun() });
         return;

@@ -213,7 +213,7 @@ export function createWorkflowService({
         };
       }
 
-      const taskPool = applyAppendRequest(
+      let taskPool = applyAppendRequest(
         buildTaskPool(await listRawTasks(tasksDir), {
           taskContextPackages: [latestRecommendationRun.taskContextPackage],
         }),
@@ -225,23 +225,6 @@ export function createWorkflowService({
           taskPackage.packageId === decision.appendRequest.packageId,
         ) ?? latestRecommendationRun.taskContextPackage;
       latestRecommendationRun.completionHumanDecisionError = null;
-      emitRecommendationChanged(latestRecommendationRun);
-
-      return {
-        accepted: true,
-        error: null,
-        recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
-      };
-    },
-
-    async planAutoMerge() {
-      if (!latestRecommendationRun?.taskContextPackage) {
-        return {
-          planned: false,
-          error: "没有可自动合并的任务上下文包。",
-          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
-        };
-      }
 
       const planning = planAutoMerge({
         taskContextPackage: latestRecommendationRun.taskContextPackage,
@@ -251,13 +234,14 @@ export function createWorkflowService({
         latestRecommendationRun.autoMergePlanningError = planning.error;
         emitRecommendationChanged(latestRecommendationRun);
         return {
+          accepted: true,
           planned: false,
           error: planning.error,
           recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
         };
       }
 
-      const taskPool = applyAppendRequest(
+      taskPool = applyAppendRequest(
         buildTaskPool(await listRawTasks(tasksDir), {
           taskContextPackages: [latestRecommendationRun.taskContextPackage],
         }),
@@ -277,6 +261,7 @@ export function createWorkflowService({
       emitRecommendationChanged(latestRecommendationRun);
 
       return {
+        accepted: true,
         planned: planning.appendRequest.artifactType === "autoMergePlan",
         error: null,
         recommendationRun: toRecommendationSnapshot(latestRecommendationRun),

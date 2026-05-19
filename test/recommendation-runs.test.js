@@ -224,8 +224,10 @@ test("workflow service captures a successful recommendation run", async (t) => {
   const accepted = await service.acceptTaskCompletion();
 
   assert.equal(accepted.accepted, true);
+  assert.equal(accepted.planned, true);
   assert.equal(accepted.error, null);
-  assert.equal(accepted.recommendationRun.taskContextPackage.currentWorkStage, "auto-merge");
+  assert.equal(accepted.recommendationRun.autoMergePlanning.appendRequest.artifactType, "autoMergePlan");
+  assert.equal(accepted.recommendationRun.taskContextPackage.currentWorkStage, "auto-merge-execution");
   assert.equal(
     accepted.recommendationRun.taskContextPackage.artifacts.humanDecision.body.decision,
     "accept-completion",
@@ -241,34 +243,27 @@ test("workflow service captures a successful recommendation run", async (t) => {
       ".workflow-agent/execution-agent-002.txt",
     ],
   );
-
-  const planned = await service.planAutoMerge();
-
-  assert.equal(planned.planned, true);
-  assert.equal(planned.error, null);
-  assert.equal(planned.recommendationRun.autoMergePlanning.appendRequest.artifactType, "autoMergePlan");
-  assert.equal(planned.recommendationRun.taskContextPackage.currentWorkStage, "auto-merge-execution");
   assert.deepEqual(
-    planned.recommendationRun.taskContextPackage.artifacts.autoMergePlan.body.changeSet.changedFiles,
+    accepted.recommendationRun.taskContextPackage.artifacts.autoMergePlan.body.changeSet.changedFiles,
     [
       ".workflow-agent/execution-agent-001.txt",
       ".workflow-agent/execution-agent-002.txt",
     ],
   );
   assert.equal(
-    "hasChanges" in planned.recommendationRun.taskContextPackage.artifacts.autoMergePlan.body.changeSet,
+    "hasChanges" in accepted.recommendationRun.taskContextPackage.artifacts.autoMergePlan.body.changeSet,
     false,
   );
   assert.equal(
-    "strategy" in planned.recommendationRun.taskContextPackage.artifacts.autoMergePlan.body,
+    "strategy" in accepted.recommendationRun.taskContextPackage.artifacts.autoMergePlan.body,
     false,
   );
   assert.equal(
-    "nextRequiredStage" in planned.recommendationRun.taskContextPackage.artifacts.autoMergePlan.body,
+    "nextRequiredStage" in accepted.recommendationRun.taskContextPackage.artifacts.autoMergePlan.body,
     false,
   );
   assert.equal(
-    "taskCompletionRef" in planned.recommendationRun.taskContextPackage.artifacts.autoMergePlan.body,
+    "taskCompletionRef" in accepted.recommendationRun.taskContextPackage.artifacts.autoMergePlan.body,
     false,
   );
 });
@@ -525,6 +520,7 @@ test("POST /api/human-decisions/accept-completion accepts completion", async (t)
     async acceptTaskCompletion() {
       return {
         accepted: true,
+        planned: true,
         error: null,
         recommendationRun: latestRun,
       };
@@ -549,41 +545,6 @@ test("POST /api/human-decisions/accept-completion accepts completion", async (t)
 
   assert.equal(response.status, 200);
   assert.equal(payload.accepted, true);
-  assert.equal(payload.recommendationRun.status, "succeeded");
-});
-
-test("POST /api/auto-merge/plan creates auto-merge plan", async (t) => {
-  const latestRun = {
-    id: "recommendation-run-test",
-    status: "succeeded",
-  };
-  const workflowService = {
-    async planAutoMerge() {
-      return {
-        planned: true,
-        error: null,
-        recommendationRun: latestRun,
-      };
-    },
-    getLatestRecommendationRun() {
-      return latestRun;
-    },
-    onEvent() {
-      return () => {};
-    },
-  };
-  const server = createApp({ workflowService });
-  server.listen(0);
-  t.after(() => server.close());
-  await once(server, "listening");
-
-  const response = await fetch(
-    `http://localhost:${server.address().port}/api/auto-merge/plan`,
-    { method: "POST" },
-  );
-  const payload = await response.json();
-
-  assert.equal(response.status, 200);
   assert.equal(payload.planned, true);
   assert.equal(payload.recommendationRun.status, "succeeded");
 });

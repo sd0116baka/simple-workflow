@@ -38,7 +38,6 @@ const autoMergeStatus = document.querySelector("#autoMergeStatus");
 const autoMergeInputs = document.querySelector("#autoMergeInputs");
 const autoMergeRaw = document.querySelector("#autoMergeRaw");
 const autoMergePanel = document.querySelector("#autoMergePanel");
-const planAutoMergeButton = document.querySelector("#planAutoMergeButton");
 
 let tasks = [];
 let poolEntries = [];
@@ -422,8 +421,6 @@ function renderAutoMerge(taskContextPackage) {
     { label: "拒绝记录", value: rejection?.artifactId ?? "未生成" },
   ]);
 
-  planAutoMergeButton.disabled = taskContextPackage?.currentWorkStage !== "auto-merge";
-
   if (plan) {
     autoMergeStatus.textContent = "可执行合并";
     const panel = createAutoMergePanel(taskContextPackage);
@@ -439,8 +436,8 @@ function renderAutoMerge(taskContextPackage) {
   }
 
   if (taskContextPackage?.currentWorkStage === "auto-merge") {
-    autoMergeStatus.textContent = "等待检查";
-    autoMergePanel.textContent = "人工已接受完成，可以生成自动合并计划。";
+    autoMergeStatus.textContent = "自动检查中";
+    autoMergePanel.textContent = "人工已接受完成，系统正在生成自动合并计划。";
     return;
   }
 
@@ -458,19 +455,6 @@ async function acceptCompletion() {
   const payload = await response.json();
   if (!response.ok) {
     throw new Error(payload.error ?? `接受完成失败：${response.status}`);
-  }
-  recommendationRun = payload.recommendationRun ?? null;
-  renderRecommendationRun();
-}
-
-async function planAutoMerge() {
-  autoMergeStatus.textContent = "检查中";
-  const response = await fetch("/api/auto-merge/plan", {
-    method: "POST",
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload.error ?? `生成自动合并计划失败：${response.status}`);
   }
   recommendationRun = payload.recommendationRun ?? null;
   renderRecommendationRun();
@@ -674,7 +658,6 @@ function renderRecommendationRun() {
     autoMergeStatus.textContent = "等待输入";
     autoMergeRaw.textContent = "尚未进入自动合并环节。";
     autoMergePanel.textContent = "等待人工接受完成。";
-    planAutoMergeButton.disabled = true;
     return;
   }
 
@@ -864,10 +847,6 @@ refreshButton.addEventListener("click", () => {
 
 runRecommendationButton.addEventListener("click", () => {
   createRecommendationRun().catch(showError);
-});
-
-planAutoMergeButton.addEventListener("click", () => {
-  planAutoMerge().catch(showError);
 });
 
 function connectWorkflowEvents() {
