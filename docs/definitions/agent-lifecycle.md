@@ -182,6 +182,8 @@ admissionRejection
 humanDecisionRequest
 humanDecision
 isolatedWorkspace
+autoMergePlan
+autoMergeRejection
 ```
 
 Agent loop 产物是多例：
