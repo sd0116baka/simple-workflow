@@ -287,6 +287,51 @@ test("executes auto-merge with a fast-forward merge", async (t) => {
   );
 });
 
+test("executes auto-merge when accepted work was already committed", async (t) => {
+  const { repositoryDir, baseCommit } = await createGitRepositoryWithWorktree(t);
+  const worktreeDir = join(repositoryDir, ".workflow", "worktrees", "tasks", "tasks-task-003");
+  runGit(["add", "result.txt"], worktreeDir);
+  runGit([
+    "-c",
+    "user.name=Simple Workflow Test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-m",
+    "commit accepted work",
+  ], worktreeDir);
+  const sourceCommit = runGit(["rev-parse", "HEAD"], worktreeDir);
+  const planning = planAutoMerge({
+    taskContextPackage: acceptedPackage(baseCommit),
+    repositoryDir,
+    now: () => "2026-05-19T10:00:00.000Z",
+  });
+
+  const result = executeAutoMerge({
+    taskContextPackage: packageReadyForExecution(baseCommit, planning.appendRequest.artifact),
+    repositoryDir,
+    now: () => "2026-05-19T10:05:00.000Z",
+  });
+
+  assert.equal(result.error, null);
+  assert.equal(result.appendRequest.artifactType, "autoMergeResult");
+  assert.equal(result.appendRequest.artifact.source.commit, sourceCommit);
+  assert.equal(result.appendRequest.artifact.target.beforeCommit, baseCommit);
+  assert.equal(result.appendRequest.artifact.target.afterCommit, sourceCommit);
+  assert.deepEqual(result.appendRequest.artifact.changeSet.changedFiles, ["result.txt"]);
+  assert.deepEqual(result.appendRequest.artifact.checks, [
+    { name: "mainWorktreeClean", passed: true },
+    { name: "targetStillAtPlannedCommit", passed: true },
+    { name: "sourceCommitted", passed: true },
+    { name: "sourceRebasedOntoTarget", passed: false },
+    { name: "mergedFastForward", passed: true },
+  ]);
+  assert.equal(
+    (await readFile(join(repositoryDir, "result.txt"), "utf8")).replace(/\r\n/g, "\n"),
+    "accepted work\n",
+  );
+});
+
 test("rebases accepted work onto the target before fast-forward merge", async (t) => {
   const { repositoryDir, baseCommit } = await createGitRepositoryWithWorktree(t);
   await writeFile(join(repositoryDir, "target-before-plan.txt"), "target moved before plan\n");

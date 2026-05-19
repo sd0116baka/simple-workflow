@@ -353,17 +353,6 @@ export function executeAutoMerge({
     };
   }
 
-  if (worktreeChangedFiles.length === 0) {
-    return {
-      appendRequest: failureRequest({
-        taskContextPackage,
-        reasons: [reason("NO_CHANGES", "隔离工作树没有可提交变更。")],
-        now,
-      }),
-      error: null,
-    };
-  }
-
   let sourceCommit;
   let afterCommit;
   let sourceRebased = false;
