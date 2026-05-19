@@ -184,7 +184,7 @@ export function createWorkflowService({
   async function finishRecommendationRun(run, startedCommand) {
     try {
       const result = await startedCommand;
-      Object.assign(run, completeRecommendationFlow({
+      Object.assign(run, await completeRecommendationFlow({
         run,
         commandResult: result,
         tasks: await listRawTasks(tasksDir),

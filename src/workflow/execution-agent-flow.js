@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { createStubAgentSession, normalizeAgentStatus } from "./agent-runner.js";
@@ -208,43 +208,60 @@ export function runOpencodeExecutionAgentSession({
     runId,
     inputArtifactRefs,
   });
-  const result = spawnSync(command, args, {
-    cwd,
-    env,
-    input: prompt,
-    encoding: "utf8",
-    shell,
-    windowsHide: true,
-  });
-  const stdout = result.stdout ?? "";
-  const stderr = result.stderr ?? "";
-  const extractedText = extractTextFromJsonEvents(stdout);
-  const report = parseExecutionReportText(extractedText);
-  const error = result.error?.message ?? null;
-  const exitCode = typeof result.status === "number" ? result.status : null;
-  const status = normalizeAgentStatus({ exitCode, error });
-  const sessionId = findSessionIdInJsonEvents(stdout) ?? `opencode-session-unavailable:${runId}`;
+  return new Promise((resolve) => {
+    const child = spawn(command, args, {
+      cwd,
+      env,
+      shell,
+      windowsHide: true,
+    });
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
 
-  return {
-    role,
-    packageId,
-    sessionId,
-    status,
-    summary: typeof report.summary === "string" && report.summary.trim().length > 0
-      ? report.summary
-      : extractedText.trim(),
-    tests: Array.isArray(report.tests) ? report.tests : [],
-    notes: Array.isArray(report.notes) ? report.notes : [],
-    rawOutput: {
-      stdout: extractedText,
-      stderr,
-      exitCode,
-      error,
-    },
-  };
+    function finish({ exitCode = null, error = null } = {}) {
+      if (settled) return;
+      settled = true;
+      const extractedText = extractTextFromJsonEvents(stdout);
+      const report = parseExecutionReportText(extractedText);
+      const status = normalizeAgentStatus({ exitCode, error });
+      const sessionId = findSessionIdInJsonEvents(stdout) ?? `opencode-session-unavailable:${runId}`;
+
+      resolve({
+        role,
+        packageId,
+        sessionId,
+        status,
+        summary: typeof report.summary === "string" && report.summary.trim().length > 0
+          ? report.summary
+          : extractedText.trim(),
+        tests: Array.isArray(report.tests) ? report.tests : [],
+        notes: Array.isArray(report.notes) ? report.notes : [],
+        rawOutput: {
+          stdout: extractedText,
+          stderr,
+          exitCode,
+          error,
+        },
+      });
+    }
+
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
+    child.stdout?.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr?.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("error", (error) => finish({ error: error.message }));
+    child.on("close", (exitCode) => finish({ exitCode }));
+    child.stdin?.write(prompt);
+    child.stdin?.end();
+  });
 }
 
-export function runExecutionAgent({
+export async function runExecutionAgent({
   taskContextPackage,
   runAgentSession = runStubExecutionAgentSession,
   repositoryDir = process.cwd(),
@@ -283,7 +300,7 @@ export function runExecutionAgent({
 
   const startedAt = now();
   const inputArtifactRefs = inputArtifactRefsForExecution(taskContextPackage);
-  const session = runAgentSession({
+  const session = await runAgentSession({
     role: "execution",
     packageId: taskContextPackage.packageId,
     taskContextPackage,

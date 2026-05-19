@@ -90,7 +90,7 @@ function executablePackage(worktreePath = ".workflow/worktrees/tasks/tasks-task-
 
 test("runs execution agent stub in the isolated workspace cwd", async (t) => {
   const repositoryDir = await createGitRepositoryWithWorktree(t);
-  const result = runExecutionAgent({
+  const result = await runExecutionAgent({
     taskContextPackage: executablePackage(),
     repositoryDir,
     now: () => "2026-05-18T10:00:01.000Z",
@@ -126,7 +126,7 @@ test("runs execution agent stub in the isolated workspace cwd", async (t) => {
 test("passes isolated workspace cwd to a supplied execution runner", async (t) => {
   const repositoryDir = await createGitRepositoryWithWorktree(t);
   let observed = null;
-  const result = runExecutionAgent({
+  const result = await runExecutionAgent({
     taskContextPackage: executablePackage(),
     repositoryDir,
     runAgentSession: ({ cwd, runId, inputArtifactRefs }) => {
@@ -194,7 +194,7 @@ test("runs opencode execution session command in the isolated workspace", async 
     "console.log(JSON.stringify({ type: 'text', part: { text } }));",
   ].join("");
 
-  const session = runOpencodeExecutionAgentSession({
+  const session = await runOpencodeExecutionAgentSession({
     role: "execution",
     packageId: "task-context-package:tasks/task-003.yaml",
     cwd: worktreeDir,
@@ -225,7 +225,7 @@ test("increments execution agent run id from existing execution reports", async 
     },
   ];
 
-  const result = runExecutionAgent({
+  const result = await runExecutionAgent({
     taskContextPackage: taskPackage,
     repositoryDir,
   });
@@ -251,7 +251,7 @@ test("uses latest convergence advice as next execution input", async (t) => {
     },
   ];
 
-  const result = runExecutionAgent({
+  const result = await runExecutionAgent({
     taskContextPackage: taskPackage,
     repositoryDir,
   });
@@ -269,11 +269,11 @@ test("uses latest convergence advice as next execution input", async (t) => {
   ]);
 });
 
-test("does not run execution agent before isolated workspace is allocated", () => {
+test("does not run execution agent before isolated workspace is allocated", async () => {
   const taskPackage = executablePackage();
   delete taskPackage.artifacts.isolatedWorkspace;
 
-  const result = runExecutionAgent({
+  const result = await runExecutionAgent({
     taskContextPackage: taskPackage,
   });
 
@@ -281,11 +281,11 @@ test("does not run execution agent before isolated workspace is allocated", () =
   assert.match(result.error, /缺少 isolatedWorkspace/);
 });
 
-test("does not run execution agent before main agent is initialized", () => {
+test("does not run execution agent before main agent is initialized", async () => {
   const taskPackage = executablePackage();
   taskPackage.agentRuns = [];
 
-  const result = runExecutionAgent({
+  const result = await runExecutionAgent({
     taskContextPackage: taskPackage,
   });
 
@@ -297,7 +297,7 @@ test("does not run execution agent when isolated workspace path is missing", asy
   const repositoryDir = await createGitRepositoryWithWorktree(t);
   const taskPackage = executablePackage(".workflow/worktrees/tasks/missing-task");
 
-  const result = runExecutionAgent({
+  const result = await runExecutionAgent({
     taskContextPackage: taskPackage,
     repositoryDir,
   });

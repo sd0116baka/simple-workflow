@@ -119,7 +119,7 @@ export async function startRecommendationFlow({
   return { run, taskPool };
 }
 
-export function completeRecommendationFlow({
+export async function completeRecommendationFlow({
   run,
   commandResult,
   tasks,
@@ -197,7 +197,7 @@ export function completeRecommendationFlow({
     : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
   const executionAgentRun = !mainInitializedPackage || !mainAgentInitialization?.appendRequest
     ? null
-    : runExecutionAgent({
+    : await runExecutionAgent({
         taskContextPackage: mainInitializedPackage,
         runAgentSession: runExecutionAgentSession,
         repositoryDir,
@@ -243,7 +243,7 @@ export function completeRecommendationFlow({
     : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
   const nextExecutionAgentRun = !convergedPackage || !convergenceRun?.appendRequest
     ? null
-    : runExecutionAgent({
+    : await runExecutionAgent({
         taskContextPackage: convergedPackage,
         runAgentSession: runExecutionAgentSession,
         repositoryDir,

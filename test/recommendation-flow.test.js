@@ -122,7 +122,7 @@ test("recommendation flow starts a running run with injected candidate tasks", a
 
 test("recommendation flow applies module append requests through the task pool", async (t) => {
   const repositoryDir = await createGitRepository(t);
-  const completed = completeRecommendationFlow({
+  const completed = await completeRecommendationFlow({
     run: {
       id: "recommendation-run-flow",
       status: "running",
@@ -256,7 +256,7 @@ test("recommendation flow applies module append requests through the task pool",
 
 test("recommendation flow stops before review when execution agent fails", async (t) => {
   const repositoryDir = await createGitRepository(t);
-  const completed = completeRecommendationFlow({
+  const completed = await completeRecommendationFlow({
     run: {
       id: "recommendation-run-flow",
       status: "running",
