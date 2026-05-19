@@ -230,7 +230,15 @@ Agent 调用也通过同一个追加请求接口进入任务池。
   "appendRequest": {
     "packageId": "task-context-package:tasks/task-003.yaml",
     "artifactType": "executionReport",
-    "artifact": {},
+    "artifact": {
+      "summary": "完成执行。",
+      "cwd": ".workflow/worktrees/tasks/tasks-task-003",
+      "changedFiles": [
+        "src/server/server.js"
+      ],
+      "tests": [],
+      "notes": []
+    },
     "agentRun": {
       "runId": "execution-agent:001",
       "role": "execution",

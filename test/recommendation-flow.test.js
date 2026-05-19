@@ -196,6 +196,12 @@ test("recommendation flow applies module append requests through the task pool",
   assert.equal(completed.taskContextPackage.agentRuns[6].sessionId, "resumed:main:session:main:task-context-package:tasks/task-001.yaml");
   assert.equal(completed.taskContextPackage.artifacts.executionReport[0].artifactId, "executionReport:001");
   assert.equal(completed.taskContextPackage.artifacts.executionReport[1].artifactId, "executionReport:002");
+  assert.equal(
+    completed.taskContextPackage.artifacts.executionReport[0].body.cwd,
+    ".workflow/worktrees/tasks/tasks-task-001",
+  );
+  assert.deepEqual(completed.taskContextPackage.artifacts.executionReport[0].body.changedFiles, []);
+  assert.deepEqual(completed.taskContextPackage.artifacts.executionReport[1].body.changedFiles, []);
   assert.equal(completed.taskContextPackage.artifacts.reviewReport[0].artifactId, "reviewReport:001");
   assert.equal(completed.taskContextPackage.artifacts.reviewReport[1].artifactId, "reviewReport:002");
   assert.equal(completed.taskContextPackage.artifacts.convergenceAdvice[0].artifactId, "convergenceAdvice:001");

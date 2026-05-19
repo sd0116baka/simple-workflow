@@ -143,7 +143,13 @@ Agent 调用完成后，flow 仍然通过统一追加请求交给任务池。
     "packageId": "task-context-package:tasks/task-003.yaml",
     "artifactType": "executionReport",
     "artifact": {
-      "summary": "完成 tasks 目录监听。"
+      "summary": "完成 tasks 目录监听。",
+      "cwd": ".workflow/worktrees/tasks/tasks-task-003",
+      "changedFiles": [
+        "src/server/server.js"
+      ],
+      "tests": [],
+      "notes": []
     },
     "agentRun": {
       "runId": "execution-agent:001",
@@ -255,6 +261,10 @@ tasks/task-003.yaml -> tasks-task-003
 第一版不考虑文件改名。
 
 `execution` Agent 使用 `isolatedWorkspace.body.worktreePath` 作为 `cwd`，可以修改这个工作树。
+
+`executionReport` 必须记录本次执行使用的 `cwd` 和该 worktree 内的 `changedFiles`。
+
+当前 stub execution Agent 会在隔离工作树中写入 `.workflow-agent/execution-agent-<N>.txt`，用于验证 cwd 传递和变更收集。真实 execution Agent 接入后，不再写这个 stub 探针文件。
 
 `review` Agent 读取同一个 `isolatedWorkspace.body.worktreePath`，原则上只读。第一版只在 review Agent 提示词中要求不得修改文件，不做代码级 diff 检查。
 

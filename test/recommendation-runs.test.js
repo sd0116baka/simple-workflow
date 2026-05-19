@@ -198,6 +198,17 @@ test("workflow service captures a successful recommendation run", async (t) => {
   ]);
   assert.equal(finished.taskContextPackage.artifacts.executionReport[0].artifactId, "executionReport:001");
   assert.equal(finished.taskContextPackage.artifacts.executionReport[1].artifactId, "executionReport:002");
+  assert.equal(
+    finished.taskContextPackage.artifacts.executionReport[0].body.cwd,
+    ".workflow/worktrees/tasks/tasks-task-001",
+  );
+  assert.deepEqual(finished.taskContextPackage.artifacts.executionReport[0].body.changedFiles, [
+    ".workflow-agent/execution-agent-001.txt",
+  ]);
+  assert.deepEqual(finished.taskContextPackage.artifacts.executionReport[1].body.changedFiles, [
+    ".workflow-agent/execution-agent-001.txt",
+    ".workflow-agent/execution-agent-002.txt",
+  ]);
   assert.equal(finished.taskContextPackage.artifacts.reviewReport[0].artifactId, "reviewReport:001");
   assert.equal(finished.taskContextPackage.artifacts.reviewReport[1].artifactId, "reviewReport:002");
   assert.equal(finished.taskContextPackage.artifacts.convergenceAdvice[0].artifactId, "convergenceAdvice:001");

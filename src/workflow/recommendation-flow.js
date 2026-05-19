@@ -194,6 +194,7 @@ export function completeRecommendationFlow({
     : runExecutionAgent({
         taskContextPackage: mainInitializedPackage,
         runAgentSession: runExecutionAgentSession,
+        repositoryDir,
         now,
       });
   taskPool = !executionAgentRun?.appendRequest
@@ -239,6 +240,7 @@ export function completeRecommendationFlow({
     : runExecutionAgent({
         taskContextPackage: convergedPackage,
         runAgentSession: runExecutionAgentSession,
+        repositoryDir,
         now,
       });
   taskPool = !nextExecutionAgentRun?.appendRequest
