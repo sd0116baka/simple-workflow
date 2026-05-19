@@ -132,6 +132,7 @@ export async function completeRecommendationFlow({
   runConvergenceSession,
   repositoryDir = process.cwd(),
   now = () => new Date().toISOString(),
+  onProgress,
 }) {
   const failed = commandResult.error || commandResult.exitCode !== 0;
   const parsed = failed
@@ -202,6 +203,7 @@ export async function completeRecommendationFlow({
         runAgentSession: runExecutionAgentSession,
         repositoryDir,
         now,
+        onProgress,
       });
   taskPool = !executionAgentRun?.appendRequest
     ? taskPool
@@ -248,6 +250,7 @@ export async function completeRecommendationFlow({
         runAgentSession: runExecutionAgentSession,
         repositoryDir,
         now,
+        onProgress,
       });
   taskPool = !nextExecutionAgentRun?.appendRequest
     ? taskPool

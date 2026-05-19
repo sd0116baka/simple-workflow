@@ -2,18 +2,46 @@ import { spawn } from "node:child_process";
 
 export const OPENCODE_RECOMMENDATION_ARGS = ["run", "--format", "json"];
 
+function truncateTerminalLine(text, maxLength = 4000) {
+  const value = String(text ?? "");
+  return value.length > maxLength
+    ? `${value.slice(0, maxLength)}\n...[truncated ${value.length - maxLength} chars]`
+    : value;
+}
+
 export function toProgressEntry(event) {
   const type = event?.type ?? "event";
   if (type === "step_start") {
-    return { type, message: "开始运行 opencode" };
+    return {
+      type,
+      stream: "opencode",
+      message: "开始运行 opencode",
+      terminalLine: "opencode: step_start",
+    };
   }
   if (type === "text") {
-    return { type, message: "收到模型输出" };
+    return {
+      type,
+      stream: "opencode",
+      message: "收到模型输出",
+      terminalLine: "opencode: text",
+    };
   }
   if (type === "step_finish") {
-    return { type, message: `运行结束：${event?.part?.reason ?? "unknown"}` };
+    const reason = event?.part?.reason ?? "unknown";
+    return {
+      type,
+      stream: "opencode",
+      message: `运行结束：${reason}`,
+      terminalLine: `opencode: step_finish ${reason}`,
+    };
   }
-  return { type, message: `opencode 事件：${type}` };
+  return {
+    type,
+    stream: "opencode",
+    message: `opencode 事件：${type}`,
+    terminalLine: `opencode: ${type}`,
+  };
 }
 
 export function extractTextFromJsonEvents(output) {
@@ -75,27 +103,67 @@ export function runOpencodeRecommendation({
     let stderr = "";
     let stdoutBuffer = "";
     let settled = false;
+    let lastOutputAt = Date.now();
+    const commandLine = [command, ...args].join(" ");
+
+    onProgress?.({
+      type: "process_start",
+      stream: "system",
+      message: `启动进程：${commandLine}`,
+      terminalLine: `$ ${commandLine}\ncwd: ${cwd}\npid: ${child.pid ?? "unknown"}`,
+    });
+
+    const heartbeat = setInterval(() => {
+      const idleSeconds = Math.floor((Date.now() - lastOutputAt) / 1000);
+      onProgress?.({
+        type: "heartbeat",
+        stream: "system",
+        message: `进程仍在运行，${idleSeconds}s 无新输出`,
+        terminalLine: `process: still running, no output for ${idleSeconds}s`,
+      });
+    }, 10000);
 
     function finish(result) {
       if (settled) return;
       settled = true;
+      clearInterval(heartbeat);
       resolve(result);
     }
 
     child.stdout?.setEncoding("utf8");
     child.stderr?.setEncoding("utf8");
     child.stdout?.on("data", (chunk) => {
+      lastOutputAt = Date.now();
       stdout += chunk;
+      onProgress?.({
+        type: "stdout",
+        stream: "stdout",
+        message: `stdout ${chunk.length} chars`,
+        terminalLine: truncateTerminalLine(chunk.trimEnd()),
+      });
       stdoutBuffer = readJsonEventLines(stdoutBuffer + chunk, onProgress);
     });
     child.stderr?.on("data", (chunk) => {
+      lastOutputAt = Date.now();
       stderr += chunk;
+      onProgress?.({
+        type: "stderr",
+        stream: "stderr",
+        message: `stderr ${chunk.length} chars`,
+        terminalLine: truncateTerminalLine(chunk.trimEnd()),
+      });
     });
 
     child.on("error", (error) => {
       if (stdoutBuffer) {
         stdoutBuffer = readJsonEventLines(`${stdoutBuffer}\n`, onProgress);
       }
+      onProgress?.({
+        type: "process_error",
+        stream: "system",
+        message: `进程启动失败：${error.message}`,
+        terminalLine: `process: error ${error.message}`,
+      });
       finish({
         stdout: extractTextFromJsonEvents(stdout),
         stderr,
@@ -108,6 +176,12 @@ export function runOpencodeRecommendation({
       if (stdoutBuffer) {
         stdoutBuffer = readJsonEventLines(`${stdoutBuffer}\n`, onProgress);
       }
+      onProgress?.({
+        type: "process_close",
+        stream: "system",
+        message: `进程退出：${exitCode}`,
+        terminalLine: `process: exited with code ${exitCode}`,
+      });
       finish({
         stdout: extractTextFromJsonEvents(stdout),
         stderr,

@@ -604,6 +604,22 @@ h2 {
   white-space: pre-wrap;
 }
 
+.terminal-output {
+  min-height: 180px;
+  max-height: 280px;
+  margin: 12px 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid #101827;
+  border-radius: 6px;
+  background: #080d16;
+  color: #d9f2e6;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
 .stage-list {
   display: flex;
   flex-direction: column;

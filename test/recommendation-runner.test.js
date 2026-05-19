@@ -21,14 +21,20 @@ test("falls back to raw output when stdout is not JSON events", () => {
 test("maps opencode JSON events to progress entries", () => {
   assert.deepEqual(toProgressEntry({ type: "step_start" }), {
     type: "step_start",
+    stream: "opencode",
     message: "开始运行 opencode",
+    terminalLine: "opencode: step_start",
   });
   assert.deepEqual(toProgressEntry({ type: "text" }), {
     type: "text",
+    stream: "opencode",
     message: "收到模型输出",
+    terminalLine: "opencode: text",
   });
   assert.deepEqual(toProgressEntry({ type: "step_finish", part: { reason: "stop" } }), {
     type: "step_finish",
+    stream: "opencode",
     message: "运行结束：stop",
+    terminalLine: "opencode: step_finish stop",
   });
 });

@@ -129,8 +129,9 @@ test("passes isolated workspace cwd to a supplied execution runner", async (t) =
   const result = await runExecutionAgent({
     taskContextPackage: executablePackage(),
     repositoryDir,
-    runAgentSession: ({ cwd, runId, inputArtifactRefs }) => {
-      observed = { cwd, runId, inputArtifactRefs };
+    onProgress: () => {},
+    runAgentSession: ({ cwd, runId, inputArtifactRefs, onProgress }) => {
+      observed = { cwd, runId, inputArtifactRefs, hasOnProgress: typeof onProgress === "function" };
       return {
         sessionId: "session:execution:custom",
         status: "succeeded",
@@ -141,6 +142,7 @@ test("passes isolated workspace cwd to a supplied execution runner", async (t) =
 
   assert.equal(result.error, null);
   assert.equal(observed.runId, "execution-agent:001");
+  assert.equal(observed.hasOnProgress, true);
   assert.equal(observed.cwd, join(repositoryDir, ".workflow", "worktrees", "tasks", "tasks-task-003"));
   assert.deepEqual(observed.inputArtifactRefs, [
     "taskDraft",
@@ -186,6 +188,7 @@ test("builds execution agent prompt from task context package artifacts", () => 
 test("runs opencode execution session command in the isolated workspace", async (t) => {
   const repositoryDir = await createGitRepositoryWithWorktree(t);
   const worktreeDir = join(repositoryDir, ".workflow", "worktrees", "tasks", "tasks-task-003");
+  const progress = [];
   const script = [
     "const fs = require('node:fs');",
     "fs.writeFileSync('agent-output.txt', 'changed by fake execution agent\\n');",
@@ -204,6 +207,7 @@ test("runs opencode execution session command in the isolated workspace", async 
     command: process.execPath,
     args: ["-e", script],
     shell: false,
+    onProgress: (entry) => progress.push(entry),
   });
 
   assert.equal(session.status, "succeeded");
@@ -211,6 +215,9 @@ test("runs opencode execution session command in the isolated workspace", async 
   assert.equal(session.summary, "真实 runner 完成");
   assert.deepEqual(session.tests, [{ command: "npm test", status: "not-run" }]);
   assert.deepEqual(session.notes, ["fake command"]);
+  assert.equal(progress[0].type, "execution_process_start");
+  assert.equal(progress.at(-1).type, "execution_process_close");
+  assert.equal(progress.some((entry) => entry.type === "execution_stdout"), true);
   assert.equal(existsSync(join(worktreeDir, "agent-output.txt")), true);
 });
 

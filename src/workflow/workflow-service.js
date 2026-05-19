@@ -34,10 +34,11 @@ export function createWorkflowService({
   getRepositoryStatus = () => readRepositoryStatus({ cwd: repositoryDir }),
   recommendationPromptPath = join(repositoryDir, "project_profiles", "recommender-agent.prompt.md"),
   taskContextPackageStoreDir = join(repositoryDir, ".workflow", "task-context-packages"),
-  runRecommendationCommand = ({ prompt }) =>
+  runRecommendationCommand = ({ prompt, onProgress }) =>
     runOpencodeRecommendation({
       prompt,
       cwd: repositoryDir,
+      onProgress,
     }),
   runExecutionAgentSession = runOpencodeExecutionAgentSession,
   watchDebounceMs = 100,
@@ -224,7 +225,7 @@ export function createWorkflowService({
     return taskPool;
   }
 
-  async function finishRecommendationRun(run, startedCommand) {
+  async function finishRecommendationRun(run, startedCommand, onProgress) {
     try {
       const result = await startedCommand;
       Object.assign(run, await completeRecommendationFlow({
@@ -240,6 +241,7 @@ export function createWorkflowService({
         existingTaskContextPackages: await loadExistingTaskContextPackages(),
         runExecutionAgentSession,
         repositoryDir,
+        onProgress,
       }));
       await persistTaskContextPackage(run.taskContextPackage);
     } catch (error) {
@@ -284,7 +286,7 @@ export function createWorkflowService({
           ...progress,
           timestamp: new Date().toISOString(),
         });
-        run.progress = run.progress.slice(-20);
+        run.progress = run.progress.slice(-200);
         emitRecommendationChanged(run);
       };
       const startedCommand = Promise.resolve().then(() =>
@@ -294,7 +296,7 @@ export function createWorkflowService({
           onProgress: appendProgress,
         }),
       );
-      finishRecommendationRun(run, startedCommand);
+      finishRecommendationRun(run, startedCommand, appendProgress);
       return toRecommendationSnapshot(run);
     },
 

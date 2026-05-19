@@ -7,6 +7,13 @@ import { parseGitPorcelainStatus } from "./repository-status.js";
 
 export const OPENCODE_EXECUTION_ARGS = ["run", "--format", "json"];
 
+function truncateTerminalLine(text, maxLength = 4000) {
+  const value = String(text ?? "");
+  return value.length > maxLength
+    ? `${value.slice(0, maxLength)}\n...[truncated ${value.length - maxLength} chars]`
+    : value;
+}
+
 function hasExecutionAuthorization(taskContextPackage) {
   return Boolean(taskContextPackage?.artifacts?.executionAuthorization?.body);
 }
@@ -202,6 +209,7 @@ export function runOpencodeExecutionAgentSession({
   args = OPENCODE_EXECUTION_ARGS,
   env = process.env,
   shell = process.platform === "win32",
+  onProgress,
 }) {
   const prompt = buildExecutionAgentPrompt({
     taskContextPackage,
@@ -218,10 +226,30 @@ export function runOpencodeExecutionAgentSession({
     let stdout = "";
     let stderr = "";
     let settled = false;
+    let lastOutputAt = Date.now();
+    const commandLine = [command, ...args].join(" ");
+
+    onProgress?.({
+      type: "execution_process_start",
+      stream: "execution-agent",
+      message: `启动 ${runId}：${commandLine}`,
+      terminalLine: `$ ${commandLine}\ncwd: ${cwd}\nrunId: ${runId}\npid: ${child.pid ?? "unknown"}`,
+    });
+
+    const heartbeat = setInterval(() => {
+      const idleSeconds = Math.floor((Date.now() - lastOutputAt) / 1000);
+      onProgress?.({
+        type: "execution_heartbeat",
+        stream: "execution-agent",
+        message: `${runId} 仍在运行，${idleSeconds}s 无新输出`,
+        terminalLine: `${runId}: still running, no output for ${idleSeconds}s`,
+      });
+    }, 10000);
 
     function finish({ exitCode = null, error = null } = {}) {
       if (settled) return;
       settled = true;
+      clearInterval(heartbeat);
       const extractedText = extractTextFromJsonEvents(stdout);
       const report = parseExecutionReportText(extractedText);
       const status = normalizeAgentStatus({ exitCode, error });
@@ -249,13 +277,43 @@ export function runOpencodeExecutionAgentSession({
     child.stdout?.setEncoding("utf8");
     child.stderr?.setEncoding("utf8");
     child.stdout?.on("data", (chunk) => {
+      lastOutputAt = Date.now();
       stdout += chunk;
+      onProgress?.({
+        type: "execution_stdout",
+        stream: "execution-stdout",
+        message: `${runId} stdout ${chunk.length} chars`,
+        terminalLine: truncateTerminalLine(chunk.trimEnd()),
+      });
     });
     child.stderr?.on("data", (chunk) => {
+      lastOutputAt = Date.now();
       stderr += chunk;
+      onProgress?.({
+        type: "execution_stderr",
+        stream: "execution-stderr",
+        message: `${runId} stderr ${chunk.length} chars`,
+        terminalLine: truncateTerminalLine(chunk.trimEnd()),
+      });
     });
-    child.on("error", (error) => finish({ error: error.message }));
-    child.on("close", (exitCode) => finish({ exitCode }));
+    child.on("error", (error) => {
+      onProgress?.({
+        type: "execution_process_error",
+        stream: "execution-agent",
+        message: `${runId} 启动失败：${error.message}`,
+        terminalLine: `${runId}: error ${error.message}`,
+      });
+      finish({ error: error.message });
+    });
+    child.on("close", (exitCode) => {
+      onProgress?.({
+        type: "execution_process_close",
+        stream: "execution-agent",
+        message: `${runId} 退出：${exitCode}`,
+        terminalLine: `${runId}: exited with code ${exitCode}`,
+      });
+      finish({ exitCode });
+    });
     child.stdin?.write(prompt);
     child.stdin?.end();
   });
@@ -266,6 +324,7 @@ export async function runExecutionAgent({
   runAgentSession = runStubExecutionAgentSession,
   repositoryDir = process.cwd(),
   now = () => new Date().toISOString(),
+  onProgress,
 } = {}) {
   if (!taskContextPackage?.packageId) {
     throw new Error("taskContextPackage.packageId is required");
@@ -307,6 +366,7 @@ export async function runExecutionAgent({
     cwd,
     runId,
     inputArtifactRefs,
+    onProgress,
   });
   const changedFiles = gitChangedFiles(cwd);
   const finishedAt = now();
