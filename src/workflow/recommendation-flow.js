@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { runConvergence } from "./convergence-flow.js";
 import { evaluateExecutionAdmission } from "./execution-admission.js";
 import { runExecutionAgent } from "./execution-agent-flow.js";
+import { requestHumanDecisionForTaskCompletion } from "./human-decision-flow.js";
 import { initializeMainAgent } from "./main-agent-flow.js";
 import { parseRecommendationIntent } from "./recommendation-intent.js";
 import { buildRecommendationPrompt } from "./recommendation-prompt.js";
@@ -32,6 +33,8 @@ export function createBlockedRecommendationRun({ id, startupCheck, now = () => n
     reviewAgentErrors: [],
     convergenceRuns: [],
     convergenceErrors: [],
+    completionHumanDecisionRequest: null,
+    completionHumanDecisionError: null,
     taskContextPackage: null,
     stdout: "",
     stderr: "",
@@ -68,6 +71,8 @@ export function createRunningRecommendationRun({
     reviewAgentErrors: [],
     convergenceRuns: [],
     convergenceErrors: [],
+    completionHumanDecisionRequest: null,
+    completionHumanDecisionError: null,
     taskContextPackage: null,
     stdout: "",
     stderr: "",
@@ -252,6 +257,21 @@ export function completeRecommendationFlow({
           ? "task-completion"
           : "convergence",
       });
+  const completedPackage = failed || !parsed.appendRequest
+    ? null
+    : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
+  const completionHumanDecisionRequest =
+    !completedPackage || nextConvergenceRun?.appendRequest?.artifactType !== "taskCompletion"
+      ? null
+      : requestHumanDecisionForTaskCompletion({
+          taskContextPackage: completedPackage,
+          now,
+        });
+  taskPool = !completionHumanDecisionRequest?.appendRequest
+    ? taskPool
+    : applyAppendRequest(taskPool, completionHumanDecisionRequest.appendRequest, {
+        currentWorkStage: "human-decision",
+      });
   const taskContextPackage = failed || !parsed.appendRequest
     ? null
     : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
@@ -294,6 +314,8 @@ export function completeRecommendationFlow({
     convergenceErrors: convergenceRuns
       .map((agentRun) => agentRun.error)
       .filter(Boolean),
+    completionHumanDecisionRequest,
+    completionHumanDecisionError: completionHumanDecisionRequest?.error ?? null,
     taskContextPackage,
   };
 }

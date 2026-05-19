@@ -409,6 +409,11 @@ h2 {
   background: #f6f9ff;
 }
 
+.context-package.human-decision {
+  border-color: #d7c2f2;
+  background: #fbf8ff;
+}
+
 .context-package-title {
   font-weight: 700;
 }
@@ -475,6 +480,48 @@ h2 {
   margin-top: 3px;
   color: #44536a;
   font-style: normal;
+}
+
+.human-decision-notice {
+  padding: 14px;
+  border: 1px solid #d7c2f2;
+  border-radius: 6px;
+  background: #fbf8ff;
+}
+
+.human-decision-title {
+  font-weight: 750;
+  color: #341c64;
+}
+
+.human-decision-reason {
+  margin-top: 8px;
+  color: #172033;
+}
+
+.human-decision-meta {
+  margin-top: 8px;
+  color: #607089;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.human-decision-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.human-decision-options span {
+  padding: 4px 8px;
+  border: 1px solid #d7c2f2;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #341c64;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
 }
 
 .recommendation-output {

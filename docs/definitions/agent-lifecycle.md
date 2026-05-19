@@ -190,6 +190,12 @@ convergenceAdvice:001
 taskCompletion
 ```
 
+人工决策请求产物是单例：
+
+```text
+humanDecisionRequest
+```
+
 artifactId 由任务池生成。Agent 不生成 artifactId。
 
 ## 收敛环节
@@ -222,6 +228,12 @@ taskCompletion
 ```
 
 `taskCompletion` 表示任务成功收敛。它是终态产物，不作为下一轮 Agent 输入。
+
+`taskCompletion` 不是任务最终关闭凭据。它只表示 Agent 认为任务已经完成。
+
+系统收到 `taskCompletion` 后，必须追加 `humanDecisionRequest`，把是否接受完成交给人工决定。
+
+第一版只处理成功收敛后的人工确认；任务无法收敛、超过循环次数、审查冲突等分支另行定义。
 
 ## inputArtifactRefs 业务规则
 

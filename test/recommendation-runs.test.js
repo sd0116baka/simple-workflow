@@ -105,8 +105,9 @@ test("workflow service captures a successful recommendation run", async () => {
   assert.equal(finished.executionIntentAppendRequest.artifactType, "executionIntent");
   assert.equal(finished.executionIntentError, null);
   assert.equal(finished.executionAdmission.appendRequest.artifactType, "executionAuthorization");
-  assert.equal(finished.taskContextPackage.currentWorkStage, "task-completion");
+  assert.equal(finished.taskContextPackage.currentWorkStage, "human-decision");
   assert.equal(finished.taskContextPackage.artifacts.executionAuthorization.body.termination.maxIterations, 3);
+  assert.equal(finished.completionHumanDecisionRequest.appendRequest.artifactType, "humanDecisionRequest");
   assert.equal(finished.executionAgentRuns.length, 2);
   assert.equal(finished.reviewAgentRuns.length, 2);
   assert.equal(finished.convergenceRuns.length, 2);
@@ -150,6 +151,10 @@ test("workflow service captures a successful recommendation run", async () => {
   assert.equal(finished.taskContextPackage.artifacts.reviewReport[1].artifactId, "reviewReport:002");
   assert.equal(finished.taskContextPackage.artifacts.convergenceAdvice[0].artifactId, "convergenceAdvice:001");
   assert.equal(finished.taskContextPackage.artifacts.taskCompletion.artifactId, "taskCompletion");
+  assert.equal(
+    finished.taskContextPackage.artifacts.humanDecisionRequest.body.taskCompletionRef,
+    "taskCompletion",
+  );
   assert.equal(finished.exitCode, 0);
   assert.equal(service.getLatestRecommendationRun().status, "succeeded");
 });

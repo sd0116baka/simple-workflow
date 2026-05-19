@@ -78,6 +78,10 @@ export function createWorkflowService({
           convergenceErrors: run.convergenceErrors
             ? [...run.convergenceErrors]
             : [],
+          completionHumanDecisionRequest: run.completionHumanDecisionRequest
+            ? JSON.parse(JSON.stringify(run.completionHumanDecisionRequest))
+            : null,
+          completionHumanDecisionError: run.completionHumanDecisionError ?? null,
           executionIntentAppendRequest: run.executionIntentAppendRequest
             ? JSON.parse(JSON.stringify(run.executionIntentAppendRequest))
             : null,

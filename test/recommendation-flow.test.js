@@ -147,7 +147,8 @@ test("recommendation flow applies module append requests through the task pool",
   assert.equal(completed.convergenceRuns[0].appendRequest.agentRun.runId, "main-agent:convergence:001");
   assert.equal(completed.convergenceRuns[1].appendRequest.agentRun.runId, "main-agent:convergence:002");
   assert.equal(completed.convergenceRuns[1].appendRequest.artifactType, "taskCompletion");
-  assert.equal(completed.taskContextPackage.currentWorkStage, "task-completion");
+  assert.equal(completed.completionHumanDecisionRequest.appendRequest.artifactType, "humanDecisionRequest");
+  assert.equal(completed.taskContextPackage.currentWorkStage, "human-decision");
   assert.equal(completed.taskContextPackage.agentRuns[0].sessionId, "session:main:task-context-package:tasks/task-001.yaml");
   assert.equal(completed.taskContextPackage.agentRuns[1].sessionId, "session:execution:task-context-package:tasks/task-001.yaml");
   assert.equal(completed.taskContextPackage.agentRuns[2].sessionId, "session:review:task-context-package:tasks/task-001.yaml");
@@ -161,6 +162,10 @@ test("recommendation flow applies module append requests through the task pool",
   assert.equal(completed.taskContextPackage.artifacts.reviewReport[1].artifactId, "reviewReport:002");
   assert.equal(completed.taskContextPackage.artifacts.convergenceAdvice[0].artifactId, "convergenceAdvice:001");
   assert.equal(completed.taskContextPackage.artifacts.taskCompletion.artifactId, "taskCompletion");
+  assert.equal(
+    completed.taskContextPackage.artifacts.humanDecisionRequest.body.taskCompletionRef,
+    "taskCompletion",
+  );
   assert.deepEqual(completed.taskContextPackage.agentRuns[1].outputArtifactRefs, ["executionReport:001"]);
   assert.deepEqual(completed.taskContextPackage.agentRuns[2].outputArtifactRefs, ["reviewReport:001"]);
   assert.deepEqual(completed.taskContextPackage.agentRuns[3].outputArtifactRefs, ["convergenceAdvice:001"]);
@@ -187,4 +192,5 @@ test("recommendation flow applies module append requests through the task pool",
     "reviewReport:002",
   ]);
   assert.deepEqual(completed.taskContextPackage.agentRuns[6].outputArtifactRefs, ["taskCompletion"]);
+  assert.equal(completed.taskContextPackage.timeline.at(-1).artifactId, "humanDecisionRequest");
 });

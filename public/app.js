@@ -30,6 +30,10 @@ const taskPoolInputs = document.querySelector("#taskPoolInputs");
 const startupCheckInputs = document.querySelector("#startupCheckInputs");
 const recommendationInputs = document.querySelector("#recommendationInputs");
 const admissionInputs = document.querySelector("#admissionInputs");
+const humanDecisionStatus = document.querySelector("#humanDecisionStatus");
+const humanDecisionInputs = document.querySelector("#humanDecisionInputs");
+const humanDecisionRaw = document.querySelector("#humanDecisionRaw");
+const humanDecisionPanel = document.querySelector("#humanDecisionPanel");
 
 let tasks = [];
 let poolEntries = [];
@@ -141,6 +145,44 @@ function artifactRecords(artifactValue) {
   return artifactValue ? [artifactValue] : [];
 }
 
+function createHumanDecisionPanel(taskContextPackage) {
+  const request = taskContextPackage?.artifacts?.humanDecisionRequest;
+  if (!request?.body) return null;
+
+  const notice = document.createElement("div");
+  notice.className = "human-decision-notice";
+
+  const title = document.createElement("div");
+  title.className = "human-decision-title";
+  title.textContent = "等待人工决策";
+
+  const reason = document.createElement("div");
+  reason.className = "human-decision-reason";
+  reason.textContent = request.body.reason ?? "需要人工确认下一步。";
+
+  const meta = document.createElement("div");
+  meta.className = "human-decision-meta";
+  meta.textContent = [
+    `target: ${request.body.taskCompletionRef ?? "unknown"}`,
+    `requestedAt: ${request.body.requestedAt ?? request.appendedAt ?? "unknown"}`,
+  ].join(" · ");
+
+  notice.append(title, reason, meta);
+
+  if (request.body.decisionOptions?.length > 0) {
+    const options = document.createElement("div");
+    options.className = "human-decision-options";
+    for (const option of request.body.decisionOptions) {
+      const badge = document.createElement("span");
+      badge.textContent = option;
+      options.append(badge);
+    }
+    notice.append(options);
+  }
+
+  return notice;
+}
+
 function createTaskContextPackagePanel(taskContextPackage) {
   const panel = document.createElement("div");
   panel.className = `context-package ${taskContextPackage.currentWorkStage}`;
@@ -164,6 +206,8 @@ function createTaskContextPackagePanel(taskContextPackage) {
     <span>基础包</span><strong></strong>
     <span>执行意图</span><strong></strong>
     <span>执行授权</span><strong></strong>
+    <span>任务完成结论</span><strong></strong>
+    <span>人工决策</span><strong></strong>
   `;
   const values = artifacts.querySelectorAll("strong");
   values[0].textContent = taskContextPackage.qualityGate?.outcome ?? "missing";
@@ -173,6 +217,8 @@ function createTaskContextPackagePanel(taskContextPackage) {
     : taskContextPackage.artifacts?.admissionRejection
       ? "未授权"
       : "未追加";
+  values[3].textContent = taskContextPackage.artifacts?.taskCompletion ? "待确认" : "未生成";
+  values[4].textContent = taskContextPackage.artifacts?.humanDecisionRequest ? "等待人工决策" : "未请求";
   panel.append(artifacts);
 
   const artifactEntries = Object.entries(taskContextPackage.artifacts ?? {});
@@ -217,6 +263,33 @@ function createTaskContextPackagePanel(taskContextPackage) {
 
 function formatJsonBlock(value) {
   return value ? JSON.stringify(value, null, 2) : "未生成。";
+}
+
+function renderHumanDecision(taskContextPackage) {
+  humanDecisionPanel.replaceChildren();
+  const request = taskContextPackage?.artifacts?.humanDecisionRequest ?? null;
+  const taskCompletion = taskContextPackage?.artifacts?.taskCompletion ?? null;
+  humanDecisionRaw.textContent = formatJsonBlock({
+    taskCompletion,
+    humanDecisionRequest: request,
+  });
+  renderInputs(humanDecisionInputs, [
+    { label: "任务完成结论", value: taskCompletion?.artifactId ?? "未生成" },
+    { label: "人工决策请求", value: request?.artifactId ?? "未请求" },
+    { label: "当前环节", value: taskContextPackage?.currentWorkStage ?? "未生成" },
+  ]);
+
+  if (!request) {
+    humanDecisionStatus.textContent = taskCompletion ? "未请求" : "等待完成";
+    humanDecisionPanel.textContent = taskCompletion
+      ? "已生成任务完成结论，但尚未请求人工决策。"
+      : "等待任务完成结论。";
+    return;
+  }
+
+  humanDecisionStatus.textContent = "等待人工决策";
+  const panel = createHumanDecisionPanel(taskContextPackage);
+  humanDecisionPanel.append(panel);
 }
 
 function renderInputs(container, inputs) {
@@ -380,6 +453,7 @@ function renderRecommendationRun() {
   recommendationIntentPanel.replaceChildren();
   admissionPanel.replaceChildren();
   taskContextPackagePanel.replaceChildren();
+  humanDecisionPanel.replaceChildren();
   taskContextPackageRaw.textContent = recommendationRun?.taskContextPackage
     ? JSON.stringify(recommendationRun.taskContextPackage, null, 2)
     : "尚未生成任务上下文包。";
@@ -396,6 +470,7 @@ function renderRecommendationRun() {
     { label: "任务池", value: `${poolEntries.length} 个条目` },
     { label: "启动检查", value: startupCheck ? String(startupCheck.canStartWork) : "未载入" },
   ]);
+  renderHumanDecision(recommendationRun?.taskContextPackage ?? null);
   runRecommendationButton.disabled = recommendationRun?.status === "running";
 
   if (!recommendationRun) {
@@ -407,6 +482,9 @@ function renderRecommendationRun() {
     taskContextPackageStatus.textContent = "等待输入";
     taskContextPackageRaw.textContent = "等待执行准入器输出。";
     taskContextPackagePanel.textContent = "等待执行准入器输出。";
+    humanDecisionStatus.textContent = "等待输入";
+    humanDecisionRaw.textContent = "尚未请求人工决策。";
+    humanDecisionPanel.textContent = "等待任务完成结论。";
     return;
   }
 
