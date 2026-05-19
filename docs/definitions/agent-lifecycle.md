@@ -180,6 +180,7 @@ executionIntent
 executionAuthorization
 admissionRejection
 humanDecisionRequest
+humanDecision
 isolatedWorkspace
 ```
 
@@ -201,6 +202,12 @@ taskCompletion
 
 ```text
 humanDecisionRequest
+```
+
+人工决策结果产物是单例：
+
+```text
+humanDecision
 ```
 
 artifactId 由任务池生成。Agent 不生成 artifactId。
@@ -323,6 +330,35 @@ taskCompletion
 `taskCompletion` 不是任务最终关闭凭据。它只表示 Agent 认为任务已经完成。
 
 系统收到 `taskCompletion` 后，必须追加 `humanDecisionRequest`，把是否接受完成交给人工决定。
+
+人工接受完成后，系统追加 `humanDecision`：
+
+```json
+{
+  "artifactId": "humanDecision",
+  "body": {
+    "decision": "accept-completion",
+    "decidedAt": "2026-05-19T10:00:00.000Z",
+    "taskCompletionRef": "taskCompletion",
+    "acceptedWork": {
+      "isolatedWorkspaceRef": "isolatedWorkspace",
+      "worktreePath": ".workflow/worktrees/tasks/tasks-task-003",
+      "branchName": "workflow/tasks/tasks-task-003",
+      "baseCommit": "abc123"
+    },
+    "worktreeSnapshot": {
+      "cwd": ".workflow/worktrees/tasks/tasks-task-003",
+      "changedFiles": [
+        ".workflow-agent/execution-agent-001.txt"
+      ]
+    },
+    "nextRequiredStage": "auto-merge"
+  },
+  "appendedAt": "2026-05-19T10:00:00.000Z"
+}
+```
+
+追加 `humanDecision` 后，`currentWorkStage` 推进到 `auto-merge`。自动合并环节另行消费该产物，本环节不合并主线。
 
 第一版只处理成功收敛后的人工确认；任务无法收敛、超过循环次数、审查冲突等分支另行定义。
 

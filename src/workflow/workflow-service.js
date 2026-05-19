@@ -10,8 +10,9 @@ import {
   completeRecommendationFlow,
   startRecommendationFlow,
 } from "./recommendation-flow.js";
+import { acceptTaskCompletion } from "./human-decision-flow.js";
 import { runOpencodeRecommendation } from "./recommendation-runner.js";
-import { buildTaskPool } from "./task-pool.js";
+import { applyAppendRequest, buildTaskPool } from "./task-pool.js";
 import { listRawTasks } from "./task-source.js";
 
 const TASK_EXTENSIONS = new Set([".yaml", ".yml"]);
@@ -182,6 +183,50 @@ export function createWorkflowService({
 
     getLatestRecommendationRun() {
       return toRecommendationSnapshot(latestRecommendationRun);
+    },
+
+    async acceptTaskCompletion() {
+      if (!latestRecommendationRun?.taskContextPackage) {
+        return {
+          accepted: false,
+          error: "没有可接受的任务上下文包。",
+          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+        };
+      }
+
+      const decision = acceptTaskCompletion({
+        taskContextPackage: latestRecommendationRun.taskContextPackage,
+        repositoryDir,
+      });
+      if (!decision.appendRequest) {
+        latestRecommendationRun.completionHumanDecisionError = decision.error;
+        emitRecommendationChanged(latestRecommendationRun);
+        return {
+          accepted: false,
+          error: decision.error,
+          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+        };
+      }
+
+      const taskPool = applyAppendRequest(
+        buildTaskPool(await listRawTasks(tasksDir), {
+          taskContextPackages: [latestRecommendationRun.taskContextPackage],
+        }),
+        decision.appendRequest,
+        { currentWorkStage: "auto-merge" },
+      );
+      latestRecommendationRun.taskContextPackage =
+        taskPool.taskContextPackages.find((taskPackage) =>
+          taskPackage.packageId === decision.appendRequest.packageId,
+        ) ?? latestRecommendationRun.taskContextPackage;
+      latestRecommendationRun.completionHumanDecisionError = null;
+      emitRecommendationChanged(latestRecommendationRun);
+
+      return {
+        accepted: true,
+        error: null,
+        recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+      };
     },
 
     onEvent(listener) {

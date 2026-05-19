@@ -524,6 +524,11 @@ h2 {
   font-size: 12px;
 }
 
+.human-decision-action {
+  width: auto;
+  margin-top: 14px;
+}
+
 .recommendation-output {
   max-height: 220px;
   margin: 10px 0 0;

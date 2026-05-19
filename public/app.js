@@ -147,29 +147,49 @@ function artifactRecords(artifactValue) {
 
 function createHumanDecisionPanel(taskContextPackage) {
   const request = taskContextPackage?.artifacts?.humanDecisionRequest;
-  if (!request?.body) return null;
+  const decision = taskContextPackage?.artifacts?.humanDecision;
+  if (!request?.body && !decision?.body) return null;
 
   const notice = document.createElement("div");
   notice.className = "human-decision-notice";
 
   const title = document.createElement("div");
   title.className = "human-decision-title";
-  title.textContent = "等待人工决策";
+  title.textContent = decision?.body
+    ? "已接受完成"
+    : "等待人工决策";
 
   const reason = document.createElement("div");
   reason.className = "human-decision-reason";
-  reason.textContent = request.body.reason ?? "需要人工确认下一步。";
+  reason.textContent = decision?.body
+    ? "任务完成结论已由人工接受，等待自动合并环节处理。"
+    : request.body.reason ?? "需要人工确认下一步。";
 
   const meta = document.createElement("div");
   meta.className = "human-decision-meta";
-  meta.textContent = [
-    `target: ${request.body.taskCompletionRef ?? "unknown"}`,
-    `requestedAt: ${request.body.requestedAt ?? request.appendedAt ?? "unknown"}`,
-  ].join(" · ");
+  meta.textContent = decision?.body
+    ? [
+        `decision: ${decision.body.decision}`,
+        `next: ${decision.body.nextRequiredStage}`,
+        `decidedAt: ${decision.body.decidedAt ?? decision.appendedAt ?? "unknown"}`,
+      ].join(" · ")
+    : [
+        `target: ${request.body.taskCompletionRef ?? "unknown"}`,
+        `requestedAt: ${request.body.requestedAt ?? request.appendedAt ?? "unknown"}`,
+      ].join(" · ");
 
   notice.append(title, reason, meta);
 
-  if (request.body.decisionOptions?.length > 0) {
+  if (decision?.body?.worktreeSnapshot?.changedFiles?.length > 0) {
+    const options = document.createElement("div");
+    options.className = "human-decision-options";
+    for (const filePath of decision.body.worktreeSnapshot.changedFiles) {
+      const badge = document.createElement("span");
+      badge.textContent = filePath;
+      options.append(badge);
+    }
+    notice.append(options);
+  } else if (request.body.decisionOptions?.length > 0) {
     const options = document.createElement("div");
     options.className = "human-decision-options";
     for (const option of request.body.decisionOptions) {
@@ -178,6 +198,17 @@ function createHumanDecisionPanel(taskContextPackage) {
       options.append(badge);
     }
     notice.append(options);
+  }
+
+  if (request?.body && !decision?.body) {
+    const acceptButton = document.createElement("button");
+    acceptButton.type = "button";
+    acceptButton.className = "primary-button human-decision-action";
+    acceptButton.textContent = "接受完成";
+    acceptButton.addEventListener("click", () => {
+      acceptCompletion().catch(showError);
+    });
+    notice.append(acceptButton);
   }
 
   return notice;
@@ -220,7 +251,11 @@ function createTaskContextPackagePanel(taskContextPackage) {
       : "未追加";
   values[3].textContent = taskContextPackage.artifacts?.isolatedWorkspace ? "已分配" : "未分配";
   values[4].textContent = taskContextPackage.artifacts?.taskCompletion ? "待确认" : "未生成";
-  values[5].textContent = taskContextPackage.artifacts?.humanDecisionRequest ? "等待人工决策" : "未请求";
+  values[5].textContent = taskContextPackage.artifacts?.humanDecision
+    ? "已接受完成"
+    : taskContextPackage.artifacts?.humanDecisionRequest
+      ? "等待人工决策"
+      : "未请求";
   panel.append(artifacts);
 
   const artifactEntries = Object.entries(taskContextPackage.artifacts ?? {});
@@ -270,16 +305,26 @@ function formatJsonBlock(value) {
 function renderHumanDecision(taskContextPackage) {
   humanDecisionPanel.replaceChildren();
   const request = taskContextPackage?.artifacts?.humanDecisionRequest ?? null;
+  const decision = taskContextPackage?.artifacts?.humanDecision ?? null;
   const taskCompletion = taskContextPackage?.artifacts?.taskCompletion ?? null;
   humanDecisionRaw.textContent = formatJsonBlock({
     taskCompletion,
     humanDecisionRequest: request,
+    humanDecision: decision,
   });
   renderInputs(humanDecisionInputs, [
     { label: "任务完成结论", value: taskCompletion?.artifactId ?? "未生成" },
     { label: "人工决策请求", value: request?.artifactId ?? "未请求" },
+    { label: "人工决策", value: decision?.body?.decision ?? "未决策" },
     { label: "当前环节", value: taskContextPackage?.currentWorkStage ?? "未生成" },
   ]);
+
+  if (decision) {
+    humanDecisionStatus.textContent = "已接受完成";
+    const panel = createHumanDecisionPanel(taskContextPackage);
+    humanDecisionPanel.append(panel);
+    return;
+  }
 
   if (!request) {
     humanDecisionStatus.textContent = taskCompletion ? "未请求" : "等待完成";
@@ -292,6 +337,19 @@ function renderHumanDecision(taskContextPackage) {
   humanDecisionStatus.textContent = "等待人工决策";
   const panel = createHumanDecisionPanel(taskContextPackage);
   humanDecisionPanel.append(panel);
+}
+
+async function acceptCompletion() {
+  humanDecisionStatus.textContent = "提交中";
+  const response = await fetch("/api/human-decisions/accept-completion", {
+    method: "POST",
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error ?? `接受完成失败：${response.status}`);
+  }
+  recommendationRun = payload.recommendationRun ?? null;
+  renderRecommendationRun();
 }
 
 function renderInputs(container, inputs) {

@@ -83,6 +83,12 @@ export function createApp({
         return;
       }
 
+      if (request.method === "POST" && request.url?.startsWith("/api/human-decisions/accept-completion")) {
+        const result = await workflowService.acceptTaskCompletion();
+        sendJson(response, result.accepted ? 200 : 409, result);
+        return;
+      }
+
       if (request.method === "GET" && request.url?.startsWith("/api/recommendation-runs/latest")) {
         sendJson(response, 200, { recommendationRun: workflowService.getLatestRecommendationRun() });
         return;

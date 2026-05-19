@@ -220,6 +220,27 @@ test("workflow service captures a successful recommendation run", async (t) => {
   );
   assert.equal(finished.exitCode, 0);
   assert.equal(service.getLatestRecommendationRun().status, "succeeded");
+
+  const accepted = await service.acceptTaskCompletion();
+
+  assert.equal(accepted.accepted, true);
+  assert.equal(accepted.error, null);
+  assert.equal(accepted.recommendationRun.taskContextPackage.currentWorkStage, "auto-merge");
+  assert.equal(
+    accepted.recommendationRun.taskContextPackage.artifacts.humanDecision.body.decision,
+    "accept-completion",
+  );
+  assert.equal(
+    accepted.recommendationRun.taskContextPackage.artifacts.humanDecision.body.nextRequiredStage,
+    "auto-merge",
+  );
+  assert.deepEqual(
+    accepted.recommendationRun.taskContextPackage.artifacts.humanDecision.body.worktreeSnapshot.changedFiles,
+    [
+      ".workflow-agent/execution-agent-001.txt",
+      ".workflow-agent/execution-agent-002.txt",
+    ],
+  );
 });
 
 test("workflow service does not expose invalid tasks to the recommender prompt", async (t) => {
@@ -463,4 +484,40 @@ test("POST /api/recommendation-runs starts a run and latest returns the snapshot
   assert.equal(createPayload.recommendationRun.status, "running");
   assert.equal(latestResponse.status, 200);
   assert.equal(latestPayload.recommendationRun.id, "recommendation-run-test");
+});
+
+test("POST /api/human-decisions/accept-completion accepts completion", async (t) => {
+  const latestRun = {
+    id: "recommendation-run-test",
+    status: "succeeded",
+  };
+  const workflowService = {
+    async acceptTaskCompletion() {
+      return {
+        accepted: true,
+        error: null,
+        recommendationRun: latestRun,
+      };
+    },
+    getLatestRecommendationRun() {
+      return latestRun;
+    },
+    onEvent() {
+      return () => {};
+    },
+  };
+  const server = createApp({ workflowService });
+  server.listen(0);
+  t.after(() => server.close());
+  await once(server, "listening");
+
+  const response = await fetch(
+    `http://localhost:${server.address().port}/api/human-decisions/accept-completion`,
+    { method: "POST" },
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.accepted, true);
+  assert.equal(payload.recommendationRun.status, "succeeded");
 });

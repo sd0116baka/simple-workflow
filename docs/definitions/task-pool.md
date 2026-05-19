@@ -133,6 +133,7 @@ review-agent
 convergence
 task-completion
 human-decision
+auto-merge
 ```
 
 `closed` 不是工作环节。关闭、接受、取消等结果应由人工决策产物表达。
@@ -140,6 +141,8 @@ human-decision
 `task-completion` 表示 Agent 已产出任务完成结论。
 
 `human-decision` 表示系统正在等待人工接受、打回或另行处理该结论。
+
+`auto-merge` 表示人工已经接受任务完成，系统等待自动合并环节消费 `humanDecision`。
 
 ## isolatedWorkspace
 
