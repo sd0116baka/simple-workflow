@@ -57,6 +57,10 @@ export function createWorkflowService({
           executionAdmission: run.executionAdmission
             ? JSON.parse(JSON.stringify(run.executionAdmission))
             : null,
+          isolatedWorkspaceAllocation: run.isolatedWorkspaceAllocation
+            ? JSON.parse(JSON.stringify(run.isolatedWorkspaceAllocation))
+            : null,
+          isolatedWorkspaceError: run.isolatedWorkspaceError ?? null,
           mainAgentInitialization: run.mainAgentInitialization
             ? JSON.parse(JSON.stringify(run.mainAgentInitialization))
             : null,

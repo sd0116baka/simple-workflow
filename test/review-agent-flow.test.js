@@ -11,6 +11,13 @@ function reviewablePackage() {
         body: {},
         appendedAt: "2026-05-18T09:01:00.000Z",
       },
+      isolatedWorkspace: {
+        artifactId: "isolatedWorkspace",
+        body: {
+          worktreePath: ".workflow/worktrees/tasks/tasks-task-003",
+        },
+        appendedAt: "2026-05-18T09:02:00.000Z",
+      },
       executionReport: [
         {
           artifactId: "executionReport:001",
@@ -69,6 +76,7 @@ test("runs review agent stub and requests review report append", () => {
   assert.deepEqual(result.appendRequest.agentRun.inputArtifactRefs, [
     "taskDraft",
     "executionAuthorization",
+    "isolatedWorkspace",
     "executionReport:001",
   ]);
 });
@@ -121,8 +129,21 @@ test("uses latest convergence advice when reviewing a later execution", () => {
     "taskDraft",
     "executionAuthorization",
     "convergenceAdvice:001",
+    "isolatedWorkspace",
     "executionReport:002",
   ]);
+});
+
+test("does not run review agent before isolated workspace exists", () => {
+  const taskPackage = reviewablePackage();
+  delete taskPackage.artifacts.isolatedWorkspace;
+
+  const result = runReviewAgent({
+    taskContextPackage: taskPackage,
+  });
+
+  assert.equal(result.appendRequest, null);
+  assert.match(result.error, /缺少 isolatedWorkspace/);
 });
 
 test("does not run review agent before execution report exists", () => {

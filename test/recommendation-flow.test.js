@@ -136,6 +136,11 @@ test("recommendation flow applies module append requests through the task pool",
     completed.taskContextPackage.artifacts.executionAuthorization.body.termination.maxIterations,
     3,
   );
+  assert.equal(completed.isolatedWorkspaceAllocation.appendRequest.artifactType, "isolatedWorkspace");
+  assert.equal(
+    completed.taskContextPackage.artifacts.isolatedWorkspace.body.worktreePath,
+    ".workflow/worktrees/tasks/tasks-task-001",
+  );
   assert.equal(completed.mainAgentInitialization.appendRequest.agentRun.role, "main");
   assert.equal(completed.executionAgentRuns.length, 2);
   assert.equal(completed.executionAgentRuns[0].appendRequest.agentRun.role, "execution");
@@ -169,17 +174,31 @@ test("recommendation flow applies module append requests through the task pool",
   assert.deepEqual(completed.taskContextPackage.agentRuns[1].outputArtifactRefs, ["executionReport:001"]);
   assert.deepEqual(completed.taskContextPackage.agentRuns[2].outputArtifactRefs, ["reviewReport:001"]);
   assert.deepEqual(completed.taskContextPackage.agentRuns[3].outputArtifactRefs, ["convergenceAdvice:001"]);
+  assert.deepEqual(completed.taskContextPackage.agentRuns[1].inputArtifactRefs, [
+    "taskDraft",
+    "executionIntent",
+    "executionAuthorization",
+    "isolatedWorkspace",
+  ]);
+  assert.deepEqual(completed.taskContextPackage.agentRuns[2].inputArtifactRefs, [
+    "taskDraft",
+    "executionAuthorization",
+    "isolatedWorkspace",
+    "executionReport:001",
+  ]);
   assert.deepEqual(completed.taskContextPackage.agentRuns[4].inputArtifactRefs, [
     "taskDraft",
     "executionIntent",
     "executionAuthorization",
     "convergenceAdvice:001",
+    "isolatedWorkspace",
   ]);
   assert.deepEqual(completed.taskContextPackage.agentRuns[4].outputArtifactRefs, ["executionReport:002"]);
   assert.deepEqual(completed.taskContextPackage.agentRuns[5].inputArtifactRefs, [
     "taskDraft",
     "executionAuthorization",
     "convergenceAdvice:001",
+    "isolatedWorkspace",
     "executionReport:002",
   ]);
   assert.deepEqual(completed.taskContextPackage.agentRuns[5].outputArtifactRefs, ["reviewReport:002"]);
@@ -192,5 +211,6 @@ test("recommendation flow applies module append requests through the task pool",
     "reviewReport:002",
   ]);
   assert.deepEqual(completed.taskContextPackage.agentRuns[6].outputArtifactRefs, ["taskCompletion"]);
+  assert.equal(completed.taskContextPackage.timeline[2].artifactId, "isolatedWorkspace");
   assert.equal(completed.taskContextPackage.timeline.at(-1).artifactId, "humanDecisionRequest");
 });

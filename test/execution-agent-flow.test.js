@@ -19,6 +19,13 @@ function executablePackage() {
         body: {},
         appendedAt: "2026-05-18T09:01:00.000Z",
       },
+      isolatedWorkspace: {
+        artifactId: "isolatedWorkspace",
+        body: {
+          worktreePath: ".workflow/worktrees/tasks/tasks-task-003",
+        },
+        appendedAt: "2026-05-18T09:02:00.000Z",
+      },
     },
     agentRuns: [
       {
@@ -59,6 +66,7 @@ test("runs execution agent stub and requests execution report append", () => {
     "taskDraft",
     "executionIntent",
     "executionAuthorization",
+    "isolatedWorkspace",
   ]);
 });
 
@@ -106,7 +114,20 @@ test("uses latest convergence advice as next execution input", () => {
     "executionIntent",
     "executionAuthorization",
     "convergenceAdvice:001",
+    "isolatedWorkspace",
   ]);
+});
+
+test("does not run execution agent before isolated workspace is allocated", () => {
+  const taskPackage = executablePackage();
+  delete taskPackage.artifacts.isolatedWorkspace;
+
+  const result = runExecutionAgent({
+    taskContextPackage: taskPackage,
+  });
+
+  assert.equal(result.appendRequest, null);
+  assert.match(result.error, /缺少 isolatedWorkspace/);
 });
 
 test("does not run execution agent before main agent is initialized", () => {

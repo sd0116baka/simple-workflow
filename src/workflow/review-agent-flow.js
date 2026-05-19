@@ -14,6 +14,10 @@ function latestConvergenceAdvice(taskContextPackage) {
     : null;
 }
 
+function hasIsolatedWorkspace(taskContextPackage) {
+  return Boolean(taskContextPackage?.artifacts?.isolatedWorkspace?.body);
+}
+
 function nextReviewRunId(taskContextPackage) {
   const existingReports = taskContextPackage?.artifacts?.reviewReport ?? [];
   const nextIndex = Array.isArray(existingReports) ? existingReports.length + 1 : 1;
@@ -24,6 +28,7 @@ function inputArtifactRefsForReview(taskContextPackage, executionReport) {
   const refs = [
     "taskDraft",
     "executionAuthorization",
+    "isolatedWorkspace",
     executionReport.artifactId,
   ];
   const convergenceAdvice = latestConvergenceAdvice(taskContextPackage);
@@ -32,6 +37,7 @@ function inputArtifactRefsForReview(taskContextPackage, executionReport) {
         "taskDraft",
         "executionAuthorization",
         convergenceAdvice.artifactId,
+        "isolatedWorkspace",
         executionReport.artifactId,
       ]
     : refs;
@@ -51,6 +57,12 @@ export function runReviewAgent({
     return {
       appendRequest: null,
       error: "任务上下文包缺少 executionReport，不能运行 review agent。",
+    };
+  }
+  if (!hasIsolatedWorkspace(taskContextPackage)) {
+    return {
+      appendRequest: null,
+      error: "任务上下文包缺少 isolatedWorkspace，不能运行 review agent。",
     };
   }
 

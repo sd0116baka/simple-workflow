@@ -3,6 +3,7 @@ import { runConvergence } from "./convergence-flow.js";
 import { evaluateExecutionAdmission } from "./execution-admission.js";
 import { runExecutionAgent } from "./execution-agent-flow.js";
 import { requestHumanDecisionForTaskCompletion } from "./human-decision-flow.js";
+import { allocateIsolatedWorkspace } from "./isolated-workspace-flow.js";
 import { initializeMainAgent } from "./main-agent-flow.js";
 import { parseRecommendationIntent } from "./recommendation-intent.js";
 import { buildRecommendationPrompt } from "./recommendation-prompt.js";
@@ -25,6 +26,8 @@ export function createBlockedRecommendationRun({ id, startupCheck, now = () => n
     executionIntentAppendRequest: null,
     executionIntentError: null,
     executionAdmission: null,
+    isolatedWorkspaceAllocation: null,
+    isolatedWorkspaceError: null,
     mainAgentInitialization: null,
     mainAgentInitializationError: null,
     executionAgentRuns: [],
@@ -63,6 +66,8 @@ export function createRunningRecommendationRun({
     executionIntentAppendRequest: null,
     executionIntentError: null,
     executionAdmission: null,
+    isolatedWorkspaceAllocation: null,
+    isolatedWorkspaceError: null,
     mainAgentInitialization: null,
     mainAgentInitializationError: null,
     executionAgentRuns: [],
@@ -152,11 +157,25 @@ export function completeRecommendationFlow({
   const authorizedPackage = failed || !parsed.appendRequest
     ? null
     : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
-  const mainAgentInitialization =
+  const isolatedWorkspaceAllocation =
     !authorizedPackage || admission?.appendRequest?.artifactType !== "executionAuthorization"
       ? null
-      : initializeMainAgent({
+      : allocateIsolatedWorkspace({
           taskContextPackage: authorizedPackage,
+        });
+  taskPool = !isolatedWorkspaceAllocation?.appendRequest
+    ? taskPool
+    : applyAppendRequest(taskPool, isolatedWorkspaceAllocation.appendRequest, {
+        currentWorkStage: "isolated-workspace",
+      });
+  const workspaceReadyPackage = failed || !parsed.appendRequest
+    ? null
+    : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
+  const mainAgentInitialization =
+    !workspaceReadyPackage || !isolatedWorkspaceAllocation?.appendRequest
+      ? null
+      : initializeMainAgent({
+          taskContextPackage: workspaceReadyPackage,
           runAgentSession: runMainAgentSession,
           now,
         });
@@ -300,6 +319,8 @@ export function completeRecommendationFlow({
     executionIntentAppendRequest: parsed.appendRequest,
     executionIntentError: parsed.error,
     executionAdmission: admission,
+    isolatedWorkspaceAllocation,
+    isolatedWorkspaceError: isolatedWorkspaceAllocation?.error ?? null,
     mainAgentInitialization,
     mainAgentInitializationError: mainAgentInitialization?.error ?? null,
     executionAgentRuns,

@@ -8,6 +8,10 @@ function hasMainAgentInitialization(taskContextPackage) {
   return taskContextPackage?.agentRuns?.[0]?.role === "main";
 }
 
+function hasIsolatedWorkspace(taskContextPackage) {
+  return Boolean(taskContextPackage?.artifacts?.isolatedWorkspace?.body);
+}
+
 function nextExecutionRunId(taskContextPackage) {
   const existingReports = taskContextPackage?.artifacts?.executionReport ?? [];
   const nextIndex = Array.isArray(existingReports) ? existingReports.length + 1 : 1;
@@ -22,15 +26,15 @@ function latestArtifact(taskContextPackage, artifactType) {
 }
 
 function inputArtifactRefsForExecution(taskContextPackage) {
-  const refs = [
+  const baseRefs = [
     "taskDraft",
     "executionIntent",
     "executionAuthorization",
   ];
   const convergenceAdvice = latestArtifact(taskContextPackage, "convergenceAdvice");
   return convergenceAdvice
-    ? [...refs, convergenceAdvice.artifactId]
-    : refs;
+    ? [...baseRefs, convergenceAdvice.artifactId, "isolatedWorkspace"]
+    : [...baseRefs, "isolatedWorkspace"];
 }
 
 export function runExecutionAgent({
@@ -45,6 +49,12 @@ export function runExecutionAgent({
     return {
       appendRequest: null,
       error: "任务上下文包缺少执行授权，不能运行 execution agent。",
+    };
+  }
+  if (!hasIsolatedWorkspace(taskContextPackage)) {
+    return {
+      appendRequest: null,
+      error: "任务上下文包缺少 isolatedWorkspace，不能运行 execution agent。",
     };
   }
   if (!hasMainAgentInitialization(taskContextPackage)) {

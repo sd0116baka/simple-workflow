@@ -174,6 +174,7 @@ executionIntent
 executionAuthorization
 admissionRejection
 humanDecisionRequest
+isolatedWorkspace
 ```
 
 Agent loop 产物是多例：
@@ -197,6 +198,69 @@ humanDecisionRequest
 ```
 
 artifactId 由任务池生成。Agent 不生成 artifactId。
+
+## 隔离工作树
+
+`isolatedWorkspace` 是任务级单例 artifact。
+
+它表示这个任务的隔离开发工作树，绑定任务生命周期，不绑定某一轮 `execution` Agent。
+
+第一版每个任务最多只有一个 `isolatedWorkspace`：
+
+```json
+{
+  "artifactId": "isolatedWorkspace",
+  "body": {
+    "worktreePath": ".workflow/worktrees/tasks/task-003",
+    "branchName": "workflow/tasks/task-003",
+    "baseBranch": "main",
+    "baseCommit": "abc123",
+    "status": "ready"
+  },
+  "appendedAt": "2026-05-18T10:00:00.000Z"
+}
+```
+
+系统负责创建和分配 `isolatedWorkspace`。Agent 不决定工作树路径，不决定分支名，不决定主线合入。
+
+创建时机：
+
+```text
+executionAuthorization
+-> isolatedWorkspace
+-> main-agent:initialization
+-> execution-agent:001
+```
+
+准入通过后才创建 `isolatedWorkspace`。第一个 `execution` Agent 启动前，`isolatedWorkspace` 必须已经追加到任务上下文包。
+
+第一版命名规则：
+
+```text
+baseBranch: main
+worktreePath: .workflow/worktrees/tasks/<safe-package-id>
+branchName: workflow/tasks/<safe-package-id>
+```
+
+`safe-package-id` 从 `source.path` 派生，不从任务标题派生。
+
+示例：
+
+```text
+tasks/task-003.yaml -> tasks-task-003
+```
+
+第一版不考虑文件改名。
+
+`execution` Agent 使用 `isolatedWorkspace.body.worktreePath` 作为 `cwd`，可以修改这个工作树。
+
+`review` Agent 读取同一个 `isolatedWorkspace.body.worktreePath`，原则上只读。第一版只在 review Agent 提示词中要求不得修改文件，不做代码级 diff 检查。
+
+`main` Agent 不读取 `isolatedWorkspace`。
+
+`accept-completion` 后，后续 integration flow 读取 `isolatedWorkspace`、`taskCompletion`、人工决策产物、最新 `executionReport` 和最新 `reviewReport`，由系统负责合入主线。
+
+未来如果需要从某一轮接收成果、重试或并行探索，再新增 `workspaceCheckpoint` 或 `workspaceFork`。第一版不引入多工作树。
 
 ## 收敛环节
 
@@ -246,19 +310,19 @@ main 初始化：
 taskDraft, executionIntent, executionAuthorization
 
 execution 第 1 轮：
-taskDraft, executionIntent, executionAuthorization
+taskDraft, executionIntent, executionAuthorization, isolatedWorkspace
 
 review 第 1 轮：
-taskDraft, executionAuthorization, executionReport:001
+taskDraft, executionAuthorization, isolatedWorkspace, executionReport:001
 
 review 第 N 轮，N >= 2：
-taskDraft, executionAuthorization, convergenceAdvice:N-1, executionReport:N
+taskDraft, executionAuthorization, convergenceAdvice:N-1, isolatedWorkspace, executionReport:N
 
 convergence 第 N 轮：
 taskDraft, executionIntent, executionAuthorization, convergenceAdvice:N-1, executionReport:N, reviewReport:N
 
 execution 第 N+1 轮：
-taskDraft, executionIntent, executionAuthorization, convergenceAdvice:N
+taskDraft, executionIntent, executionAuthorization, convergenceAdvice:N, isolatedWorkspace
 ```
 
 `convergenceAdvice:0` 不存在。第一轮 execution、第一轮 review 和第一轮 convergence 都不使用 `convergenceAdvice`。

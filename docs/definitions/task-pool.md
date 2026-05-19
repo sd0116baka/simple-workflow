@@ -126,6 +126,7 @@ task-parser
 task-pool
 task-recommender
 execution-admission
+isolated-workspace
 main-agent
 execution-agent
 review-agent
@@ -139,6 +140,49 @@ human-decision
 `task-completion` 表示 Agent 已产出任务完成结论。
 
 `human-decision` 表示系统正在等待人工接受、打回或另行处理该结论。
+
+## isolatedWorkspace
+
+`isolatedWorkspace` 是任务上下文包里的任务级单例 artifact。
+
+它表示该任务的隔离开发工作树：
+
+```json
+{
+  "artifactId": "isolatedWorkspace",
+  "body": {
+    "worktreePath": ".workflow/worktrees/tasks/task-003",
+    "branchName": "workflow/tasks/task-003",
+    "baseBranch": "main",
+    "baseCommit": "abc123",
+    "status": "ready"
+  },
+  "appendedAt": "2026-05-18T10:00:00.000Z"
+}
+```
+
+`isolatedWorkspace` 不按执行轮次重复创建。多轮 `execution` 和 `review` 都引用同一个任务级工作树。
+
+创建时机：
+
+```text
+executionAuthorization
+-> isolatedWorkspace
+-> main-agent:initialization
+-> execution-agent:001
+```
+
+第一版命名规则：
+
+```text
+baseBranch: main
+worktreePath: .workflow/worktrees/tasks/<safe-package-id>
+branchName: workflow/tasks/<safe-package-id>
+```
+
+`safe-package-id` 从 `source.path` 派生，不从任务标题派生。示例：`tasks/task-003.yaml -> tasks-task-003`。
+
+任务池只负责保存 `isolatedWorkspace` 产物。创建 git worktree、指定 Agent `cwd`、检查工作树状态、合入主线，属于后续工作流模块职责。
 
 ## 任务上下文包
 

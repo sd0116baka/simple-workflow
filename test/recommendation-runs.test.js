@@ -107,6 +107,11 @@ test("workflow service captures a successful recommendation run", async () => {
   assert.equal(finished.executionAdmission.appendRequest.artifactType, "executionAuthorization");
   assert.equal(finished.taskContextPackage.currentWorkStage, "human-decision");
   assert.equal(finished.taskContextPackage.artifacts.executionAuthorization.body.termination.maxIterations, 3);
+  assert.equal(finished.isolatedWorkspaceAllocation.appendRequest.artifactType, "isolatedWorkspace");
+  assert.equal(
+    finished.taskContextPackage.artifacts.isolatedWorkspace.body.branchName,
+    "workflow/tasks/tasks-task-001",
+  );
   assert.equal(finished.completionHumanDecisionRequest.appendRequest.artifactType, "humanDecisionRequest");
   assert.equal(finished.executionAgentRuns.length, 2);
   assert.equal(finished.reviewAgentRuns.length, 2);
@@ -125,16 +130,30 @@ test("workflow service captures a successful recommendation run", async () => {
   assert.equal(finished.taskContextPackage.agentRuns[5].role, "review");
   assert.equal(finished.taskContextPackage.agentRuns[6].runId, "main-agent:convergence:002");
   assert.equal(finished.taskContextPackage.agentRuns[6].role, "main");
+  assert.deepEqual(finished.taskContextPackage.agentRuns[1].inputArtifactRefs, [
+    "taskDraft",
+    "executionIntent",
+    "executionAuthorization",
+    "isolatedWorkspace",
+  ]);
+  assert.deepEqual(finished.taskContextPackage.agentRuns[2].inputArtifactRefs, [
+    "taskDraft",
+    "executionAuthorization",
+    "isolatedWorkspace",
+    "executionReport:001",
+  ]);
   assert.deepEqual(finished.taskContextPackage.agentRuns[4].inputArtifactRefs, [
     "taskDraft",
     "executionIntent",
     "executionAuthorization",
     "convergenceAdvice:001",
+    "isolatedWorkspace",
   ]);
   assert.deepEqual(finished.taskContextPackage.agentRuns[5].inputArtifactRefs, [
     "taskDraft",
     "executionAuthorization",
     "convergenceAdvice:001",
+    "isolatedWorkspace",
     "executionReport:002",
   ]);
   assert.deepEqual(finished.taskContextPackage.agentRuns[6].inputArtifactRefs, [
@@ -151,6 +170,7 @@ test("workflow service captures a successful recommendation run", async () => {
   assert.equal(finished.taskContextPackage.artifacts.reviewReport[1].artifactId, "reviewReport:002");
   assert.equal(finished.taskContextPackage.artifacts.convergenceAdvice[0].artifactId, "convergenceAdvice:001");
   assert.equal(finished.taskContextPackage.artifacts.taskCompletion.artifactId, "taskCompletion");
+  assert.equal(finished.taskContextPackage.timeline[2].artifactId, "isolatedWorkspace");
   assert.equal(
     finished.taskContextPackage.artifacts.humanDecisionRequest.body.taskCompletionRef,
     "taskCompletion",

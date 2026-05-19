@@ -206,6 +206,7 @@ function createTaskContextPackagePanel(taskContextPackage) {
     <span>基础包</span><strong></strong>
     <span>执行意图</span><strong></strong>
     <span>执行授权</span><strong></strong>
+    <span>隔离工作树</span><strong></strong>
     <span>任务完成结论</span><strong></strong>
     <span>人工决策</span><strong></strong>
   `;
@@ -217,8 +218,9 @@ function createTaskContextPackagePanel(taskContextPackage) {
     : taskContextPackage.artifacts?.admissionRejection
       ? "未授权"
       : "未追加";
-  values[3].textContent = taskContextPackage.artifacts?.taskCompletion ? "待确认" : "未生成";
-  values[4].textContent = taskContextPackage.artifacts?.humanDecisionRequest ? "等待人工决策" : "未请求";
+  values[3].textContent = taskContextPackage.artifacts?.isolatedWorkspace ? "已分配" : "未分配";
+  values[4].textContent = taskContextPackage.artifacts?.taskCompletion ? "待确认" : "未生成";
+  values[5].textContent = taskContextPackage.artifacts?.humanDecisionRequest ? "等待人工决策" : "未请求";
   panel.append(artifacts);
 
   const artifactEntries = Object.entries(taskContextPackage.artifacts ?? {});
