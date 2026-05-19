@@ -47,6 +47,12 @@ h2 {
   font-weight: 700;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .secondary-button {
   min-height: 36px;
   padding: 0 14px;
@@ -81,6 +87,13 @@ h2 {
 
 .secondary-button:hover {
   background: #f0f4fa;
+}
+
+.secondary-button:disabled {
+  color: #7d8da5;
+  border-color: #d4dce8;
+  background: #f4f7fb;
+  cursor: not-allowed;
 }
 
 .layout {

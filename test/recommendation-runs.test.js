@@ -603,3 +603,52 @@ test("POST /api/human-decisions/accept-completion accepts completion", async (t)
   assert.equal(payload.closed, true);
   assert.equal(payload.recommendationRun.status, "succeeded");
 });
+
+test("POST /api/server/restart triggers configured restart handler", async (t) => {
+  let restartCalled = false;
+  const workflowService = {
+    onEvent() {
+      return () => {};
+    },
+  };
+  const server = createApp({
+    workflowService,
+    restartServer() {
+      restartCalled = true;
+    },
+  });
+  server.listen(0);
+  t.after(() => server.close());
+  await once(server, "listening");
+
+  const response = await fetch(
+    `http://localhost:${server.address().port}/api/server/restart`,
+    { method: "POST" },
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 202);
+  assert.equal(payload.restarting, true);
+  assert.equal(restartCalled, true);
+});
+
+test("POST /api/server/restart returns unavailable without restart handler", async (t) => {
+  const workflowService = {
+    onEvent() {
+      return () => {};
+    },
+  };
+  const server = createApp({ workflowService });
+  server.listen(0);
+  t.after(() => server.close());
+  await once(server, "listening");
+
+  const response = await fetch(
+    `http://localhost:${server.address().port}/api/server/restart`,
+    { method: "POST" },
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 501);
+  assert.match(payload.error, /not available/);
+});

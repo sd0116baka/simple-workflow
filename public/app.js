@@ -11,6 +11,7 @@ const parsedText = document.querySelector("#parsedText");
 const parseStatus = document.querySelector("#parseStatus");
 const validationResult = document.querySelector("#validationResult");
 const validationStatus = document.querySelector("#validationStatus");
+const restartButton = document.querySelector("#restartButton");
 const refreshButton = document.querySelector("#refreshButton");
 const recommendationStatus = document.querySelector("#recommendationStatus");
 const recommendationResult = document.querySelector("#recommendationResult");
@@ -1036,6 +1037,52 @@ async function createRecommendationRun() {
   recommendationRun = payload.recommendationRun ?? null;
   renderRecommendationRun();
 }
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForServerReady() {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await sleep(500);
+    try {
+      const response = await fetch(`/api/startup-check?restartProbe=${Date.now()}`, {
+        cache: "no-store",
+      });
+      if (response.ok) return;
+    } catch {
+      // The server is expected to be unavailable briefly while restarting.
+    }
+  }
+  throw new Error("服务重启超时，请手动刷新页面确认。");
+}
+
+async function restartServer() {
+  restartButton.disabled = true;
+  refreshButton.disabled = true;
+  restartButton.textContent = "重启中";
+  const response = await fetch("/api/server/restart", { method: "POST" });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error ?? `重启失败：${response.status}`);
+  }
+  await sleep(1000);
+  await waitForServerReady();
+  restartButton.textContent = "已重启";
+  await Promise.all([loadTasks(), loadRecommendationRun()]);
+  restartButton.disabled = false;
+  refreshButton.disabled = false;
+  restartButton.textContent = "重启";
+}
+
+restartButton.addEventListener("click", () => {
+  restartServer().catch((error) => {
+    restartButton.disabled = false;
+    refreshButton.disabled = false;
+    restartButton.textContent = "重启";
+    showError(error);
+  });
+});
 
 refreshButton.addEventListener("click", () => {
   Promise.all([loadTasks(), loadRecommendationRun()]).catch(showError);

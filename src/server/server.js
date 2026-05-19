@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -70,6 +71,7 @@ async function serveStatic(request, response) {
 
 export function createApp({
   workflowService = createWorkflowService({ tasksDir, repositoryDir: rootDir }),
+  restartServer = null,
 } = {}) {
   return createServer(async (request, response) => {
     try {
@@ -86,6 +88,16 @@ export function createApp({
       if (request.method === "POST" && request.url?.startsWith("/api/human-decisions/accept-completion")) {
         const result = await workflowService.acceptTaskCompletion();
         sendJson(response, result.accepted ? 200 : 409, result);
+        return;
+      }
+
+      if (request.method === "POST" && request.url?.startsWith("/api/server/restart")) {
+        if (!restartServer) {
+          sendJson(response, 501, { error: "Server restart is not available." });
+          return;
+        }
+        sendJson(response, 202, { restarting: true });
+        restartServer();
         return;
       }
 
@@ -124,7 +136,24 @@ export function isDirectRun(moduleUrl, argvPath) {
 if (isDirectRun(import.meta.url, process.argv[1])) {
   const workflowService = createWorkflowService({ tasksDir, repositoryDir: rootDir });
   await workflowService.startWatching();
-  createApp({ workflowService }).listen(port, () => {
+  let server = null;
+  const restartServer = () => {
+    setTimeout(() => {
+      workflowService.stopWatching();
+      server.close(() => {
+        const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+        spawn(npmCommand, ["run", "start"], {
+          cwd: rootDir,
+          detached: true,
+          stdio: "ignore",
+          windowsHide: true,
+        }).unref();
+        process.exit(0);
+      });
+      server.closeAllConnections?.();
+    }, 250);
+  };
+  server = createApp({ workflowService, restartServer }).listen(port, () => {
     console.log(`simple-workflow running at http://localhost:${port}`);
   });
 }
