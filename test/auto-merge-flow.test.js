@@ -299,3 +299,45 @@ test("fails auto-merge execution when main worktree is dirty", async (t) => {
   assert.equal(result.appendRequest.artifactType, "autoMergeFailure");
   assert.equal(result.appendRequest.artifact.reasons[0].code, "MAIN_WORKTREE_DIRTY");
 });
+
+test("fails auto-merge execution clearly when a stale plan has no staged changes", async (t) => {
+  const { repositoryDir, baseCommit } = await createGitRepositoryWithWorktree(t, {
+    withChanges: false,
+  });
+  const stalePlan = {
+    plannedAt: "2026-05-19T10:00:00.000Z",
+    decisionRef: "humanDecision",
+    source: {
+      worktreePath: ".workflow/worktrees/tasks/tasks-task-003",
+      branchName: "workflow/tasks/tasks-task-003",
+      baseCommit,
+    },
+    target: {
+      branchName: "main",
+      currentCommit: baseCommit,
+    },
+    changeSet: {
+      changedFiles: ["README.md"],
+    },
+    checks: [
+      { name: "humanDecisionAccepted", passed: true },
+      { name: "worktreeExists", passed: true },
+      { name: "worktreeHeadMatchesAcceptedBase", passed: true },
+      { name: "targetBranchAvailable", passed: true },
+    ],
+  };
+
+  const result = executeAutoMerge({
+    taskContextPackage: packageReadyForExecution(baseCommit, stalePlan),
+    repositoryDir,
+  });
+
+  assert.equal(result.error, null);
+  assert.equal(result.appendRequest.artifactType, "autoMergeFailure");
+  assert.deepEqual(result.appendRequest.artifact.reasons, [
+    {
+      code: "NO_CHANGES",
+      message: "隔离工作树没有可提交变更。",
+    },
+  ]);
+});

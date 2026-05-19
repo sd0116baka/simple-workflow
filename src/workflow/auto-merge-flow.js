@@ -20,11 +20,12 @@ function resolveWorktreePath(worktreePath, repositoryDir) {
 }
 
 function changedFilesInWorktree(cwd) {
-  const output = runGit(["status", "--porcelain", "--untracked-files=all"], { cwd });
-  return output
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .map((line) => line.slice(3));
+  const trackedOutput = runGit(["diff", "--name-only", "HEAD", "--"], { cwd });
+  const untrackedOutput = runGit(["ls-files", "--others", "--exclude-standard"], { cwd });
+  return Array.from(new Set([
+    ...trackedOutput.split(/\r?\n/).filter(Boolean),
+    ...untrackedOutput.split(/\r?\n/).filter(Boolean),
+  ]));
 }
 
 function repositoryChangedFiles(cwd) {
@@ -33,6 +34,13 @@ function repositoryChangedFiles(cwd) {
     .split(/\r?\n/)
     .filter(Boolean)
     .map((line) => line.slice(3));
+}
+
+function stagedChangedFiles(cwd) {
+  const output = runGit(["diff", "--cached", "--name-only", "--"], { cwd });
+  return output
+    .split(/\r?\n/)
+    .filter(Boolean);
 }
 
 function checkedInputs(taskContextPackage) {
@@ -332,6 +340,17 @@ export function executeAutoMerge({
   let afterCommit;
   try {
     runGit(["add", "-A"], { cwd: absoluteWorktreePath });
+    const stagedFiles = stagedChangedFiles(absoluteWorktreePath);
+    if (stagedFiles.length === 0) {
+      return {
+        appendRequest: failureRequest({
+          taskContextPackage,
+          reasons: [reason("NO_STAGED_CHANGES", "隔离工作树没有可提交的暂存变更。")],
+          now,
+        }),
+        error: null,
+      };
+    }
     runGit([
       "-c",
       "user.name=Simple Workflow",

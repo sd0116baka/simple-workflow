@@ -245,6 +245,7 @@ export function createWorkflowService({
         return {
           accepted: true,
           planned: false,
+          closed: false,
           error: planning.error,
           recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
         };
@@ -273,6 +274,7 @@ export function createWorkflowService({
           accepted: true,
           planned: false,
           executed: false,
+          closed: false,
           error: null,
           recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
         };
