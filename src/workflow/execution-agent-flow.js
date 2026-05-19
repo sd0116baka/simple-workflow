@@ -8,6 +8,12 @@ function hasMainAgentInitialization(taskContextPackage) {
   return taskContextPackage?.agentRuns?.[0]?.role === "main";
 }
 
+function nextExecutionRunId(taskContextPackage) {
+  const existingReports = taskContextPackage?.artifacts?.executionReport ?? [];
+  const nextIndex = Array.isArray(existingReports) ? existingReports.length + 1 : 1;
+  return `execution-agent:${String(nextIndex).padStart(3, "0")}`;
+}
+
 export function runExecutionAgent({
   taskContextPackage,
   runAgentSession = createStubAgentSession,
@@ -50,7 +56,7 @@ export function runExecutionAgent({
         ],
       },
       agentRun: {
-        runId: "agent-run-002",
+        runId: nextExecutionRunId(taskContextPackage),
         role: "execution",
         sessionId: session.sessionId,
         inputArtifactRefs: [

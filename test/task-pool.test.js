@@ -253,7 +253,7 @@ test("task pool records agent runs and generated multi artifact refs", () => {
         summary: "完成监听实现",
       },
       agentRun: {
-        runId: "agent-run-002",
+        runId: "execution-agent:001",
         role: "execution",
         sessionId: "opencode-session-execution-002",
         inputArtifactRefs: ["taskDraft", "executionAuthorization"],
@@ -276,7 +276,7 @@ test("task pool records agent runs and generated multi artifact refs", () => {
   assert.equal(taskPackage.artifacts.executionReport[0].body.summary, "完成监听实现");
   assert.equal(taskPackage.agentRuns[0].sessionId, "opencode-session-execution-002");
   assert.deepEqual(taskPackage.agentRuns[0].outputArtifactRefs, ["executionReport:001"]);
-  assert.equal(taskPackage.timeline[0].agentRunId, "agent-run-002");
+  assert.equal(taskPackage.timeline[0].agentRunId, "execution-agent:001");
 });
 
 test("task pool records a main agent run without requiring an artifact", () => {
@@ -302,7 +302,7 @@ test("task pool records a main agent run without requiring an artifact", () => {
     {
       packageId: "task-context-package:tasks/task-003.yaml",
       agentRun: {
-        runId: "agent-run-001",
+        runId: "main-agent:initialization",
         role: "main",
         sessionId: "opencode-session-main-task-003",
         inputArtifactRefs: ["taskDraft", "executionIntent", "executionAuthorization"],
@@ -325,5 +325,5 @@ test("task pool records a main agent run without requiring an artifact", () => {
   assert.equal(taskPackage.agentRuns[0].role, "main");
   assert.deepEqual(taskPackage.agentRuns[0].outputArtifactRefs, []);
   assert.equal(taskPackage.timeline[0].artifactId, null);
-  assert.equal(taskPackage.timeline[0].agentRunId, "agent-run-001");
+  assert.equal(taskPackage.timeline[0].agentRunId, "main-agent:initialization");
 });

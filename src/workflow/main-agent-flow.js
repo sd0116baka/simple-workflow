@@ -31,7 +31,7 @@ export function initializeMainAgent({
     appendRequest: {
       packageId: taskContextPackage.packageId,
       agentRun: {
-        runId: "agent-run-001",
+        runId: "main-agent:initialization",
         role: "main",
         sessionId: session.sessionId,
         inputArtifactRefs: [

@@ -22,7 +22,7 @@ function executablePackage() {
     },
     agentRuns: [
       {
-        runId: "agent-run-001",
+        runId: "main-agent:initialization",
         role: "main",
         sessionId: "session:main",
         inputArtifactRefs: ["taskDraft", "executionIntent", "executionAuthorization"],
@@ -49,6 +49,7 @@ test("runs execution agent stub and requests execution report append", () => {
   assert.equal(result.appendRequest.packageId, "task-context-package:tasks/task-003.yaml");
   assert.equal(result.appendRequest.artifactType, "executionReport");
   assert.equal(result.appendRequest.artifact.summary, "stub execution completed");
+  assert.equal(result.appendRequest.agentRun.runId, "execution-agent:001");
   assert.equal(result.appendRequest.agentRun.role, "execution");
   assert.equal(
     result.appendRequest.agentRun.sessionId,
@@ -59,6 +60,23 @@ test("runs execution agent stub and requests execution report append", () => {
     "executionIntent",
     "executionAuthorization",
   ]);
+});
+
+test("increments execution agent run id from existing execution reports", () => {
+  const taskPackage = executablePackage();
+  taskPackage.artifacts.executionReport = [
+    {
+      artifactId: "executionReport:001",
+      body: {},
+      appendedAt: "2026-05-18T10:00:01.000Z",
+    },
+  ];
+
+  const result = runExecutionAgent({
+    taskContextPackage: taskPackage,
+  });
+
+  assert.equal(result.appendRequest.agentRun.runId, "execution-agent:002");
 });
 
 test("does not run execution agent before main agent is initialized", () => {

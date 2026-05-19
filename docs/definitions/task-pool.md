@@ -178,7 +178,7 @@ Agent 调用也通过同一个追加请求接口进入任务池。
     "artifactType": "executionReport",
     "artifact": {},
     "agentRun": {
-      "runId": "agent-run-002",
+      "runId": "execution-agent:001",
       "role": "execution",
       "sessionId": "opencode-session-execution-002",
       "inputArtifactRefs": [

@@ -37,6 +37,7 @@ test("initializes main agent session without producing an artifact", () => {
   assert.equal(init.error, null);
   assert.equal(init.appendRequest.packageId, "task-context-package:tasks/task-003.yaml");
   assert.equal(init.appendRequest.artifactType, undefined);
+  assert.equal(init.appendRequest.agentRun.runId, "main-agent:initialization");
   assert.equal(init.appendRequest.agentRun.role, "main");
   assert.equal(
     init.appendRequest.agentRun.sessionId,

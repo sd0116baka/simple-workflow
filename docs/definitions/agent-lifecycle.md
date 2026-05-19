@@ -46,7 +46,7 @@ review
 
 ```json
 {
-  "runId": "agent-run-001",
+  "runId": "main-agent:initialization",
   "role": "main",
   "sessionId": "opencode-session-main-task-003",
   "inputArtifactRefs": [
@@ -60,6 +60,25 @@ review
   "finishedAt": "2026-05-18T10:00:10.000Z"
 }
 ```
+
+`runId` 使用 Agent 名称和轮次命名，不使用全局流水号。
+
+第一版命名规则：
+
+```text
+main-agent:initialization
+execution-agent:001
+review-agent:001
+main-agent:convergence:001
+```
+
+`main-agent:initialization` 表示任务级 main Agent 会话初始化，不属于执行轮次。
+
+`execution-agent:001` 表示第 1 轮执行。
+
+`review-agent:001` 表示第 1 轮审查。
+
+`main-agent:convergence:001` 表示第 1 轮收敛建议。
 
 `role` 枚举值：
 
@@ -90,7 +109,7 @@ Agent 调用完成后，flow 仍然通过统一追加请求交给任务池。
   "appendRequest": {
     "packageId": "task-context-package:tasks/task-003.yaml",
     "agentRun": {
-      "runId": "agent-run-001",
+      "runId": "main-agent:initialization",
       "role": "main",
       "sessionId": "opencode-session-main-task-003",
       "inputArtifactRefs": [
@@ -118,7 +137,7 @@ Agent 调用完成后，flow 仍然通过统一追加请求交给任务池。
       "summary": "完成 tasks 目录监听。"
     },
     "agentRun": {
-      "runId": "agent-run-002",
+      "runId": "execution-agent:001",
       "role": "execution",
       "sessionId": "opencode-session-execution-002",
       "inputArtifactRefs": [
