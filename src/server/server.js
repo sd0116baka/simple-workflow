@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -145,16 +145,22 @@ export function restartCommand({
   platform = process.platform,
 } = {}) {
   if (platform === "win32") {
-    const script = [
+    const restartScript = [
       "$ErrorActionPreference = 'Stop'",
       `Wait-Process -Id ${currentPid} -ErrorAction SilentlyContinue`,
       "Start-Sleep -Milliseconds 300",
       `Set-Location ${quotePowerShellSingle(cwd)}`,
       `& ${quotePowerShellSingle(nodePath)} ${quotePowerShellSingle(serverPath)}`,
     ].join("; ");
+    const launcherScript = [
+      "Start-Process",
+      `-FilePath ${quotePowerShellSingle("powershell.exe")}`,
+      `-ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ${quotePowerShellSingle(restartScript)})`,
+      "-WindowStyle Hidden",
+    ].join(" ");
     return {
       command: "powershell.exe",
-      args: ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+      args: ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", launcherScript],
     };
   }
 
@@ -171,6 +177,14 @@ export function restartCommand({
 
 function spawnRestartProcess(options) {
   const { command, args } = restartCommand(options);
+  if ((options.platform ?? process.platform) === "win32") {
+    spawnSync(command, args, {
+      cwd: options.cwd,
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    return;
+  }
   spawn(command, args, {
     cwd: options.cwd,
     detached: true,
