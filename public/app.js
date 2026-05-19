@@ -54,6 +54,7 @@ let poolTaskContextPackages = [];
 let startupCheck = null;
 let recommendationRun = null;
 let selectedFileName = null;
+let latestRecommendationSyncAt = 0;
 
 function stripAnsi(text) {
   return String(text ?? "").replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
@@ -1092,7 +1093,18 @@ async function loadRecommendationRun() {
   }
   const payload = await response.json();
   recommendationRun = payload.recommendationRun ?? null;
+  latestRecommendationSyncAt = Date.now();
   renderRecommendationRun();
+}
+
+async function syncRecommendationRunSilently() {
+  try {
+    await loadRecommendationRun();
+  } catch {
+    if (recommendationRun?.status === "running") {
+      recommendationStatus.textContent = `running · 连接中断 · ${formatElapsed(recommendationRun.startedAt)}`;
+    }
+  }
 }
 
 async function createRecommendationRun() {
@@ -1165,6 +1177,17 @@ runRecommendationButton.addEventListener("click", () => {
 function connectWorkflowEvents() {
   if (!("EventSource" in window)) return;
   const events = new EventSource("/api/events");
+  events.addEventListener("open", () => {
+    Promise.all([loadTasks(), loadRecommendationRun()]).catch(() => {});
+  });
+  events.addEventListener("error", () => {
+    if (recommendationRun?.status === "running") {
+      recommendationStatus.textContent = `running · 连接中断 · ${formatElapsed(recommendationRun.startedAt)}`;
+      setTimeout(() => {
+        syncRecommendationRunSilently();
+      }, 1500);
+    }
+  });
   events.addEventListener("tasks-changed", () => {
     loadTasks().catch(showError);
   });
@@ -1193,5 +1216,8 @@ connectWorkflowEvents();
 setInterval(() => {
   if (recommendationRun?.status === "running") {
     renderRecommendationRun();
+    if (Date.now() - latestRecommendationSyncAt > 5000) {
+      syncRecommendationRunSilently();
+    }
   }
 }, 1000);
