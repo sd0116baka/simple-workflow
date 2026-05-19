@@ -70,6 +70,7 @@ main-agent:initialization
 execution-agent:001
 review-agent:001
 main-agent:convergence:001
+execution-agent:002
 ```
 
 `main-agent:initialization` 表示任务级 main Agent 会话初始化，不属于执行轮次。
@@ -79,6 +80,8 @@ main-agent:convergence:001
 `review-agent:001` 表示第 1 轮审查。
 
 `main-agent:convergence:001` 表示第 1 轮收敛建议。
+
+`execution-agent:002` 表示收敛建议后的第 2 轮执行。
 
 `role` 枚举值：
 
@@ -198,6 +201,8 @@ convergenceAdvice:002
 
 它会作为下一轮 `execution` Agent 的输入，帮助执行过程收敛。
 
+收敛环节不会结束工作流。状态机收到 `convergenceAdvice:N` 后，可以继续调用下一轮 `execution` Agent，并把该建议放进下一轮 `execution` Agent 的 `inputArtifactRefs`。
+
 ## inputArtifactRefs 业务规则
 
 `inputArtifactRefs` 表示本次 Agent 工作所依据的任务事实、授权、上一轮结果和收敛意见。
@@ -221,7 +226,7 @@ convergence 第 N 轮：
 taskDraft, executionIntent, executionAuthorization, executionReport:N, reviewReport:N
 
 execution 第 N+1 轮：
-taskDraft, executionAuthorization, convergenceAdvice:N
+taskDraft, executionIntent, executionAuthorization, convergenceAdvice:N
 ```
 
 `convergenceAdvice:0` 不存在。第一轮 execution 使用 `executionIntent`，第一轮 review 不使用 `convergenceAdvice`。

@@ -14,6 +14,25 @@ function nextExecutionRunId(taskContextPackage) {
   return `execution-agent:${String(nextIndex).padStart(3, "0")}`;
 }
 
+function latestArtifact(taskContextPackage, artifactType) {
+  const artifacts = taskContextPackage?.artifacts?.[artifactType];
+  return Array.isArray(artifacts) && artifacts.length > 0
+    ? artifacts[artifacts.length - 1]
+    : null;
+}
+
+function inputArtifactRefsForExecution(taskContextPackage) {
+  const refs = [
+    "taskDraft",
+    "executionIntent",
+    "executionAuthorization",
+  ];
+  const convergenceAdvice = latestArtifact(taskContextPackage, "convergenceAdvice");
+  return convergenceAdvice
+    ? [...refs, convergenceAdvice.artifactId]
+    : refs;
+}
+
 export function runExecutionAgent({
   taskContextPackage,
   runAgentSession = createStubAgentSession,
@@ -42,6 +61,7 @@ export function runExecutionAgent({
     taskContextPackage,
   });
   const finishedAt = now();
+  const inputArtifactRefs = inputArtifactRefsForExecution(taskContextPackage);
 
   return {
     appendRequest: {
@@ -52,18 +72,16 @@ export function runExecutionAgent({
         changedFiles: [],
         tests: [],
         notes: [
-          "execution agent stub 未修改文件，仅验证执行期追加结构。",
+          inputArtifactRefs.some((ref) => ref.startsWith("convergenceAdvice:"))
+            ? "execution agent stub 已接收上一轮收敛建议，仅验证循环追加结构。"
+            : "execution agent stub 未修改文件，仅验证执行期追加结构。",
         ],
       },
       agentRun: {
         runId: nextExecutionRunId(taskContextPackage),
         role: "execution",
         sessionId: session.sessionId,
-        inputArtifactRefs: [
-          "taskDraft",
-          "executionIntent",
-          "executionAuthorization",
-        ],
+        inputArtifactRefs,
         outputArtifactRefs: [],
         status: session.status,
         startedAt,

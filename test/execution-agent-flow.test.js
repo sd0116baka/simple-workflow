@@ -79,6 +79,36 @@ test("increments execution agent run id from existing execution reports", () => 
   assert.equal(result.appendRequest.agentRun.runId, "execution-agent:002");
 });
 
+test("uses latest convergence advice as next execution input", () => {
+  const taskPackage = executablePackage();
+  taskPackage.artifacts.executionReport = [
+    {
+      artifactId: "executionReport:001",
+      body: {},
+      appendedAt: "2026-05-18T10:00:01.000Z",
+    },
+  ];
+  taskPackage.artifacts.convergenceAdvice = [
+    {
+      artifactId: "convergenceAdvice:001",
+      body: {},
+      appendedAt: "2026-05-18T10:00:03.000Z",
+    },
+  ];
+
+  const result = runExecutionAgent({
+    taskContextPackage: taskPackage,
+  });
+
+  assert.equal(result.appendRequest.agentRun.runId, "execution-agent:002");
+  assert.deepEqual(result.appendRequest.agentRun.inputArtifactRefs, [
+    "taskDraft",
+    "executionIntent",
+    "executionAuthorization",
+    "convergenceAdvice:001",
+  ]);
+});
+
 test("does not run execution agent before main agent is initialized", () => {
   const taskPackage = executablePackage();
   taskPackage.agentRuns = [];

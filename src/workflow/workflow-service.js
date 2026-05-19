@@ -60,15 +60,24 @@ export function createWorkflowService({
           mainAgentInitialization: run.mainAgentInitialization
             ? JSON.parse(JSON.stringify(run.mainAgentInitialization))
             : null,
-          executionAgentRun: run.executionAgentRun
-            ? JSON.parse(JSON.stringify(run.executionAgentRun))
-            : null,
-          reviewAgentRun: run.reviewAgentRun
-            ? JSON.parse(JSON.stringify(run.reviewAgentRun))
-            : null,
-          convergenceRun: run.convergenceRun
-            ? JSON.parse(JSON.stringify(run.convergenceRun))
-            : null,
+          executionAgentRuns: run.executionAgentRuns
+            ? JSON.parse(JSON.stringify(run.executionAgentRuns))
+            : [],
+          executionAgentErrors: run.executionAgentErrors
+            ? [...run.executionAgentErrors]
+            : [],
+          reviewAgentRuns: run.reviewAgentRuns
+            ? JSON.parse(JSON.stringify(run.reviewAgentRuns))
+            : [],
+          reviewAgentErrors: run.reviewAgentErrors
+            ? [...run.reviewAgentErrors]
+            : [],
+          convergenceRuns: run.convergenceRuns
+            ? JSON.parse(JSON.stringify(run.convergenceRuns))
+            : [],
+          convergenceErrors: run.convergenceErrors
+            ? [...run.convergenceErrors]
+            : [],
           executionIntentAppendRequest: run.executionIntentAppendRequest
             ? JSON.parse(JSON.stringify(run.executionIntentAppendRequest))
             : null,

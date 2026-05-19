@@ -105,8 +105,11 @@ test("workflow service captures a successful recommendation run", async () => {
   assert.equal(finished.executionIntentAppendRequest.artifactType, "executionIntent");
   assert.equal(finished.executionIntentError, null);
   assert.equal(finished.executionAdmission.appendRequest.artifactType, "executionAuthorization");
-  assert.equal(finished.taskContextPackage.currentWorkStage, "convergence");
+  assert.equal(finished.taskContextPackage.currentWorkStage, "execution-agent");
   assert.equal(finished.taskContextPackage.artifacts.executionAuthorization.body.termination.maxIterations, 3);
+  assert.equal(finished.executionAgentRuns.length, 2);
+  assert.equal(finished.reviewAgentRuns.length, 1);
+  assert.equal(finished.convergenceRuns.length, 1);
   assert.equal(finished.taskContextPackage.agentRuns[0].role, "main");
   assert.match(finished.taskContextPackage.agentRuns[0].sessionId, /^stub-main-session:/);
   assert.equal(finished.taskContextPackage.agentRuns[1].role, "execution");
@@ -115,7 +118,16 @@ test("workflow service captures a successful recommendation run", async () => {
   assert.match(finished.taskContextPackage.agentRuns[2].sessionId, /^stub-review-session:/);
   assert.equal(finished.taskContextPackage.agentRuns[3].role, "main");
   assert.match(finished.taskContextPackage.agentRuns[3].sessionId, /^stub-main-session:/);
+  assert.equal(finished.taskContextPackage.agentRuns[4].runId, "execution-agent:002");
+  assert.equal(finished.taskContextPackage.agentRuns[4].role, "execution");
+  assert.deepEqual(finished.taskContextPackage.agentRuns[4].inputArtifactRefs, [
+    "taskDraft",
+    "executionIntent",
+    "executionAuthorization",
+    "convergenceAdvice:001",
+  ]);
   assert.equal(finished.taskContextPackage.artifacts.executionReport[0].artifactId, "executionReport:001");
+  assert.equal(finished.taskContextPackage.artifacts.executionReport[1].artifactId, "executionReport:002");
   assert.equal(finished.taskContextPackage.artifacts.reviewReport[0].artifactId, "reviewReport:001");
   assert.equal(finished.taskContextPackage.artifacts.convergenceAdvice[0].artifactId, "convergenceAdvice:001");
   assert.equal(finished.exitCode, 0);

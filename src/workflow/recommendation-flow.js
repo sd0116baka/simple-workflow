@@ -26,12 +26,12 @@ export function createBlockedRecommendationRun({ id, startupCheck, now = () => n
     executionAdmission: null,
     mainAgentInitialization: null,
     mainAgentInitializationError: null,
-    executionAgentRun: null,
-    executionAgentError: null,
-    reviewAgentRun: null,
-    reviewAgentError: null,
-    convergenceRun: null,
-    convergenceError: null,
+    executionAgentRuns: [],
+    executionAgentErrors: [],
+    reviewAgentRuns: [],
+    reviewAgentErrors: [],
+    convergenceRuns: [],
+    convergenceErrors: [],
     taskContextPackage: null,
     stdout: "",
     stderr: "",
@@ -62,12 +62,12 @@ export function createRunningRecommendationRun({
     executionAdmission: null,
     mainAgentInitialization: null,
     mainAgentInitializationError: null,
-    executionAgentRun: null,
-    executionAgentError: null,
-    reviewAgentRun: null,
-    reviewAgentError: null,
-    convergenceRun: null,
-    convergenceError: null,
+    executionAgentRuns: [],
+    executionAgentErrors: [],
+    reviewAgentRuns: [],
+    reviewAgentErrors: [],
+    convergenceRuns: [],
+    convergenceErrors: [],
     taskContextPackage: null,
     stdout: "",
     stderr: "",
@@ -205,9 +205,30 @@ export function completeRecommendationFlow({
     : applyAppendRequest(taskPool, convergenceRun.appendRequest, {
         currentWorkStage: "convergence",
       });
+  const convergedPackage = failed || !parsed.appendRequest
+    ? null
+    : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
+  const nextExecutionAgentRun = !convergedPackage || !convergenceRun?.appendRequest
+    ? null
+    : runExecutionAgent({
+        taskContextPackage: convergedPackage,
+        runAgentSession: runExecutionAgentSession,
+        now,
+      });
+  taskPool = !nextExecutionAgentRun?.appendRequest
+    ? taskPool
+    : applyAppendRequest(taskPool, nextExecutionAgentRun.appendRequest, {
+        currentWorkStage: "execution-agent",
+      });
   const taskContextPackage = failed || !parsed.appendRequest
     ? null
     : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
+  const executionAgentRuns = [
+    executionAgentRun,
+    nextExecutionAgentRun,
+  ].filter(Boolean);
+  const reviewAgentRuns = [reviewAgentRun].filter(Boolean);
+  const convergenceRuns = [convergenceRun].filter(Boolean);
 
   return {
     ...run,
@@ -223,12 +244,18 @@ export function completeRecommendationFlow({
     executionAdmission: admission,
     mainAgentInitialization,
     mainAgentInitializationError: mainAgentInitialization?.error ?? null,
-    executionAgentRun,
-    executionAgentError: executionAgentRun?.error ?? null,
-    reviewAgentRun,
-    reviewAgentError: reviewAgentRun?.error ?? null,
-    convergenceRun,
-    convergenceError: convergenceRun?.error ?? null,
+    executionAgentRuns,
+    executionAgentErrors: executionAgentRuns
+      .map((agentRun) => agentRun.error)
+      .filter(Boolean),
+    reviewAgentRuns,
+    reviewAgentErrors: reviewAgentRuns
+      .map((agentRun) => agentRun.error)
+      .filter(Boolean),
+    convergenceRuns,
+    convergenceErrors: convergenceRuns
+      .map((agentRun) => agentRun.error)
+      .filter(Boolean),
     taskContextPackage,
   };
 }
