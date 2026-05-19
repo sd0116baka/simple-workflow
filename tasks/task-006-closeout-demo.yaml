@@ -1,0 +1,12 @@
+id: task-006-closeout-demo
+title: 验证合并收尾演示任务
+type: feature
+priority: high
+description: |
+  这是一个无关紧要的演示任务。
+  用来让 stub execution agent 生成任务专属假产物，
+  验证自动合并和任务收尾能成功闭环。
+acceptance:
+  - execution agent 生成任务专属假产物
+  - 自动合并执行能把假产物合入 main
+  - 任务收尾能删除隔离 worktree 和任务分支

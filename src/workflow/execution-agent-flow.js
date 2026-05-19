@@ -50,6 +50,11 @@ function normalizePathForGit(filePath) {
   return filePath.replace(/\\/g, "/");
 }
 
+function safePathSegment(value) {
+  const safeValue = String(value ?? "").replace(/[^a-zA-Z0-9._-]/g, "-");
+  return safeValue || "unknown-task";
+}
+
 function gitChangedFiles(cwd) {
   const output = execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], {
     cwd,
@@ -61,7 +66,8 @@ function gitChangedFiles(cwd) {
 
 function writeStubExecutionProbe({ cwd, runId, taskContextPackage, inputArtifactRefs }) {
   const safeRunId = runId.replace(/[^a-zA-Z0-9.-]/g, "-");
-  const probeRelativePath = `.workflow-agent/${safeRunId}.txt`;
+  const safeTaskId = safePathSegment(taskContextPackage.taskDraft?.id ?? taskContextPackage.packageId);
+  const probeRelativePath = `.workflow-agent/${safeTaskId}/${safeRunId}.txt`;
   const probePath = resolve(cwd, probeRelativePath);
   mkdirSync(dirname(probePath), { recursive: true });
   writeFileSync(

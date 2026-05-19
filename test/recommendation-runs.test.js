@@ -204,11 +204,11 @@ test("workflow service captures a successful recommendation run", async (t) => {
     ".workflow/worktrees/tasks/tasks-task-001",
   );
   assert.deepEqual(finished.taskContextPackage.artifacts.executionReport[0].body.changedFiles, [
-    ".workflow-agent/execution-agent-001.txt",
+    ".workflow-agent/task-001/execution-agent-001.txt",
   ]);
   assert.deepEqual(finished.taskContextPackage.artifacts.executionReport[1].body.changedFiles, [
-    ".workflow-agent/execution-agent-001.txt",
-    ".workflow-agent/execution-agent-002.txt",
+    ".workflow-agent/task-001/execution-agent-001.txt",
+    ".workflow-agent/task-001/execution-agent-002.txt",
   ]);
   assert.equal(finished.taskContextPackage.artifacts.reviewReport[0].artifactId, "reviewReport:001");
   assert.equal(finished.taskContextPackage.artifacts.reviewReport[1].artifactId, "reviewReport:002");
@@ -244,15 +244,15 @@ test("workflow service captures a successful recommendation run", async (t) => {
   assert.deepEqual(
     accepted.recommendationRun.taskContextPackage.artifacts.humanDecision.body.worktreeSnapshot.changedFiles,
     [
-      ".workflow-agent/execution-agent-001.txt",
-      ".workflow-agent/execution-agent-002.txt",
+      ".workflow-agent/task-001/execution-agent-001.txt",
+      ".workflow-agent/task-001/execution-agent-002.txt",
     ],
   );
   assert.deepEqual(
     accepted.recommendationRun.taskContextPackage.artifacts.autoMergePlan.body.changeSet.changedFiles,
     [
-      ".workflow-agent/execution-agent-001.txt",
-      ".workflow-agent/execution-agent-002.txt",
+      ".workflow-agent/task-001/execution-agent-001.txt",
+      ".workflow-agent/task-001/execution-agent-002.txt",
     ],
   );
   assert.equal(
@@ -274,8 +274,8 @@ test("workflow service captures a successful recommendation run", async (t) => {
   assert.deepEqual(
     accepted.recommendationRun.taskContextPackage.artifacts.autoMergeResult.body.changeSet.changedFiles,
     [
-      ".workflow-agent/execution-agent-001.txt",
-      ".workflow-agent/execution-agent-002.txt",
+      ".workflow-agent/task-001/execution-agent-001.txt",
+      ".workflow-agent/task-001/execution-agent-002.txt",
     ],
   );
   assert.equal(
