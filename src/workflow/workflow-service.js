@@ -60,6 +60,9 @@ export function createWorkflowService({
           mainAgentInitialization: run.mainAgentInitialization
             ? JSON.parse(JSON.stringify(run.mainAgentInitialization))
             : null,
+          executionAgentRun: run.executionAgentRun
+            ? JSON.parse(JSON.stringify(run.executionAgentRun))
+            : null,
           executionIntentAppendRequest: run.executionIntentAppendRequest
             ? JSON.parse(JSON.stringify(run.executionIntentAppendRequest))
             : null,

@@ -186,7 +186,7 @@ function createTaskContextPackagePanel(taskContextPackage) {
         item.innerHTML = "<strong></strong><span></span><em></em>";
         item.querySelector("strong").textContent = artifact.artifactId ?? artifactType;
         item.querySelector("span").textContent = body.authorizedAt ?? body.rejectedAt ?? body.requestedAt ?? artifact.appendedAt ?? "已追加";
-        item.querySelector("em").textContent = body.reason ?? body.executionBrief?.goalInterpretation ?? "";
+        item.querySelector("em").textContent = body.reason ?? body.executionBrief?.goalInterpretation ?? body.summary ?? "";
         list.append(item);
       }
     }

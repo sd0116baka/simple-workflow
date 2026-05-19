@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { evaluateExecutionAdmission } from "./execution-admission.js";
+import { runExecutionAgent } from "./execution-agent-flow.js";
 import { initializeMainAgent } from "./main-agent-flow.js";
 import { parseRecommendationIntent } from "./recommendation-intent.js";
 import { buildRecommendationPrompt } from "./recommendation-prompt.js";
@@ -23,6 +24,8 @@ export function createBlockedRecommendationRun({ id, startupCheck, now = () => n
     executionAdmission: null,
     mainAgentInitialization: null,
     mainAgentInitializationError: null,
+    executionAgentRun: null,
+    executionAgentError: null,
     taskContextPackage: null,
     stdout: "",
     stderr: "",
@@ -53,6 +56,8 @@ export function createRunningRecommendationRun({
     executionAdmission: null,
     mainAgentInitialization: null,
     mainAgentInitializationError: null,
+    executionAgentRun: null,
+    executionAgentError: null,
     taskContextPackage: null,
     stdout: "",
     stderr: "",
@@ -98,6 +103,7 @@ export function completeRecommendationFlow({
   startupCheck,
   projectProfile,
   runMainAgentSession,
+  runExecutionAgentSession,
   now = () => new Date().toISOString(),
 }) {
   const failed = commandResult.error || commandResult.exitCode !== 0;
@@ -142,6 +148,21 @@ export function completeRecommendationFlow({
     : applyAppendRequest(taskPool, mainAgentInitialization.appendRequest, {
         currentWorkStage: "main-agent",
       });
+  const mainInitializedPackage = failed || !parsed.appendRequest
+    ? null
+    : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
+  const executionAgentRun = !mainInitializedPackage || !mainAgentInitialization?.appendRequest
+    ? null
+    : runExecutionAgent({
+        taskContextPackage: mainInitializedPackage,
+        runAgentSession: runExecutionAgentSession,
+        now,
+      });
+  taskPool = !executionAgentRun?.appendRequest
+    ? taskPool
+    : applyAppendRequest(taskPool, executionAgentRun.appendRequest, {
+        currentWorkStage: "execution-agent",
+      });
   const taskContextPackage = failed || !parsed.appendRequest
     ? null
     : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
@@ -160,6 +181,8 @@ export function completeRecommendationFlow({
     executionAdmission: admission,
     mainAgentInitialization,
     mainAgentInitializationError: mainAgentInitialization?.error ?? null,
+    executionAgentRun,
+    executionAgentError: executionAgentRun?.error ?? null,
     taskContextPackage,
   };
 }
