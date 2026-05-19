@@ -1,5 +1,6 @@
 import { once } from "node:events";
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,6 +9,7 @@ import assert from "node:assert/strict";
 import { createApp, restartCommand } from "../src/server/server.js";
 import { runStubExecutionAgentSession } from "../src/workflow/execution-agent-flow.js";
 import { createWorkflowService } from "../src/workflow/workflow-service.js";
+import { saveTaskContextPackage } from "../src/workflow/task-context-package-store.js";
 
 function runGit(args, cwd) {
   return execFileSync("git", args, {
@@ -15,6 +17,15 @@ function runGit(args, cwd) {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
   }).trim();
+}
+
+function gitSucceeds(args, cwd) {
+  try {
+    runGit(args, cwd);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function createGitRepository(t) {
@@ -678,6 +689,123 @@ test("POST /api/auto-merge/retry retries auto-merge execution", async (t) => {
   assert.equal(payload.closed, true);
   assert.equal(payload.recommendationRun.status, "succeeded");
   assert.equal(observedPackageId, "task-context-package:tasks/task-001.yaml");
+});
+
+test("workflow service retry closes a merged package without re-running merge", async (t) => {
+  const repositoryDir = await createGitRepository(t);
+  const promptPath = await writePrompt("retry-closeout");
+  const tasksDir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "retry-closeout-tasks");
+  await mkdir(tasksDir, { recursive: true });
+  await writeFile(
+    join(tasksDir, "task-001.yaml"),
+    [
+      "id: task-001",
+      "title: 展示任务真源",
+      "type: feature",
+      "description: 展示任务",
+      "acceptance:",
+      "  - 可以看到任务",
+      "",
+    ].join("\n"),
+  );
+  const headCommit = runGit(["rev-parse", "main"], repositoryDir);
+  const branchName = "workflow/tasks/tasks-task-001";
+  const worktreePath = ".workflow/worktrees/tasks/tasks-task-001";
+  const worktreeDir = join(repositoryDir, ".workflow", "worktrees", "tasks", "tasks-task-001");
+  runGit(["branch", branchName, headCommit], repositoryDir);
+  await mkdir(worktreeDir, { recursive: true });
+  await writeFile(join(worktreeDir, "leftover.txt"), "residual file\n");
+  const taskContextPackage = {
+    packageId: "task-context-package:tasks/task-001.yaml",
+    currentWorkStage: "merged",
+    source: {
+      path: "tasks/task-001.yaml",
+      format: "yaml",
+      contentHash: "unavailable",
+    },
+    recognition: {
+      outcome: "recognized",
+      findings: [],
+    },
+    taskDraft: {
+      id: "task-001",
+      name: "展示任务真源",
+      kind: "feature",
+      priority: "normal",
+      goal: "展示任务",
+      acceptanceCriteria: ["可以看到任务"],
+      maxIterations: "default",
+    },
+    qualityGate: {
+      outcome: "pass",
+    },
+    artifacts: {
+      isolatedWorkspace: {
+        artifactId: "isolatedWorkspace",
+        body: {
+          worktreePath,
+          branchName,
+          baseBranch: "main",
+          baseCommit: headCommit,
+          status: "ready",
+        },
+        appendedAt: "2026-05-19T10:00:00.000Z",
+      },
+      autoMergeResult: {
+        artifactId: "autoMergeResult",
+        body: {
+          mergedAt: "2026-05-19T10:05:00.000Z",
+          planRef: "autoMergePlan",
+          source: {
+            worktreePath,
+            branchName,
+            baseCommit: headCommit,
+            commit: headCommit,
+          },
+          target: {
+            branchName: "main",
+            beforeCommit: headCommit,
+            afterCommit: headCommit,
+          },
+          changeSet: {
+            changedFiles: [],
+          },
+        },
+        appendedAt: "2026-05-19T10:05:00.000Z",
+      },
+    },
+    agentRuns: [],
+    timeline: [],
+  };
+  await saveTaskContextPackage({
+    storeDir: join(repositoryDir, ".workflow", "task-context-packages"),
+    taskContextPackage,
+  });
+  const service = createWorkflowService({
+    tasksDir,
+    repositoryDir,
+    recommendationPromptPath: promptPath,
+    getRepositoryStatus: async () => ({ clean: true, entries: [] }),
+    runRecommendationCommand: async () => {
+      throw new Error("should not run");
+    },
+    runExecutionAgentSession: runStubExecutionAgentSession,
+  });
+
+  const result = await service.retryAutoMerge({
+    packageId: "task-context-package:tasks/task-001.yaml",
+  });
+
+  assert.equal(result.executed, true);
+  assert.equal(result.closed, true);
+  assert.equal(result.error, null);
+  assert.equal(result.recommendationRun.taskContextPackage.currentWorkStage, "closed");
+  assert.equal(result.recommendationRun.taskCloseout.appendRequest.artifactType, "taskCloseout");
+  assert.equal(existsSync(worktreeDir), false);
+  assert.equal(
+    gitSucceeds(["show-ref", "--verify", "--quiet", `refs/heads/${branchName}`], repositoryDir),
+    false,
+  );
 });
 
 test("POST /api/server/restart triggers configured restart handler", async (t) => {

@@ -461,6 +461,38 @@ export function createWorkflowService({
       }
 
       ensureLatestRecommendationRun(taskContextPackage);
+      if (taskContextPackage.currentWorkStage === "merged") {
+        const closeout = closeTask({
+          taskContextPackage: latestRecommendationRun.taskContextPackage,
+          repositoryDir,
+        });
+        if (!closeout.appendRequest) {
+          latestRecommendationRun.taskCloseoutError = closeout.error;
+          emitRecommendationChanged(latestRecommendationRun);
+          return {
+            executed: true,
+            closed: false,
+            error: closeout.error,
+            recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+          };
+        }
+
+        await applyAndPersistAppendRequest(
+          closeout.appendRequest,
+          { currentWorkStage: "closed" },
+        );
+        latestRecommendationRun.taskCloseout = closeout;
+        latestRecommendationRun.taskCloseoutError = null;
+        emitRecommendationChanged(latestRecommendationRun);
+
+        return {
+          executed: true,
+          closed: true,
+          error: null,
+          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+        };
+      }
+
       const planning = planAutoMerge({
         taskContextPackage: {
           ...taskContextPackage,
