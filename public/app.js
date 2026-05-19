@@ -1155,10 +1155,15 @@ async function createRecommendationRun() {
   recommendationStatus.textContent = "启动中";
   if (recommendationResult) recommendationResult.textContent = "正在启动推荐器...";
   const response = await fetch("/api/recommendation-runs", { method: "POST" });
+  const payload = await response.json();
   if (!response.ok) {
+    if (response.status === 409 && payload.recommendationRun) {
+      recommendationRun = payload.recommendationRun;
+      renderRecommendationRun();
+      return;
+    }
     throw new Error(`启动推荐器失败：${response.status}`);
   }
-  const payload = await response.json();
   recommendationRun = payload.recommendationRun ?? null;
   renderRecommendationRun();
 }

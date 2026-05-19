@@ -105,6 +105,14 @@ export function createApp({
       }
 
       if (request.method === "POST" && request.url?.startsWith("/api/recommendation-runs")) {
+        const currentRun = workflowService.getLatestRecommendationRun?.();
+        if (currentRun?.status === "running") {
+          sendJson(response, 409, {
+            error: "已有推荐器流程正在运行。请等待结束或先取消运行。",
+            recommendationRun: currentRun,
+          });
+          return;
+        }
         sendJson(response, 201, { recommendationRun: await workflowService.createRecommendationRun() });
         return;
       }

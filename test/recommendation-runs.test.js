@@ -526,6 +526,44 @@ test("workflow service cancels a running recommendation run", async () => {
   assert.equal(latest.progress.some((entry) => entry.type === "process_cancelled"), true);
 });
 
+test("workflow service does not start a second recommendation run while one is running", async () => {
+  const promptPath = await writePrompt("recommendation-mutual-exclusion");
+  let commandRuns = 0;
+  const service = createWorkflowService({
+    tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks"),
+    recommendationPromptPath: promptPath,
+    getRepositoryStatus: async () => ({ clean: true, entries: [] }),
+    runRecommendationCommand: ({ signal }) => new Promise((resolve) => {
+      commandRuns += 1;
+      const resolveCancelled = () => {
+        resolve({
+          stdout: "",
+          stderr: "",
+          exitCode: null,
+          error: "cancelled",
+        });
+      };
+      if (signal.aborted) {
+        resolveCancelled();
+        return;
+      }
+      signal.addEventListener("abort", () => {
+        resolveCancelled();
+      }, { once: true });
+    }),
+  });
+
+  const first = await service.createRecommendationRun();
+  const second = await service.createRecommendationRun();
+  service.cancelRecommendationRun();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  assert.equal(first.status, "running");
+  assert.equal(second.status, "running");
+  assert.equal(second.id, first.id);
+  assert.equal(commandRuns, 1);
+});
+
 test("workflow service marks non-zero recommendation exits as failed", async () => {
   const promptPath = await writePrompt("recommendation-failure");
   const service = createWorkflowService({
@@ -597,12 +635,14 @@ test("POST /api/recommendation-runs starts a run and latest returns the snapshot
     exitCode: null,
     error: null,
   };
+  let currentRun = null;
   const workflowService = {
     async createRecommendationRun() {
+      currentRun = latestRun;
       return latestRun;
     },
     getLatestRecommendationRun() {
-      return latestRun;
+      return currentRun;
     },
     onEvent() {
       return () => {};
@@ -623,6 +663,48 @@ test("POST /api/recommendation-runs starts a run and latest returns the snapshot
   assert.equal(createPayload.recommendationRun.status, "running");
   assert.equal(latestResponse.status, 200);
   assert.equal(latestPayload.recommendationRun.id, "recommendation-run-test");
+});
+
+test("POST /api/recommendation-runs returns conflict when a run is already running", async (t) => {
+  const latestRun = {
+    id: "recommendation-run-busy",
+    status: "running",
+    startedAt: "2026-05-16T00:00:00.000Z",
+    finishedAt: null,
+    command: "opencode",
+    args: ["run", "--format", "json"],
+    progress: [],
+    stdout: "",
+    stderr: "",
+    exitCode: null,
+    error: null,
+  };
+  let createCalled = false;
+  const workflowService = {
+    async createRecommendationRun() {
+      createCalled = true;
+      return latestRun;
+    },
+    getLatestRecommendationRun() {
+      return latestRun;
+    },
+    onEvent() {
+      return () => {};
+    },
+  };
+  const server = createApp({ workflowService });
+  server.listen(0);
+  t.after(() => server.close());
+  await once(server, "listening");
+
+  const baseUrl = `http://localhost:${server.address().port}`;
+  const response = await fetch(`${baseUrl}/api/recommendation-runs`, { method: "POST" });
+  const payload = await response.json();
+
+  assert.equal(response.status, 409);
+  assert.equal(createCalled, false);
+  assert.match(payload.error, /正在运行/);
+  assert.equal(payload.recommendationRun.id, "recommendation-run-busy");
 });
 
 test("POST /api/recommendation-runs/cancel cancels the latest run", async (t) => {

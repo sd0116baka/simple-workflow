@@ -277,6 +277,9 @@ export function createWorkflowService({
     },
 
     async createRecommendationRun() {
+      if (latestRecommendationRun?.status === "running") {
+        return toRecommendationSnapshot(latestRecommendationRun);
+      }
       const startupCheck = await getStartupCheck();
       const { run } = await startRecommendationFlow({
         id: `recommendation-run-${(recommendationRunSequence += 1)}`,
