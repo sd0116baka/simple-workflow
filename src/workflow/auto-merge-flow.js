@@ -43,6 +43,22 @@ function stagedChangedFiles(cwd) {
     .filter(Boolean);
 }
 
+function diffChangedFiles(baseCommit, headCommit, cwd) {
+  const output = runGit(["diff", "--name-only", `${baseCommit}...${headCommit}`, "--"], { cwd });
+  return output
+    .split(/\r?\n/)
+    .filter(Boolean);
+}
+
+function isAncestor(ancestorCommit, descendantCommit, cwd) {
+  try {
+    runGit(["merge-base", "--is-ancestor", ancestorCommit, descendantCommit], { cwd });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function checkedInputs(taskContextPackage) {
   return {
     currentWorkStage: taskContextPackage?.currentWorkStage ?? null,
@@ -169,18 +185,28 @@ export function planAutoMerge({
   }
 
   const acceptedBase = humanDecision.body.acceptedWork?.baseCommit;
-  if (worktreeHead !== acceptedBase) {
+  const worktreeHeadMatchesAcceptedBase = worktreeHead === acceptedBase;
+  const worktreeContainsAcceptedWork = worktreeHeadMatchesAcceptedBase
+    || isAncestor(acceptedBase, worktreeHead, absoluteWorktreePath);
+  if (!worktreeContainsAcceptedWork) {
     return {
       appendRequest: rejectionRequest({
         taskContextPackage,
-        reasons: [reason("WORKTREE_HEAD_MISMATCH", "隔离工作树 HEAD 与人工接受时的 baseCommit 不一致。")],
+        reasons: [reason("WORKTREE_HEAD_MISMATCH", "隔离工作树 HEAD 不包含人工接受时的 baseCommit。")],
         now,
       }),
       error: null,
     };
   }
 
-  if (changedFiles.length === 0) {
+  const committedChangedFiles = worktreeHeadMatchesAcceptedBase
+    ? []
+    : diffChangedFiles(acceptedBase, worktreeHead, absoluteWorktreePath);
+  const planChangedFiles = changedFiles.length > 0
+    ? changedFiles
+    : committedChangedFiles;
+
+  if (planChangedFiles.length === 0) {
     return {
       appendRequest: rejectionRequest({
         taskContextPackage,
@@ -202,18 +228,20 @@ export function planAutoMerge({
           worktreePath: normalizePathForGit(worktreePath),
           branchName: humanDecision.body.acceptedWork?.branchName ?? isolatedWorkspace.body.branchName,
           baseCommit: acceptedBase,
+          currentCommit: worktreeHead,
         },
         target: {
           branchName: targetBranch,
           currentCommit: targetCommit,
         },
         changeSet: {
-          changedFiles,
+          changedFiles: planChangedFiles,
         },
         checks: [
           { name: "humanDecisionAccepted", passed: true },
           { name: "worktreeExists", passed: true },
-          { name: "worktreeHeadMatchesAcceptedBase", passed: true },
+          { name: "worktreeHeadMatchesAcceptedBase", passed: worktreeHeadMatchesAcceptedBase },
+          { name: "worktreeContainsAcceptedWork", passed: true },
           { name: "targetBranchAvailable", passed: true },
         ],
       },
@@ -338,32 +366,62 @@ export function executeAutoMerge({
 
   let sourceCommit;
   let afterCommit;
+  let sourceRebased = false;
+  let mergedChangedFiles = worktreeChangedFiles;
   try {
-    runGit(["add", "-A"], { cwd: absoluteWorktreePath });
-    const stagedFiles = stagedChangedFiles(absoluteWorktreePath);
-    if (stagedFiles.length === 0) {
+    sourceCommit = runGit(["rev-parse", "HEAD"], { cwd: absoluteWorktreePath });
+    if (worktreeChangedFiles.length > 0) {
+      runGit(["add", "-A"], { cwd: absoluteWorktreePath });
+      const stagedFiles = stagedChangedFiles(absoluteWorktreePath);
+      if (stagedFiles.length === 0) {
+        return {
+          appendRequest: failureRequest({
+            taskContextPackage,
+            reasons: [reason("NO_STAGED_CHANGES", "隔离工作树没有可提交的暂存变更。")],
+            now,
+          }),
+          error: null,
+        };
+      }
+      runGit([
+        "-c",
+        "user.name=Simple Workflow",
+        "-c",
+        "user.email=simple-workflow@example.invalid",
+        "commit",
+        "-m",
+        commitMessageForTask(taskContextPackage),
+      ], { cwd: absoluteWorktreePath });
+      sourceCommit = runGit(["rev-parse", "HEAD"], { cwd: absoluteWorktreePath });
+    }
+
+    if (worktreeChangedFiles.length === 0 && sourceCommit === plan.source.baseCommit) {
       return {
         appendRequest: failureRequest({
           taskContextPackage,
-          reasons: [reason("NO_STAGED_CHANGES", "隔离工作树没有可提交的暂存变更。")],
+          reasons: [reason("NO_CHANGES", "隔离工作树没有可提交变更。")],
           now,
         }),
         error: null,
       };
     }
-    runGit([
-      "-c",
-      "user.name=Simple Workflow",
-      "-c",
-      "user.email=simple-workflow@example.invalid",
-      "commit",
-      "-m",
-      commitMessageForTask(taskContextPackage),
-    ], { cwd: absoluteWorktreePath });
-    sourceCommit = runGit(["rev-parse", "HEAD"], { cwd: absoluteWorktreePath });
+
+    if (!isAncestor(targetCommit, sourceCommit, repositoryDir)) {
+      runGit(["rebase", targetCommit], { cwd: absoluteWorktreePath });
+      sourceCommit = runGit(["rev-parse", "HEAD"], { cwd: absoluteWorktreePath });
+      sourceRebased = true;
+    }
+    mergedChangedFiles = worktreeChangedFiles.length > 0
+      ? worktreeChangedFiles
+      : diffChangedFiles(targetCommit, sourceCommit, repositoryDir);
     runGit(["merge", "--ff-only", sourceCommit], { cwd: repositoryDir });
     afterCommit = runGit(["rev-parse", plan.target.branchName], { cwd: repositoryDir });
   } catch (error) {
+    try {
+      runGit(["rebase", "--abort"], { cwd: absoluteWorktreePath });
+    } catch {
+      // No rebase in progress.
+    }
     return {
       appendRequest: failureRequest({
         taskContextPackage,
@@ -393,12 +451,13 @@ export function executeAutoMerge({
           afterCommit,
         },
         changeSet: {
-          changedFiles: worktreeChangedFiles,
+          changedFiles: mergedChangedFiles,
         },
         checks: [
           { name: "mainWorktreeClean", passed: true },
           { name: "targetStillAtPlannedCommit", passed: true },
           { name: "sourceCommitted", passed: true },
+          { name: "sourceRebasedOntoTarget", passed: sourceRebased },
           { name: "mergedFastForward", passed: true },
         ],
       },

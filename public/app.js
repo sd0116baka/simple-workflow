@@ -348,6 +348,17 @@ function createAutoMergeExecutionPanel(taskContextPackage) {
     panel.append(list);
   }
 
+  if (failure && taskContextPackage?.currentWorkStage === "auto-merge-execution" && !result) {
+    const retryButton = document.createElement("button");
+    retryButton.type = "button";
+    retryButton.className = "primary-button human-decision-action";
+    retryButton.textContent = "重试自动合并";
+    retryButton.addEventListener("click", () => {
+      retryAutoMerge().catch(showError);
+    });
+    panel.append(retryButton);
+  }
+
   return panel;
 }
 
@@ -662,6 +673,35 @@ async function acceptCompletion() {
   const payload = await response.json();
   if (!response.ok) {
     throw new Error(payload.error ?? `接受完成失败：${response.status}`);
+  }
+  recommendationRun = payload.recommendationRun ?? null;
+  if (recommendationRun?.taskContextPackage) {
+    const index = poolTaskContextPackages.findIndex((candidate) =>
+      candidate.packageId === recommendationRun.taskContextPackage.packageId,
+    );
+    if (index >= 0) {
+      poolTaskContextPackages[index] = recommendationRun.taskContextPackage;
+    }
+  }
+  renderRecommendationRun();
+  await loadTasks();
+}
+
+async function retryAutoMerge() {
+  const taskContextPackage = activeTaskContextPackage();
+  autoMergeExecutionStatus.textContent = "重试中";
+  const response = await fetch("/api/auto-merge/retry", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      packageId: taskContextPackage?.packageId ?? null,
+    }),
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error ?? `重试自动合并失败：${response.status}`);
   }
   recommendationRun = payload.recommendationRun ?? null;
   if (recommendationRun?.taskContextPackage) {

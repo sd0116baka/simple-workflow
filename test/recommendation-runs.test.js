@@ -631,6 +631,55 @@ test("POST /api/human-decisions/accept-completion accepts completion", async (t)
   assert.equal(observedPackageId, "task-context-package:tasks/task-001.yaml");
 });
 
+test("POST /api/auto-merge/retry retries auto-merge execution", async (t) => {
+  const latestRun = {
+    id: "recommendation-run-test",
+    status: "succeeded",
+  };
+  let observedPackageId = null;
+  const workflowService = {
+    async retryAutoMerge({ packageId }) {
+      observedPackageId = packageId;
+      return {
+        executed: true,
+        closed: true,
+        error: null,
+        recommendationRun: latestRun,
+      };
+    },
+    getLatestRecommendationRun() {
+      return latestRun;
+    },
+    onEvent() {
+      return () => {};
+    },
+  };
+  const server = createApp({ workflowService });
+  server.listen(0);
+  t.after(() => server.close());
+  await once(server, "listening");
+
+  const response = await fetch(
+    `http://localhost:${server.address().port}/api/auto-merge/retry`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        packageId: "task-context-package:tasks/task-001.yaml",
+      }),
+    },
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.executed, true);
+  assert.equal(payload.closed, true);
+  assert.equal(payload.recommendationRun.status, "succeeded");
+  assert.equal(observedPackageId, "task-context-package:tasks/task-001.yaml");
+});
+
 test("POST /api/server/restart triggers configured restart handler", async (t) => {
   let restartCalled = false;
   const workflowService = {

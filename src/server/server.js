@@ -112,6 +112,15 @@ export function createApp({
         return;
       }
 
+      if (request.method === "POST" && request.url?.startsWith("/api/auto-merge/retry")) {
+        const body = await readJsonBody(request);
+        const result = await workflowService.retryAutoMerge({
+          packageId: body.packageId,
+        });
+        sendJson(response, result.error ? 409 : 200, result);
+        return;
+      }
+
       if (request.method === "POST" && request.url?.startsWith("/api/server/restart")) {
         if (!restartServer) {
           sendJson(response, 501, { error: "Server restart is not available." });

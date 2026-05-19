@@ -178,6 +178,34 @@ export function createWorkflowService({
     ) ?? null;
   }
 
+  async function findAutoMergeExecutablePackage(packageId) {
+    const taskContextPackages = await loadExistingTaskContextPackages();
+    if (packageId) {
+      return taskContextPackages.find((candidate) => candidate.packageId === packageId) ?? null;
+    }
+    return taskContextPackages.find((candidate) =>
+      candidate.currentWorkStage === "auto-merge-execution"
+        && candidate.artifacts?.autoMergePlan?.body
+        && !candidate.artifacts?.autoMergeResult?.body,
+    ) ?? null;
+  }
+
+  function ensureLatestRecommendationRun(taskContextPackage) {
+    if (!latestRecommendationRun || latestRecommendationRun.status === "running") {
+      latestRecommendationRun = {
+        id: "manual-workflow-action",
+        status: "succeeded",
+        startedAt: new Date().toISOString(),
+        finishedAt: new Date().toISOString(),
+        command: null,
+        args: [],
+        startupCheck: null,
+        progress: [],
+      };
+    }
+    latestRecommendationRun.taskContextPackage = taskContextPackage;
+  }
+
   async function applyAndPersistAppendRequest(appendRequest, { currentWorkStage }) {
     const taskPool = applyAppendRequest(
       buildTaskPool(await listRawTasks(tasksDir), {
@@ -286,19 +314,7 @@ export function createWorkflowService({
         };
       }
 
-      if (!latestRecommendationRun) {
-        latestRecommendationRun = {
-          id: "human-decision-run",
-          status: "succeeded",
-          startedAt: new Date().toISOString(),
-          finishedAt: new Date().toISOString(),
-          command: null,
-          args: [],
-          startupCheck: null,
-          progress: [],
-        };
-      }
-      latestRecommendationRun.taskContextPackage = taskContextPackage;
+      ensureLatestRecommendationRun(taskContextPackage);
 
       const decision = acceptTaskCompletion({
         taskContextPackage,
@@ -425,6 +441,123 @@ export function createWorkflowService({
         accepted: true,
         planned: planning.appendRequest.artifactType === "autoMergePlan",
         executed: execution.appendRequest.artifactType === "autoMergeResult",
+        closed: true,
+        error: null,
+        recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+      };
+    },
+
+    async retryAutoMerge({ packageId = null } = {}) {
+      const taskContextPackage = await findAutoMergeExecutablePackage(packageId);
+      if (!taskContextPackage) {
+        return {
+          executed: false,
+          closed: false,
+          error: packageId
+            ? `没有找到可重新执行自动合并的任务上下文包：${packageId}`
+            : "没有可重新执行自动合并的任务上下文包。",
+          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+        };
+      }
+
+      ensureLatestRecommendationRun(taskContextPackage);
+      const planning = planAutoMerge({
+        taskContextPackage: {
+          ...taskContextPackage,
+          currentWorkStage: "auto-merge",
+        },
+        repositoryDir,
+      });
+      if (!planning.appendRequest) {
+        latestRecommendationRun.autoMergePlanningError = planning.error;
+        emitRecommendationChanged(latestRecommendationRun);
+        return {
+          executed: false,
+          closed: false,
+          error: planning.error,
+          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+        };
+      }
+      await applyAndPersistAppendRequest(
+        planning.appendRequest,
+        {
+          currentWorkStage: planning.appendRequest.artifactType === "autoMergePlan"
+            ? "auto-merge-execution"
+            : "auto-merge",
+        },
+      );
+      latestRecommendationRun.autoMergePlanning = planning;
+      latestRecommendationRun.autoMergePlanningError = null;
+      if (planning.appendRequest.artifactType !== "autoMergePlan") {
+        emitRecommendationChanged(latestRecommendationRun);
+        return {
+          executed: false,
+          closed: false,
+          error: null,
+          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+        };
+      }
+
+      const execution = executeAutoMerge({
+        taskContextPackage: latestRecommendationRun.taskContextPackage,
+        repositoryDir,
+      });
+      if (!execution.appendRequest) {
+        latestRecommendationRun.autoMergeExecutionError = execution.error;
+        emitRecommendationChanged(latestRecommendationRun);
+        return {
+          executed: false,
+          closed: false,
+          error: execution.error,
+          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+        };
+      }
+
+      await applyAndPersistAppendRequest(
+        execution.appendRequest,
+        {
+          currentWorkStage: execution.appendRequest.artifactType === "autoMergeResult"
+            ? "merged"
+            : "auto-merge-execution",
+        },
+      );
+      latestRecommendationRun.autoMergeExecution = execution;
+      latestRecommendationRun.autoMergeExecutionError = null;
+      if (execution.appendRequest.artifactType !== "autoMergeResult") {
+        emitRecommendationChanged(latestRecommendationRun);
+        return {
+          executed: false,
+          closed: false,
+          error: null,
+          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+        };
+      }
+
+      const closeout = closeTask({
+        taskContextPackage: latestRecommendationRun.taskContextPackage,
+        repositoryDir,
+      });
+      if (!closeout.appendRequest) {
+        latestRecommendationRun.taskCloseoutError = closeout.error;
+        emitRecommendationChanged(latestRecommendationRun);
+        return {
+          executed: true,
+          closed: false,
+          error: closeout.error,
+          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+        };
+      }
+
+      await applyAndPersistAppendRequest(
+        closeout.appendRequest,
+        { currentWorkStage: "closed" },
+      );
+      latestRecommendationRun.taskCloseout = closeout;
+      latestRecommendationRun.taskCloseoutError = null;
+      emitRecommendationChanged(latestRecommendationRun);
+
+      return {
+        executed: true,
         closed: true,
         error: null,
         recommendationRun: toRecommendationSnapshot(latestRecommendationRun),

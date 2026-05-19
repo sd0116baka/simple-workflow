@@ -127,6 +127,7 @@ test("plans auto-merge when accepted worktree has changes", async (t) => {
   assert.equal(result.appendRequest.artifact.source.worktreePath, ".workflow/worktrees/tasks/tasks-task-003");
   assert.equal(result.appendRequest.artifact.source.branchName, "workflow/tasks/tasks-task-003");
   assert.equal(result.appendRequest.artifact.source.baseCommit, baseCommit);
+  assert.equal(result.appendRequest.artifact.source.currentCommit, baseCommit);
   assert.equal(result.appendRequest.artifact.target.branchName, "main");
   assert.equal(result.appendRequest.artifact.target.currentCommit, baseCommit);
   assert.deepEqual(result.appendRequest.artifact.changeSet.changedFiles, ["result.txt"]);
@@ -134,12 +135,48 @@ test("plans auto-merge when accepted worktree has changes", async (t) => {
     { name: "humanDecisionAccepted", passed: true },
     { name: "worktreeExists", passed: true },
     { name: "worktreeHeadMatchesAcceptedBase", passed: true },
+    { name: "worktreeContainsAcceptedWork", passed: true },
     { name: "targetBranchAvailable", passed: true },
   ]);
   assert.equal("hasChanges" in result.appendRequest.artifact.changeSet, false);
   assert.equal("strategy" in result.appendRequest.artifact, false);
   assert.equal("nextRequiredStage" in result.appendRequest.artifact, false);
   assert.equal("taskCompletionRef" in result.appendRequest.artifact, false);
+});
+
+test("plans auto-merge when accepted work was already committed by a failed execution", async (t) => {
+  const { repositoryDir, baseCommit } = await createGitRepositoryWithWorktree(t);
+  const worktreeDir = join(repositoryDir, ".workflow", "worktrees", "tasks", "tasks-task-003");
+  runGit(["add", "result.txt"], worktreeDir);
+  runGit([
+    "-c",
+    "user.name=Simple Workflow Test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-m",
+    "commit accepted work",
+  ], worktreeDir);
+  const sourceCommit = runGit(["rev-parse", "HEAD"], worktreeDir);
+
+  const result = planAutoMerge({
+    taskContextPackage: acceptedPackage(baseCommit),
+    repositoryDir,
+    now: () => "2026-05-19T10:00:00.000Z",
+  });
+
+  assert.equal(result.error, null);
+  assert.equal(result.appendRequest.artifactType, "autoMergePlan");
+  assert.equal(result.appendRequest.artifact.source.baseCommit, baseCommit);
+  assert.equal(result.appendRequest.artifact.source.currentCommit, sourceCommit);
+  assert.deepEqual(result.appendRequest.artifact.changeSet.changedFiles, ["result.txt"]);
+  assert.deepEqual(result.appendRequest.artifact.checks, [
+    { name: "humanDecisionAccepted", passed: true },
+    { name: "worktreeExists", passed: true },
+    { name: "worktreeHeadMatchesAcceptedBase", passed: false },
+    { name: "worktreeContainsAcceptedWork", passed: true },
+    { name: "targetBranchAvailable", passed: true },
+  ]);
 });
 
 test("rejects auto-merge when worktree has no changes", async (t) => {
@@ -186,8 +223,8 @@ test("rejects auto-merge outside auto-merge stage", async (t) => {
 
 test("rejects auto-merge when worktree head moved after acceptance", async (t) => {
   const { repositoryDir, baseCommit } = await createGitRepositoryWithWorktree(t);
-  const worktreeDir = join(repositoryDir, ".workflow", "worktrees", "tasks", "tasks-task-003");
-  runGit(["add", "result.txt"], worktreeDir);
+  await writeFile(join(repositoryDir, "new-main.txt"), "new main work\n");
+  runGit(["add", "new-main.txt"], repositoryDir);
   runGit([
     "-c",
     "user.name=Simple Workflow Test",
@@ -195,11 +232,12 @@ test("rejects auto-merge when worktree head moved after acceptance", async (t) =
     "user.email=test@example.com",
     "commit",
     "-m",
-    "commit accepted work",
-  ], worktreeDir);
+    "move main",
+  ], repositoryDir);
+  const newMainCommit = runGit(["rev-parse", "main"], repositoryDir);
 
   const result = planAutoMerge({
-    taskContextPackage: acceptedPackage(baseCommit),
+    taskContextPackage: acceptedPackage(newMainCommit),
     repositoryDir,
   });
 
@@ -240,6 +278,56 @@ test("executes auto-merge with a fast-forward merge", async (t) => {
     { name: "mainWorktreeClean", passed: true },
     { name: "targetStillAtPlannedCommit", passed: true },
     { name: "sourceCommitted", passed: true },
+    { name: "sourceRebasedOntoTarget", passed: false },
+    { name: "mergedFastForward", passed: true },
+  ]);
+  assert.equal(
+    (await readFile(join(repositoryDir, "result.txt"), "utf8")).replace(/\r\n/g, "\n"),
+    "accepted work\n",
+  );
+});
+
+test("rebases accepted work onto the target before fast-forward merge", async (t) => {
+  const { repositoryDir, baseCommit } = await createGitRepositoryWithWorktree(t);
+  await writeFile(join(repositoryDir, "target-before-plan.txt"), "target moved before plan\n");
+  runGit(["add", "target-before-plan.txt"], repositoryDir);
+  runGit([
+    "-c",
+    "user.name=Simple Workflow Test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-m",
+    "move target before plan",
+  ], repositoryDir);
+  const targetCommit = runGit(["rev-parse", "main"], repositoryDir);
+  const planning = planAutoMerge({
+    taskContextPackage: acceptedPackage(baseCommit),
+    repositoryDir,
+    now: () => "2026-05-19T10:00:00.000Z",
+  });
+
+  assert.equal(planning.appendRequest.artifact.target.currentCommit, targetCommit);
+
+  const result = executeAutoMerge({
+    taskContextPackage: packageReadyForExecution(baseCommit, planning.appendRequest.artifact),
+    repositoryDir,
+    now: () => "2026-05-19T10:05:00.000Z",
+  });
+
+  assert.equal(result.error, null);
+  assert.equal(result.appendRequest.artifactType, "autoMergeResult");
+  assert.equal(result.appendRequest.artifact.target.beforeCommit, targetCommit);
+  assert.equal(
+    result.appendRequest.artifact.target.afterCommit,
+    result.appendRequest.artifact.source.commit,
+  );
+  assert.deepEqual(result.appendRequest.artifact.changeSet.changedFiles, ["result.txt"]);
+  assert.deepEqual(result.appendRequest.artifact.checks, [
+    { name: "mainWorktreeClean", passed: true },
+    { name: "targetStillAtPlannedCommit", passed: true },
+    { name: "sourceCommitted", passed: true },
+    { name: "sourceRebasedOntoTarget", passed: true },
     { name: "mergedFastForward", passed: true },
   ]);
   assert.equal(
