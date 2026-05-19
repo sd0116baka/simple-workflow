@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { runConvergence } from "./convergence-flow.js";
 import { evaluateExecutionAdmission } from "./execution-admission.js";
 import { runExecutionAgent } from "./execution-agent-flow.js";
 import { initializeMainAgent } from "./main-agent-flow.js";
@@ -29,6 +30,8 @@ export function createBlockedRecommendationRun({ id, startupCheck, now = () => n
     executionAgentError: null,
     reviewAgentRun: null,
     reviewAgentError: null,
+    convergenceRun: null,
+    convergenceError: null,
     taskContextPackage: null,
     stdout: "",
     stderr: "",
@@ -63,6 +66,8 @@ export function createRunningRecommendationRun({
     executionAgentError: null,
     reviewAgentRun: null,
     reviewAgentError: null,
+    convergenceRun: null,
+    convergenceError: null,
     taskContextPackage: null,
     stdout: "",
     stderr: "",
@@ -110,6 +115,7 @@ export function completeRecommendationFlow({
   runMainAgentSession,
   runExecutionAgentSession,
   runReviewAgentSession,
+  runConvergenceSession,
   now = () => new Date().toISOString(),
 }) {
   const failed = commandResult.error || commandResult.exitCode !== 0;
@@ -184,6 +190,21 @@ export function completeRecommendationFlow({
     : applyAppendRequest(taskPool, reviewAgentRun.appendRequest, {
         currentWorkStage: "review-agent",
       });
+  const reviewedPackage = failed || !parsed.appendRequest
+    ? null
+    : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
+  const convergenceRun = !reviewedPackage || !reviewAgentRun?.appendRequest
+    ? null
+    : runConvergence({
+        taskContextPackage: reviewedPackage,
+        runAgentSession: runConvergenceSession,
+        now,
+      });
+  taskPool = !convergenceRun?.appendRequest
+    ? taskPool
+    : applyAppendRequest(taskPool, convergenceRun.appendRequest, {
+        currentWorkStage: "convergence",
+      });
   const taskContextPackage = failed || !parsed.appendRequest
     ? null
     : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
@@ -206,6 +227,8 @@ export function completeRecommendationFlow({
     executionAgentError: executionAgentRun?.error ?? null,
     reviewAgentRun,
     reviewAgentError: reviewAgentRun?.error ?? null,
+    convergenceRun,
+    convergenceError: convergenceRun?.error ?? null,
     taskContextPackage,
   };
 }

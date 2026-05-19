@@ -121,6 +121,10 @@ test("recommendation flow applies module append requests through the task pool",
       sessionId: `session:${role}:${packageId}`,
       status: "succeeded",
     }),
+    runConvergenceSession: ({ role, sessionId }) => ({
+      sessionId: `resumed:${role}:${sessionId}`,
+      status: "succeeded",
+    }),
     now: () => "2026-05-18T10:00:01.000Z",
   });
 
@@ -135,12 +139,16 @@ test("recommendation flow applies module append requests through the task pool",
   assert.equal(completed.mainAgentInitialization.appendRequest.agentRun.role, "main");
   assert.equal(completed.executionAgentRun.appendRequest.agentRun.role, "execution");
   assert.equal(completed.reviewAgentRun.appendRequest.agentRun.role, "review");
-  assert.equal(completed.taskContextPackage.currentWorkStage, "review-agent");
+  assert.equal(completed.convergenceRun.appendRequest.agentRun.runId, "main-agent:convergence:001");
+  assert.equal(completed.taskContextPackage.currentWorkStage, "convergence");
   assert.equal(completed.taskContextPackage.agentRuns[0].sessionId, "session:main:task-context-package:tasks/task-001.yaml");
   assert.equal(completed.taskContextPackage.agentRuns[1].sessionId, "session:execution:task-context-package:tasks/task-001.yaml");
   assert.equal(completed.taskContextPackage.agentRuns[2].sessionId, "session:review:task-context-package:tasks/task-001.yaml");
+  assert.equal(completed.taskContextPackage.agentRuns[3].sessionId, "resumed:main:session:main:task-context-package:tasks/task-001.yaml");
   assert.equal(completed.taskContextPackage.artifacts.executionReport[0].artifactId, "executionReport:001");
   assert.equal(completed.taskContextPackage.artifacts.reviewReport[0].artifactId, "reviewReport:001");
+  assert.equal(completed.taskContextPackage.artifacts.convergenceAdvice[0].artifactId, "convergenceAdvice:001");
   assert.deepEqual(completed.taskContextPackage.agentRuns[1].outputArtifactRefs, ["executionReport:001"]);
   assert.deepEqual(completed.taskContextPackage.agentRuns[2].outputArtifactRefs, ["reviewReport:001"]);
+  assert.deepEqual(completed.taskContextPackage.agentRuns[3].outputArtifactRefs, ["convergenceAdvice:001"]);
 });
