@@ -671,5 +671,7 @@ test("restart command waits for the current Windows process before starting node
   assert.match(command.args.at(-1), /Wait-Process -Id 1234/);
   assert.match(command.args.at(-1), /node\.exe/);
   assert.match(command.args.at(-1), /src\\server\\server\.js/);
+  assert.match(command.args.at(-1), /Set-Location/);
   assert.doesNotMatch(command.args.at(-1), /npm/);
+  assert.doesNotMatch(command.args.at(-1), /Start-Process/);
 });

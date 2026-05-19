@@ -149,13 +149,8 @@ export function restartCommand({
       "$ErrorActionPreference = 'Stop'",
       `Wait-Process -Id ${currentPid} -ErrorAction SilentlyContinue`,
       "Start-Sleep -Milliseconds 300",
-      [
-        "Start-Process",
-        `-FilePath ${quotePowerShellSingle(nodePath)}`,
-        `-ArgumentList @(${quotePowerShellSingle(serverPath)})`,
-        `-WorkingDirectory ${quotePowerShellSingle(cwd)}`,
-        "-WindowStyle Hidden",
-      ].join(" "),
+      `Set-Location ${quotePowerShellSingle(cwd)}`,
+      `& ${quotePowerShellSingle(nodePath)} ${quotePowerShellSingle(serverPath)}`,
     ].join("; ");
     return {
       command: "powershell.exe",
