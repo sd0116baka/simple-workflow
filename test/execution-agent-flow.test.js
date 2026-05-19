@@ -64,6 +64,7 @@ function executablePackage(worktreePath = ".workflow/worktrees/tasks/tasks-task-
         artifactId: "isolatedWorkspace",
         body: {
           worktreePath,
+          baseCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         },
         appendedAt: "2026-05-18T09:02:00.000Z",
       },
@@ -97,10 +98,10 @@ test("runs execution agent stub in the isolated workspace cwd", async (t) => {
   assert.equal(result.appendRequest.artifact.summary, "stub execution completed");
   assert.equal(result.appendRequest.artifact.cwd, ".workflow/worktrees/tasks/tasks-task-003");
   assert.deepEqual(result.appendRequest.artifact.changedFiles, [
-    ".workflow-agent/task-003/execution-agent-001.txt",
+    ".workflow-agent/task-003/aaaaaaaaaaaa/execution-agent-001.txt",
   ]);
   assert.equal(
-    existsSync(join(repositoryDir, ".workflow", "worktrees", "tasks", "tasks-task-003", ".workflow-agent", "task-003", "execution-agent-001.txt")),
+    existsSync(join(repositoryDir, ".workflow", "worktrees", "tasks", "tasks-task-003", ".workflow-agent", "task-003", "aaaaaaaaaaaa", "execution-agent-001.txt")),
     true,
   );
   assert.equal(result.appendRequest.agentRun.runId, "execution-agent:001");
@@ -190,7 +191,7 @@ test("uses latest convergence advice as next execution input", async (t) => {
 
   assert.equal(result.appendRequest.agentRun.runId, "execution-agent:002");
   assert.deepEqual(result.appendRequest.artifact.changedFiles, [
-    ".workflow-agent/task-003/execution-agent-002.txt",
+    ".workflow-agent/task-003/aaaaaaaaaaaa/execution-agent-002.txt",
   ]);
   assert.deepEqual(result.appendRequest.agentRun.inputArtifactRefs, [
     "taskDraft",

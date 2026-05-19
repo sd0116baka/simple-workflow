@@ -55,6 +55,11 @@ function safePathSegment(value) {
   return safeValue || "unknown-task";
 }
 
+function baseCommitSegment(taskContextPackage) {
+  const baseCommit = taskContextPackage.artifacts?.isolatedWorkspace?.body?.baseCommit;
+  return safePathSegment(baseCommit ? String(baseCommit).slice(0, 12) : "unknown-base");
+}
+
 function gitChangedFiles(cwd) {
   const output = execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], {
     cwd,
@@ -67,7 +72,8 @@ function gitChangedFiles(cwd) {
 function writeStubExecutionProbe({ cwd, runId, taskContextPackage, inputArtifactRefs }) {
   const safeRunId = runId.replace(/[^a-zA-Z0-9.-]/g, "-");
   const safeTaskId = safePathSegment(taskContextPackage.taskDraft?.id ?? taskContextPackage.packageId);
-  const probeRelativePath = `.workflow-agent/${safeTaskId}/${safeRunId}.txt`;
+  const safeBaseCommit = baseCommitSegment(taskContextPackage);
+  const probeRelativePath = `.workflow-agent/${safeTaskId}/${safeBaseCommit}/${safeRunId}.txt`;
   const probePath = resolve(cwd, probeRelativePath);
   mkdirSync(dirname(probePath), { recursive: true });
   writeFileSync(

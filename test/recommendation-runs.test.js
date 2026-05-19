@@ -145,6 +145,9 @@ test("workflow service captures a successful recommendation run", async (t) => {
     finished.taskContextPackage.artifacts.isolatedWorkspace.body.branchName,
     "workflow/tasks/tasks-task-001",
   );
+  const baseCommitSegment = finished.taskContextPackage.artifacts.isolatedWorkspace.body.baseCommit.slice(0, 12);
+  const firstExecutionProbe = `.workflow-agent/task-001/${baseCommitSegment}/execution-agent-001.txt`;
+  const secondExecutionProbe = `.workflow-agent/task-001/${baseCommitSegment}/execution-agent-002.txt`;
   assert.equal(finished.completionHumanDecisionRequest.appendRequest.artifactType, "humanDecisionRequest");
   assert.equal(finished.executionAgentRuns.length, 2);
   assert.equal(finished.reviewAgentRuns.length, 2);
@@ -204,11 +207,11 @@ test("workflow service captures a successful recommendation run", async (t) => {
     ".workflow/worktrees/tasks/tasks-task-001",
   );
   assert.deepEqual(finished.taskContextPackage.artifacts.executionReport[0].body.changedFiles, [
-    ".workflow-agent/task-001/execution-agent-001.txt",
+    firstExecutionProbe,
   ]);
   assert.deepEqual(finished.taskContextPackage.artifacts.executionReport[1].body.changedFiles, [
-    ".workflow-agent/task-001/execution-agent-001.txt",
-    ".workflow-agent/task-001/execution-agent-002.txt",
+    firstExecutionProbe,
+    secondExecutionProbe,
   ]);
   assert.equal(finished.taskContextPackage.artifacts.reviewReport[0].artifactId, "reviewReport:001");
   assert.equal(finished.taskContextPackage.artifacts.reviewReport[1].artifactId, "reviewReport:002");
@@ -244,15 +247,15 @@ test("workflow service captures a successful recommendation run", async (t) => {
   assert.deepEqual(
     accepted.recommendationRun.taskContextPackage.artifacts.humanDecision.body.worktreeSnapshot.changedFiles,
     [
-      ".workflow-agent/task-001/execution-agent-001.txt",
-      ".workflow-agent/task-001/execution-agent-002.txt",
+      firstExecutionProbe,
+      secondExecutionProbe,
     ],
   );
   assert.deepEqual(
     accepted.recommendationRun.taskContextPackage.artifacts.autoMergePlan.body.changeSet.changedFiles,
     [
-      ".workflow-agent/task-001/execution-agent-001.txt",
-      ".workflow-agent/task-001/execution-agent-002.txt",
+      firstExecutionProbe,
+      secondExecutionProbe,
     ],
   );
   assert.equal(
@@ -274,8 +277,8 @@ test("workflow service captures a successful recommendation run", async (t) => {
   assert.deepEqual(
     accepted.recommendationRun.taskContextPackage.artifacts.autoMergeResult.body.changeSet.changedFiles,
     [
-      ".workflow-agent/task-001/execution-agent-001.txt",
-      ".workflow-agent/task-001/execution-agent-002.txt",
+      firstExecutionProbe,
+      secondExecutionProbe,
     ],
   );
   assert.equal(
