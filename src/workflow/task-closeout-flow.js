@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 
 function runGit(args, { cwd }) {
@@ -26,6 +26,20 @@ function normalizePathForGit(filePath) {
 function resolveWorktreePath(worktreePath, repositoryDir) {
   if (!worktreePath) return null;
   return isAbsolute(worktreePath) ? worktreePath : resolve(repositoryDir, worktreePath);
+}
+
+function isPathInside(parentPath, childPath) {
+  const parent = resolve(parentPath);
+  const child = resolve(childPath);
+  return child === parent || child.startsWith(`${parent}\\`) || child.startsWith(`${parent}/`);
+}
+
+function listedWorktreePaths(repositoryDir) {
+  const output = runGit(["worktree", "list", "--porcelain"], { cwd: repositoryDir });
+  return output
+    .split(/\r?\n/)
+    .filter((line) => line.startsWith("worktree "))
+    .map((line) => resolve(line.slice("worktree ".length)));
 }
 
 export function closeTask({
@@ -80,9 +94,22 @@ export function closeTask({
 
   try {
     if (existsSync(absoluteWorktreePath)) {
-      runGit(["worktree", "remove", "--force", normalizePathForGit(absoluteWorktreePath)], {
-        cwd: repositoryDir,
-      });
+      const isRegisteredWorktree = listedWorktreePaths(repositoryDir)
+        .includes(resolve(absoluteWorktreePath));
+      if (isRegisteredWorktree) {
+        runGit(["worktree", "remove", "--force", normalizePathForGit(absoluteWorktreePath)], {
+          cwd: repositoryDir,
+        });
+      } else {
+        const worktreeRoot = resolve(repositoryDir, ".workflow", "worktrees");
+        if (!isPathInside(worktreeRoot, absoluteWorktreePath)) {
+          return {
+            appendRequest: null,
+            error: "残留目录不在 .workflow/worktrees 下，不能自动删除。",
+          };
+        }
+        rmSync(absoluteWorktreePath, { recursive: true, force: true });
+      }
     }
     runGit(["worktree", "prune"], { cwd: repositoryDir });
     if (branchName && gitSucceeds(["show-ref", "--verify", "--quiet", `refs/heads/${branchName}`], {

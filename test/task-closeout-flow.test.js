@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -149,6 +149,27 @@ test("closes a merged task and removes worktree plus branch", async (t) => {
     },
   });
   assert.equal(result.appendRequest.artifact.finalStage, "closed");
+  assert.equal(existsSync(repository.worktreeDir), false);
+  assert.equal(
+    gitSucceeds(["show-ref", "--verify", "--quiet", "refs/heads/workflow/tasks/tasks-task-003"], repository.repositoryDir),
+    false,
+  );
+});
+
+test("closes a merged task when only a residual worktree directory remains", async (t) => {
+  const repository = await createMergedTaskRepository(t);
+  runGit(["worktree", "remove", "--force", repository.worktreeDir], repository.repositoryDir);
+  await mkdir(repository.worktreeDir, { recursive: true });
+  await writeFile(join(repository.worktreeDir, "leftover.txt"), "residual file\n");
+
+  const result = closeTask({
+    taskContextPackage: mergedPackage(repository),
+    repositoryDir: repository.repositoryDir,
+    now: () => "2026-05-19T10:10:00.000Z",
+  });
+
+  assert.equal(result.error, null);
+  assert.equal(result.appendRequest.artifactType, "taskCloseout");
   assert.equal(existsSync(repository.worktreeDir), false);
   assert.equal(
     gitSucceeds(["show-ref", "--verify", "--quiet", "refs/heads/workflow/tasks/tasks-task-003"], repository.repositoryDir),
