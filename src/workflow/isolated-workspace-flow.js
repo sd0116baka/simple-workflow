@@ -68,7 +68,9 @@ function ensureGitWorktree({
     if (!existsSync(absoluteWorktreePath)) {
       throw new Error(`隔离工作树已注册但路径不存在：${worktreePath}`);
     }
-    return { baseCommit };
+    return {
+      baseCommit: runGit(["rev-parse", "HEAD"], { cwd: absoluteWorktreePath }),
+    };
   }
 
   if (existsSync(absoluteWorktreePath)) {

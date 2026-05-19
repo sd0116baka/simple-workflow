@@ -98,6 +98,34 @@ test("reuses an existing registered git worktree for the same task", async (t) =
   });
 });
 
+test("records the actual worktree head when reusing an older registered worktree", async (t) => {
+  const repositoryDir = await createGitRepository(t);
+  const first = allocateIsolatedWorkspace({
+    taskContextPackage: authorizedPackage(),
+    repositoryDir,
+  });
+  await writeFile(join(repositoryDir, "CHANGELOG.md"), "main changed\n");
+  runGit(["add", "CHANGELOG.md"], repositoryDir);
+  runGit([
+    "-c",
+    "user.name=Simple Workflow Test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-m",
+    "advance main",
+  ], repositoryDir);
+  const second = allocateIsolatedWorkspace({
+    taskContextPackage: authorizedPackage(),
+    repositoryDir,
+  });
+
+  assert.equal(first.error, null);
+  assert.equal(second.error, null);
+  assert.equal(second.appendRequest.artifact.baseCommit, first.appendRequest.artifact.baseCommit);
+  assert.notEqual(second.appendRequest.artifact.baseCommit, runGit(["rev-parse", "HEAD"], repositoryDir));
+});
+
 test("does not claim readiness when a registered worktree path is missing", async (t) => {
   const repositoryDir = await createGitRepository(t);
   const first = allocateIsolatedWorkspace({
