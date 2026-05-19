@@ -211,7 +211,7 @@ export function completeRecommendationFlow({
   const executionCompletedPackage = failed || !parsed.appendRequest
     ? null
     : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
-  const reviewAgentRun = !executionCompletedPackage || !executionAgentRun?.appendRequest
+  const reviewAgentRun = !executionCompletedPackage || !executionAgentRun?.appendRequest || executionAgentRun.error
     ? null
     : runReviewAgent({
         taskContextPackage: executionCompletedPackage,
@@ -257,7 +257,7 @@ export function completeRecommendationFlow({
   const secondExecutionCompletedPackage = failed || !parsed.appendRequest
     ? null
     : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
-  const nextReviewAgentRun = !secondExecutionCompletedPackage || !nextExecutionAgentRun?.appendRequest
+  const nextReviewAgentRun = !secondExecutionCompletedPackage || !nextExecutionAgentRun?.appendRequest || nextExecutionAgentRun.error
     ? null
     : runReviewAgent({
         taskContextPackage: secondExecutionCompletedPackage,

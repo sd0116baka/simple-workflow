@@ -253,3 +253,51 @@ test("recommendation flow applies module append requests through the task pool",
   assert.equal(completed.taskContextPackage.timeline[2].artifactId, "isolatedWorkspace");
   assert.equal(completed.taskContextPackage.timeline.at(-1).artifactId, "humanDecisionRequest");
 });
+
+test("recommendation flow stops before review when execution agent fails", async (t) => {
+  const repositoryDir = await createGitRepository(t);
+  const completed = completeRecommendationFlow({
+    run: {
+      id: "recommendation-run-flow",
+      status: "running",
+      startedAt: "2026-05-18T10:00:00.000Z",
+      command: "opencode",
+      args: ["run", "--format", "json"],
+      startupCheck,
+      progress: [],
+    },
+    commandResult: commandResult(),
+    tasks: taskSource(),
+    startupCheck,
+    projectProfile: {
+      defaults: {
+        maxIterations: 3,
+      },
+    },
+    runMainAgentSession: ({ role, packageId }) => ({
+      sessionId: `session:${role}:${packageId}`,
+      status: "succeeded",
+    }),
+    runExecutionAgentSession: ({ role, packageId }) => ({
+      sessionId: `session:${role}:${packageId}`,
+      status: "failed",
+      rawOutput: {
+        stdout: "",
+        stderr: "execution failed",
+        exitCode: 1,
+        error: null,
+      },
+    }),
+    repositoryDir,
+    now: () => "2026-05-18T10:00:01.000Z",
+  });
+
+  assert.equal(completed.status, "succeeded");
+  assert.equal(completed.taskContextPackage.currentWorkStage, "execution-agent");
+  assert.equal(completed.executionAgentRuns.length, 1);
+  assert.deepEqual(completed.executionAgentErrors, ["execution failed"]);
+  assert.deepEqual(completed.reviewAgentRuns, []);
+  assert.deepEqual(completed.convergenceRuns, []);
+  assert.equal(completed.completionHumanDecisionRequest, null);
+  assert.equal(completed.taskContextPackage.artifacts.executionReport[0].body.status, "failed");
+});

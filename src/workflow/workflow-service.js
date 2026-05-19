@@ -10,6 +10,7 @@ import {
   completeRecommendationFlow,
   startRecommendationFlow,
 } from "./recommendation-flow.js";
+import { runOpencodeExecutionAgentSession } from "./execution-agent-flow.js";
 import { executeAutoMerge, planAutoMerge } from "./auto-merge-flow.js";
 import { acceptTaskCompletion } from "./human-decision-flow.js";
 import { runOpencodeRecommendation } from "./recommendation-runner.js";
@@ -38,6 +39,7 @@ export function createWorkflowService({
       prompt,
       cwd: repositoryDir,
     }),
+  runExecutionAgentSession = runOpencodeExecutionAgentSession,
   watchDebounceMs = 100,
 }) {
   const listeners = new Set();
@@ -193,6 +195,7 @@ export function createWorkflowService({
           },
         },
         existingTaskContextPackages: await loadExistingTaskContextPackages(),
+        runExecutionAgentSession,
         repositoryDir,
       }));
       await persistTaskContextPackage(run.taskContextPackage);

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createApp, restartCommand } from "../src/server/server.js";
+import { runStubExecutionAgentSession } from "../src/workflow/execution-agent-flow.js";
 import { createWorkflowService } from "../src/workflow/workflow-service.js";
 
 function runGit(args, cwd) {
@@ -118,6 +119,7 @@ test("workflow service captures a successful recommendation run", async (t) => {
         error: null,
       };
     },
+    runExecutionAgentSession: runStubExecutionAgentSession,
   });
 
   const completed = new Promise((resolve) => {
@@ -307,6 +309,7 @@ test("workflow service captures a successful recommendation run", async (t) => {
     runRecommendationCommand: async () => {
       throw new Error("should not run");
     },
+    runExecutionAgentSession: runStubExecutionAgentSession,
   });
   const taskPoolAfterRestart = await restartedService.listTaskPool();
 
@@ -363,6 +366,7 @@ test("workflow service does not expose invalid tasks to the recommender prompt",
         error: null,
       };
     },
+    runExecutionAgentSession: runStubExecutionAgentSession,
   });
 
   const completed = new Promise((resolve) => {

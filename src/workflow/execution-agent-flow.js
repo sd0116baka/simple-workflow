@@ -1,8 +1,11 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
-import { createStubAgentSession } from "./agent-runner.js";
+import { createStubAgentSession, normalizeAgentStatus } from "./agent-runner.js";
+import { extractTextFromJsonEvents } from "./recommendation-runner.js";
 import { parseGitPorcelainStatus } from "./repository-status.js";
+
+export const OPENCODE_EXECUTION_ARGS = ["run", "--format", "json"];
 
 function hasExecutionAuthorization(taskContextPackage) {
   return Boolean(taskContextPackage?.artifacts?.executionAuthorization?.body);
@@ -90,7 +93,80 @@ function writeStubExecutionProbe({ cwd, runId, taskContextPackage, inputArtifact
   return normalizePathForGit(relative(cwd, probePath));
 }
 
-function runStubExecutionAgentSession({
+function stripJsonFence(text) {
+  const trimmed = String(text ?? "").trim();
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  return fenced ? fenced[1].trim() : trimmed;
+}
+
+function parseExecutionReportText(text) {
+  try {
+    const parsed = JSON.parse(stripJsonFence(text));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function findSessionIdInJsonEvents(output) {
+  const lines = String(output ?? "").split(/\r?\n/);
+  for (const line of lines) {
+    if (line.trim().length === 0) continue;
+    let event;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const candidates = [
+      event.sessionId,
+      event.sessionID,
+      event.session?.id,
+      event.properties?.sessionId,
+      event.properties?.sessionID,
+    ].filter((value) => typeof value === "string" && value.length > 0);
+    if (candidates.length > 0) return candidates[0];
+  }
+  return null;
+}
+
+function latestExecutionArtifact(taskContextPackage, artifactType) {
+  return latestArtifact(taskContextPackage, artifactType)?.body ?? null;
+}
+
+export function buildExecutionAgentPrompt({
+  taskContextPackage,
+  runId,
+  inputArtifactRefs,
+} = {}) {
+  const payload = {
+    packageId: taskContextPackage.packageId,
+    runId,
+    inputArtifactRefs,
+    taskDraft: taskContextPackage.taskDraft,
+    executionIntent: taskContextPackage.artifacts.executionIntent?.body ?? null,
+    executionAuthorization: taskContextPackage.artifacts.executionAuthorization?.body ?? null,
+    isolatedWorkspace: taskContextPackage.artifacts.isolatedWorkspace?.body ?? null,
+    convergenceAdvice: latestExecutionArtifact(taskContextPackage, "convergenceAdvice"),
+  };
+
+  return [
+    "你是 simple-workflow 的 execution agent。",
+    "你只能在当前工作树中实现任务，不要修改主工作树，也不要提交或合并。",
+    "根据输入 JSON 完成任务；如果有 convergenceAdvice，优先按它修正上一轮问题。",
+    "完成后只输出 fenced JSON，不要输出额外说明。",
+    "JSON 字段：summary 字符串；tests 数组；notes 数组。",
+    "",
+    "输入 JSON：",
+    "```json",
+    JSON.stringify(payload, null, 2),
+    "```",
+  ].join("\n");
+}
+
+export function runStubExecutionAgentSession({
   role,
   packageId,
   cwd,
@@ -112,6 +188,59 @@ function runStubExecutionAgentSession({
         ? `execution agent stub 已在隔离工作树写入 ${probeFile}，并接收上一轮收敛建议。`
         : `execution agent stub 已在隔离工作树写入 ${probeFile}。`,
     ],
+  };
+}
+
+export function runOpencodeExecutionAgentSession({
+  role,
+  packageId,
+  cwd,
+  runId,
+  taskContextPackage,
+  inputArtifactRefs,
+  command = "opencode",
+  args = OPENCODE_EXECUTION_ARGS,
+  env = process.env,
+  shell = process.platform === "win32",
+}) {
+  const prompt = buildExecutionAgentPrompt({
+    taskContextPackage,
+    runId,
+    inputArtifactRefs,
+  });
+  const result = spawnSync(command, args, {
+    cwd,
+    env,
+    input: prompt,
+    encoding: "utf8",
+    shell,
+    windowsHide: true,
+  });
+  const stdout = result.stdout ?? "";
+  const stderr = result.stderr ?? "";
+  const extractedText = extractTextFromJsonEvents(stdout);
+  const report = parseExecutionReportText(extractedText);
+  const error = result.error?.message ?? null;
+  const exitCode = typeof result.status === "number" ? result.status : null;
+  const status = normalizeAgentStatus({ exitCode, error });
+  const sessionId = findSessionIdInJsonEvents(stdout) ?? `opencode-session-unavailable:${runId}`;
+
+  return {
+    role,
+    packageId,
+    sessionId,
+    status,
+    summary: typeof report.summary === "string" && report.summary.trim().length > 0
+      ? report.summary
+      : extractedText.trim(),
+    tests: Array.isArray(report.tests) ? report.tests : [],
+    notes: Array.isArray(report.notes) ? report.notes : [],
+    rawOutput: {
+      stdout: extractedText,
+      stderr,
+      exitCode,
+      error,
+    },
   };
 }
 
@@ -164,17 +293,25 @@ export function runExecutionAgent({
   });
   const changedFiles = gitChangedFiles(cwd);
   const finishedAt = now();
+  const status = session.status ?? "succeeded";
+  const error = status === "succeeded"
+    ? null
+    : session.rawOutput?.error
+      ?? session.rawOutput?.stderr
+      ?? "execution agent 运行失败。";
 
   return {
     appendRequest: {
       packageId: taskContextPackage.packageId,
       artifactType: "executionReport",
       artifact: {
-        summary: "stub execution completed",
+        summary: session.summary ?? "stub execution completed",
+        status,
         cwd: normalizePathForGit(relative(repositoryDir, cwd)),
         changedFiles,
-        tests: [],
+        tests: session.tests ?? [],
         notes: session.notes ?? [],
+        rawOutput: session.rawOutput ?? null,
       },
       agentRun: {
         runId,
@@ -182,11 +319,11 @@ export function runExecutionAgent({
         sessionId: session.sessionId,
         inputArtifactRefs,
         outputArtifactRefs: [],
-        status: session.status,
+        status,
         startedAt,
         finishedAt,
       },
     },
-    error: null,
+    error,
   };
 }

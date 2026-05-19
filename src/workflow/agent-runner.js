@@ -4,3 +4,7 @@ export function createStubAgentSession({ role, packageId }) {
     status: "succeeded",
   };
 }
+
+export function normalizeAgentStatus({ exitCode, error } = {}) {
+  return !error && exitCode === 0 ? "succeeded" : "failed";
+}

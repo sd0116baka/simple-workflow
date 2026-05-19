@@ -291,7 +291,7 @@ tasks/task-003.yaml -> tasks-task-003
 
 `executionReport` 必须记录本次执行使用的 `cwd` 和该 worktree 内的 `changedFiles`。
 
-当前 stub execution Agent 会在隔离工作树中写入 `.workflow-agent/execution-agent-<N>.txt`，用于验证 cwd 传递和变更收集。真实 execution Agent 接入后，不再写这个 stub 探针文件。
+运行时 `execution` Agent 通过 `opencode run --format json` 在隔离工作树中执行。测试环境可以注入 stub execution Agent；stub 会写入 `.workflow-agent/<task>/<base>/<run>.txt`，只用于验证 cwd 传递和变更收集。
 
 `review` Agent 读取同一个 `isolatedWorkspace.body.worktreePath`，原则上只读。第一版只在 review Agent 提示词中要求不得修改文件，不做代码级 diff 检查。
 
