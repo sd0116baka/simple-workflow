@@ -1,7 +1,7 @@
 id: task-003
 title: 监听任务文件变化
 type: feature
-priority: high
+priority: low
 description: |
   后端监听 tasks 目录中的 YAML 文件变化，
   并通过事件通道通知界面刷新任务列表和详情。
