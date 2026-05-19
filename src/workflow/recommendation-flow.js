@@ -95,9 +95,12 @@ export async function startRecommendationFlow({
   tasks,
   startupCheck,
   recommendationPromptPath,
+  existingTaskContextPackages = [],
   now = () => new Date().toISOString(),
 }) {
-  const taskPool = buildTaskPool(tasks);
+  const taskPool = buildTaskPool(tasks, {
+    taskContextPackages: existingTaskContextPackages,
+  });
   if (!startupCheck.canStartWork) {
     return {
       run: createBlockedRecommendationRun({ id, startupCheck, now }),
@@ -122,6 +125,7 @@ export function completeRecommendationFlow({
   tasks,
   startupCheck,
   projectProfile,
+  existingTaskContextPackages = [],
   runMainAgentSession,
   runExecutionAgentSession,
   runReviewAgentSession,
@@ -133,7 +137,9 @@ export function completeRecommendationFlow({
   const parsed = failed
     ? { appendRequest: null, intent: null, error: null }
     : parseRecommendationIntent(commandResult.stdout ?? "");
-  let taskPool = failed ? null : buildTaskPool(tasks);
+  let taskPool = failed ? null : buildTaskPool(tasks, {
+    taskContextPackages: existingTaskContextPackages,
+  });
   taskPool = failed || !parsed.appendRequest
     ? taskPool
     : applyAppendRequest(taskPool, parsed.appendRequest, {

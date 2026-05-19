@@ -14,6 +14,10 @@ import { executeAutoMerge, planAutoMerge } from "./auto-merge-flow.js";
 import { acceptTaskCompletion } from "./human-decision-flow.js";
 import { runOpencodeRecommendation } from "./recommendation-runner.js";
 import { closeTask } from "./task-closeout-flow.js";
+import {
+  loadTaskContextPackages,
+  saveTaskContextPackage,
+} from "./task-context-package-store.js";
 import { applyAppendRequest, buildTaskPool } from "./task-pool.js";
 import { listRawTasks } from "./task-source.js";
 
@@ -28,6 +32,7 @@ export function createWorkflowService({
   repositoryDir = process.cwd(),
   getRepositoryStatus = () => readRepositoryStatus({ cwd: repositoryDir }),
   recommendationPromptPath = join(repositoryDir, "project_profiles", "recommender-agent.prompt.md"),
+  taskContextPackageStoreDir = join(repositoryDir, ".workflow", "task-context-packages"),
   runRecommendationCommand = ({ prompt }) =>
     runOpencodeRecommendation({
       prompt,
@@ -125,6 +130,55 @@ export function createWorkflowService({
     });
   }
 
+  async function loadExistingTaskContextPackages() {
+    const packagesById = new Map(
+      (await loadTaskContextPackages({ storeDir: taskContextPackageStoreDir }))
+        .map((taskContextPackage) => [
+          taskContextPackage.packageId,
+          taskContextPackage,
+        ]),
+    );
+    if (latestRecommendationRun?.taskContextPackage?.packageId) {
+      packagesById.set(
+        latestRecommendationRun.taskContextPackage.packageId,
+        latestRecommendationRun.taskContextPackage,
+      );
+    }
+    return [...packagesById.values()];
+  }
+
+  async function persistTaskContextPackage(taskContextPackage) {
+    if (!taskContextPackage?.packageId) return;
+    await saveTaskContextPackage({
+      storeDir: taskContextPackageStoreDir,
+      taskContextPackage,
+    });
+  }
+
+  async function buildCurrentTaskPool() {
+    return buildTaskPool(await listRawTasks(tasksDir), {
+      taskContextPackages: await loadExistingTaskContextPackages(),
+    });
+  }
+
+  async function applyAndPersistAppendRequest(appendRequest, { currentWorkStage }) {
+    const taskPool = applyAppendRequest(
+      buildTaskPool(await listRawTasks(tasksDir), {
+        taskContextPackages: await loadExistingTaskContextPackages(),
+      }),
+      appendRequest,
+      { currentWorkStage },
+    );
+    const taskContextPackage = taskPool.taskContextPackages.find((candidate) =>
+      candidate.packageId === appendRequest.packageId,
+    ) ?? null;
+    if (taskContextPackage) {
+      latestRecommendationRun.taskContextPackage = taskContextPackage;
+      await persistTaskContextPackage(taskContextPackage);
+    }
+    return taskPool;
+  }
+
   async function finishRecommendationRun(run, startedCommand) {
     try {
       const result = await startedCommand;
@@ -138,8 +192,10 @@ export function createWorkflowService({
             maxIterations: 3,
           },
         },
+        existingTaskContextPackages: await loadExistingTaskContextPackages(),
         repositoryDir,
       }));
+      await persistTaskContextPackage(run.taskContextPackage);
     } catch (error) {
       Object.assign(run, {
         status: "failed",
@@ -156,11 +212,7 @@ export function createWorkflowService({
     },
 
     async listTaskPool() {
-      return buildTaskPool(await listRawTasks(tasksDir), {
-        taskContextPackages: latestRecommendationRun?.taskContextPackage
-          ? [latestRecommendationRun.taskContextPackage]
-          : [],
-      });
+      return buildCurrentTaskPool();
     },
 
     async getStartupCheck() {
@@ -174,6 +226,7 @@ export function createWorkflowService({
         tasks: await listRawTasks(tasksDir),
         startupCheck,
         recommendationPromptPath,
+        existingTaskContextPackages: await loadExistingTaskContextPackages(),
       });
       latestRecommendationRun = run;
       emitRecommendationChanged(run);
@@ -226,17 +279,10 @@ export function createWorkflowService({
         };
       }
 
-      let taskPool = applyAppendRequest(
-        buildTaskPool(await listRawTasks(tasksDir), {
-          taskContextPackages: [latestRecommendationRun.taskContextPackage],
-        }),
+      let taskPool = await applyAndPersistAppendRequest(
         decision.appendRequest,
         { currentWorkStage: "auto-merge" },
       );
-      latestRecommendationRun.taskContextPackage =
-        taskPool.taskContextPackages.find((taskPackage) =>
-          taskPackage.packageId === decision.appendRequest.packageId,
-        ) ?? latestRecommendationRun.taskContextPackage;
       latestRecommendationRun.completionHumanDecisionError = null;
 
       const planning = planAutoMerge({
@@ -255,10 +301,7 @@ export function createWorkflowService({
         };
       }
 
-      taskPool = applyAppendRequest(
-        buildTaskPool(await listRawTasks(tasksDir), {
-          taskContextPackages: [latestRecommendationRun.taskContextPackage],
-        }),
+      taskPool = await applyAndPersistAppendRequest(
         planning.appendRequest,
         {
           currentWorkStage: planning.appendRequest.artifactType === "autoMergePlan"
@@ -266,10 +309,6 @@ export function createWorkflowService({
             : "auto-merge",
         },
       );
-      latestRecommendationRun.taskContextPackage =
-        taskPool.taskContextPackages.find((taskPackage) =>
-          taskPackage.packageId === planning.appendRequest.packageId,
-        ) ?? latestRecommendationRun.taskContextPackage;
       latestRecommendationRun.autoMergePlanning = planning;
       latestRecommendationRun.autoMergePlanningError = null;
       if (planning.appendRequest.artifactType !== "autoMergePlan") {
@@ -300,10 +339,7 @@ export function createWorkflowService({
         };
       }
 
-      taskPool = applyAppendRequest(
-        buildTaskPool(await listRawTasks(tasksDir), {
-          taskContextPackages: [latestRecommendationRun.taskContextPackage],
-        }),
+      taskPool = await applyAndPersistAppendRequest(
         execution.appendRequest,
         {
           currentWorkStage: execution.appendRequest.artifactType === "autoMergeResult"
@@ -311,10 +347,6 @@ export function createWorkflowService({
             : "auto-merge-execution",
         },
       );
-      latestRecommendationRun.taskContextPackage =
-        taskPool.taskContextPackages.find((taskPackage) =>
-          taskPackage.packageId === execution.appendRequest.packageId,
-        ) ?? latestRecommendationRun.taskContextPackage;
       latestRecommendationRun.autoMergeExecution = execution;
       latestRecommendationRun.autoMergeExecutionError = null;
       if (execution.appendRequest.artifactType !== "autoMergeResult") {
@@ -346,17 +378,10 @@ export function createWorkflowService({
         };
       }
 
-      taskPool = applyAppendRequest(
-        buildTaskPool(await listRawTasks(tasksDir), {
-          taskContextPackages: [latestRecommendationRun.taskContextPackage],
-        }),
+      taskPool = await applyAndPersistAppendRequest(
         closeout.appendRequest,
         { currentWorkStage: "closed" },
       );
-      latestRecommendationRun.taskContextPackage =
-        taskPool.taskContextPackages.find((taskPackage) =>
-          taskPackage.packageId === closeout.appendRequest.packageId,
-        ) ?? latestRecommendationRun.taskContextPackage;
       latestRecommendationRun.taskCloseout = closeout;
       latestRecommendationRun.taskCloseoutError = null;
       emitRecommendationChanged(latestRecommendationRun);

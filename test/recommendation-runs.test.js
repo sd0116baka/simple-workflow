@@ -298,6 +298,25 @@ test("workflow service captures a successful recommendation run", async (t) => {
   assert.equal(taskPoolAfterCloseout.entries[0].status, "closed");
   assert.equal(taskPoolAfterCloseout.taskContextPackages[0].currentWorkStage, "closed");
   assert.deepEqual(taskPoolAfterCloseout.views.candidateTasks, []);
+
+  const restartedService = createWorkflowService({
+    tasksDir,
+    repositoryDir,
+    recommendationPromptPath: promptPath,
+    getRepositoryStatus: async () => ({ clean: true, entries: [] }),
+    runRecommendationCommand: async () => {
+      throw new Error("should not run");
+    },
+  });
+  const taskPoolAfterRestart = await restartedService.listTaskPool();
+
+  assert.equal(taskPoolAfterRestart.entries[0].status, "closed");
+  assert.equal(taskPoolAfterRestart.taskContextPackages[0].currentWorkStage, "closed");
+  assert.equal(
+    taskPoolAfterRestart.taskContextPackages[0].artifacts.taskCloseout.body.finalStage,
+    "closed",
+  );
+  assert.deepEqual(taskPoolAfterRestart.views.candidateTasks, []);
 });
 
 test("workflow service does not expose invalid tasks to the recommender prompt", async (t) => {
