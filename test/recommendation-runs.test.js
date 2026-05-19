@@ -227,7 +227,19 @@ test("workflow service captures a successful recommendation run", async (t) => {
   assert.equal(finished.exitCode, 0);
   assert.equal(service.getLatestRecommendationRun().status, "succeeded");
 
-  const accepted = await service.acceptTaskCompletion();
+  const resumedHumanDecisionService = createWorkflowService({
+    tasksDir,
+    repositoryDir,
+    recommendationPromptPath: promptPath,
+    getRepositoryStatus: async () => ({ clean: true, entries: [] }),
+    runRecommendationCommand: async () => {
+      throw new Error("should not run");
+    },
+    runExecutionAgentSession: runStubExecutionAgentSession,
+  });
+  const accepted = await resumedHumanDecisionService.acceptTaskCompletion({
+    packageId: "task-context-package:tasks/task-001.yaml",
+  });
 
   assert.equal(accepted.accepted, true);
   assert.equal(accepted.planned, true);
@@ -296,7 +308,7 @@ test("workflow service captures a successful recommendation run", async (t) => {
     true,
   );
 
-  const taskPoolAfterCloseout = await service.listTaskPool();
+  const taskPoolAfterCloseout = await resumedHumanDecisionService.listTaskPool();
   assert.equal(taskPoolAfterCloseout.entries[0].status, "closed");
   assert.equal(taskPoolAfterCloseout.taskContextPackages[0].currentWorkStage, "closed");
   assert.deepEqual(taskPoolAfterCloseout.views.candidateTasks, []);
@@ -571,8 +583,10 @@ test("POST /api/human-decisions/accept-completion accepts completion", async (t)
     id: "recommendation-run-test",
     status: "succeeded",
   };
+  let observedPackageId = null;
   const workflowService = {
-    async acceptTaskCompletion() {
+    async acceptTaskCompletion({ packageId }) {
+      observedPackageId = packageId;
       return {
         accepted: true,
         planned: true,
@@ -596,7 +610,15 @@ test("POST /api/human-decisions/accept-completion accepts completion", async (t)
 
   const response = await fetch(
     `http://localhost:${server.address().port}/api/human-decisions/accept-completion`,
-    { method: "POST" },
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        packageId: "task-context-package:tasks/task-001.yaml",
+      }),
+    },
   );
   const payload = await response.json();
 
@@ -606,6 +628,7 @@ test("POST /api/human-decisions/accept-completion accepts completion", async (t)
   assert.equal(payload.executed, true);
   assert.equal(payload.closed, true);
   assert.equal(payload.recommendationRun.status, "succeeded");
+  assert.equal(observedPackageId, "task-context-package:tasks/task-001.yaml");
 });
 
 test("POST /api/server/restart triggers configured restart handler", async (t) => {

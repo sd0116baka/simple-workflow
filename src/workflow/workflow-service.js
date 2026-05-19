@@ -163,6 +163,21 @@ export function createWorkflowService({
     });
   }
 
+  async function findAcceptableTaskContextPackage(packageId) {
+    const taskContextPackages = await loadExistingTaskContextPackages();
+    if (packageId) {
+      return taskContextPackages.find((candidate) => candidate.packageId === packageId) ?? null;
+    }
+    if (latestRecommendationRun?.taskContextPackage?.currentWorkStage === "human-decision") {
+      return latestRecommendationRun.taskContextPackage;
+    }
+    return taskContextPackages.find((candidate) =>
+      candidate.currentWorkStage === "human-decision"
+        && candidate.artifacts?.humanDecisionRequest?.body
+        && !candidate.artifacts?.humanDecision?.body,
+    ) ?? null;
+  }
+
   async function applyAndPersistAppendRequest(appendRequest, { currentWorkStage }) {
     const taskPool = applyAppendRequest(
       buildTaskPool(await listRawTasks(tasksDir), {
@@ -259,17 +274,34 @@ export function createWorkflowService({
       return toRecommendationSnapshot(latestRecommendationRun);
     },
 
-    async acceptTaskCompletion() {
-      if (!latestRecommendationRun?.taskContextPackage) {
+    async acceptTaskCompletion({ packageId = null } = {}) {
+      const taskContextPackage = await findAcceptableTaskContextPackage(packageId);
+      if (!taskContextPackage) {
         return {
           accepted: false,
-          error: "没有可接受的任务上下文包。",
+          error: packageId
+            ? `没有找到可接受的任务上下文包：${packageId}`
+            : "没有可接受的任务上下文包。",
           recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
         };
       }
 
+      if (!latestRecommendationRun) {
+        latestRecommendationRun = {
+          id: "human-decision-run",
+          status: "succeeded",
+          startedAt: new Date().toISOString(),
+          finishedAt: new Date().toISOString(),
+          command: null,
+          args: [],
+          startupCheck: null,
+          progress: [],
+        };
+      }
+      latestRecommendationRun.taskContextPackage = taskContextPackage;
+
       const decision = acceptTaskCompletion({
-        taskContextPackage: latestRecommendationRun.taskContextPackage,
+        taskContextPackage,
         repositoryDir,
       });
       if (!decision.appendRequest) {

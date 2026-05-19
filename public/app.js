@@ -50,6 +50,7 @@ const taskCloseoutPanel = document.querySelector("#taskCloseoutPanel");
 
 let tasks = [];
 let poolEntries = [];
+let poolTaskContextPackages = [];
 let startupCheck = null;
 let recommendationRun = null;
 let selectedFileName = null;
@@ -156,6 +157,19 @@ function createAdmissionPanel(admission) {
 function artifactRecords(artifactValue) {
   if (Array.isArray(artifactValue)) return artifactValue;
   return artifactValue ? [artifactValue] : [];
+}
+
+function activeTaskContextPackage() {
+  if (recommendationRun?.taskContextPackage) return recommendationRun.taskContextPackage;
+  const selectedPackage = poolTaskContextPackages.find((taskPackage) =>
+    taskPackage.source?.path === `tasks/${selectedFileName}`,
+  );
+  if (selectedPackage?.currentWorkStage === "human-decision") return selectedPackage;
+  return poolTaskContextPackages.find((taskPackage) =>
+    taskPackage.currentWorkStage === "human-decision"
+      && taskPackage.artifacts?.humanDecisionRequest?.body
+      && !taskPackage.artifacts?.humanDecision?.body,
+  ) ?? selectedPackage ?? null;
 }
 
 function createHumanDecisionPanel(taskContextPackage) {
@@ -634,15 +648,30 @@ function renderTaskCloseout(taskContextPackage) {
 }
 
 async function acceptCompletion() {
+  const taskContextPackage = activeTaskContextPackage();
   humanDecisionStatus.textContent = "提交中";
   const response = await fetch("/api/human-decisions/accept-completion", {
     method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      packageId: taskContextPackage?.packageId ?? null,
+    }),
   });
   const payload = await response.json();
   if (!response.ok) {
     throw new Error(payload.error ?? `接受完成失败：${response.status}`);
   }
   recommendationRun = payload.recommendationRun ?? null;
+  if (recommendationRun?.taskContextPackage) {
+    const index = poolTaskContextPackages.findIndex((candidate) =>
+      candidate.packageId === recommendationRun.taskContextPackage.packageId,
+    );
+    if (index >= 0) {
+      poolTaskContextPackages[index] = recommendationRun.taskContextPackage;
+    }
+  }
   renderRecommendationRun();
   await loadTasks();
 }
@@ -804,6 +833,7 @@ function buildRecommendationRaw(run) {
 }
 
 function renderRecommendationRun() {
+  const taskContextPackage = activeTaskContextPackage();
   recommendationResult?.replaceChildren();
   recommendationIntentPanel.replaceChildren();
   admissionPanel.replaceChildren();
@@ -812,8 +842,8 @@ function renderRecommendationRun() {
   autoMergePanel.replaceChildren();
   autoMergeExecutionPanel.replaceChildren();
   taskCloseoutPanel.replaceChildren();
-  taskContextPackageRaw.textContent = recommendationRun?.taskContextPackage
-    ? JSON.stringify(recommendationRun.taskContextPackage, null, 2)
+  taskContextPackageRaw.textContent = taskContextPackage
+    ? JSON.stringify(taskContextPackage, null, 2)
     : "尚未生成任务上下文包。";
   recommendationRaw.textContent = buildRecommendationRaw(recommendationRun);
   admissionRaw.textContent = formatJsonBlock(recommendationRun?.executionIntentAppendRequest);
@@ -828,10 +858,10 @@ function renderRecommendationRun() {
     { label: "任务池", value: `${poolEntries.length} 个条目` },
     { label: "启动检查", value: startupCheck ? String(startupCheck.canStartWork) : "未载入" },
   ]);
-  renderHumanDecision(recommendationRun?.taskContextPackage ?? null);
-  renderAutoMerge(recommendationRun?.taskContextPackage ?? null);
-  renderAutoMergeExecution(recommendationRun?.taskContextPackage ?? null);
-  renderTaskCloseout(recommendationRun?.taskContextPackage ?? null);
+  renderHumanDecision(taskContextPackage);
+  renderAutoMerge(taskContextPackage);
+  renderAutoMergeExecution(taskContextPackage);
+  renderTaskCloseout(taskContextPackage);
   runRecommendationButton.disabled = recommendationRun?.status === "running";
 
   if (!recommendationRun) {
@@ -840,21 +870,26 @@ function renderRecommendationRun() {
     if (recommendationResult) recommendationResult.textContent = "尚未触发推荐器。";
     recommendationIntentPanel.textContent = "尚未解析。";
     admissionPanel.textContent = "等待推荐器输出。";
-    taskContextPackageStatus.textContent = "等待输入";
-    taskContextPackageRaw.textContent = "等待执行准入器输出。";
-    taskContextPackagePanel.textContent = "等待执行准入器输出。";
-    humanDecisionStatus.textContent = "等待输入";
-    humanDecisionRaw.textContent = "尚未请求人工决策。";
-    humanDecisionPanel.textContent = "等待任务完成结论。";
-    autoMergeStatus.textContent = "等待输入";
-    autoMergeRaw.textContent = "尚未进入自动合并环节。";
-    autoMergePanel.textContent = "等待人工接受完成。";
-    autoMergeExecutionStatus.textContent = "等待输入";
-    autoMergeExecutionRaw.textContent = "尚未执行自动合并。";
-    autoMergeExecutionPanel.textContent = "等待合并计划。";
-    taskCloseoutStatus.textContent = "等待输入";
-    taskCloseoutRaw.textContent = "尚未收尾。";
-    taskCloseoutPanel.textContent = "等待自动合并结果。";
+    if (taskContextPackage) {
+      taskContextPackageStatus.textContent = taskContextPackage.currentWorkStage;
+      taskContextPackagePanel.append(createTaskContextPackagePanel(taskContextPackage));
+    } else {
+      taskContextPackageStatus.textContent = "等待输入";
+      taskContextPackageRaw.textContent = "等待执行准入器输出。";
+      taskContextPackagePanel.textContent = "等待执行准入器输出。";
+      humanDecisionStatus.textContent = "等待输入";
+      humanDecisionRaw.textContent = "尚未请求人工决策。";
+      humanDecisionPanel.textContent = "等待任务完成结论。";
+      autoMergeStatus.textContent = "等待输入";
+      autoMergeRaw.textContent = "尚未进入自动合并环节。";
+      autoMergePanel.textContent = "等待人工接受完成。";
+      autoMergeExecutionStatus.textContent = "等待输入";
+      autoMergeExecutionRaw.textContent = "尚未执行自动合并。";
+      autoMergeExecutionPanel.textContent = "等待合并计划。";
+      taskCloseoutStatus.textContent = "等待输入";
+      taskCloseoutRaw.textContent = "尚未收尾。";
+      taskCloseoutPanel.textContent = "等待自动合并结果。";
+    }
     return;
   }
 
@@ -894,9 +929,9 @@ function renderRecommendationRun() {
     admissionPanel.textContent = "尚未计算执行授权。";
   }
 
-  if (recommendationRun.taskContextPackage) {
-    taskContextPackageStatus.textContent = recommendationRun.taskContextPackage.currentWorkStage;
-    taskContextPackagePanel.append(createTaskContextPackagePanel(recommendationRun.taskContextPackage));
+  if (taskContextPackage) {
+    taskContextPackageStatus.textContent = taskContextPackage.currentWorkStage;
+    taskContextPackagePanel.append(createTaskContextPackagePanel(taskContextPackage));
   } else {
     taskContextPackageStatus.textContent = "未生成";
     taskContextPackagePanel.textContent = "尚未生成任务上下文包快照。";
@@ -991,6 +1026,7 @@ async function loadTasks() {
   const startupCheckPayload = await startupCheckResponse.json();
   tasks = tasksPayload.tasks ?? [];
   poolEntries = poolPayload.taskPool?.entries ?? [];
+  poolTaskContextPackages = poolPayload.taskPool?.taskContextPackages ?? [];
   startupCheck = startupCheckPayload.startupCheck ?? null;
   selectedFileName = tasks.some((task) => task.fileName === selectedFileName)
     ? selectedFileName

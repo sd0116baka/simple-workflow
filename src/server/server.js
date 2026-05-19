@@ -22,6 +22,24 @@ function sendJson(response, status, payload) {
   response.end(JSON.stringify(payload));
 }
 
+function readRequestBody(request) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    request.setEncoding("utf8");
+    request.on("data", (chunk) => {
+      body += chunk;
+    });
+    request.on("end", () => resolve(body));
+    request.on("error", reject);
+  });
+}
+
+async function readJsonBody(request) {
+  const body = await readRequestBody(request);
+  if (!body.trim()) return {};
+  return JSON.parse(body);
+}
+
 function sendEvent(response, event) {
   response.write(`event: ${event.type}\n`);
   response.write(`data: ${JSON.stringify(event)}\n\n`);
@@ -86,7 +104,10 @@ export function createApp({
       }
 
       if (request.method === "POST" && request.url?.startsWith("/api/human-decisions/accept-completion")) {
-        const result = await workflowService.acceptTaskCompletion();
+        const body = await readJsonBody(request);
+        const result = await workflowService.acceptTaskCompletion({
+          packageId: body.packageId,
+        });
         sendJson(response, result.accepted ? 200 : 409, result);
         return;
       }
