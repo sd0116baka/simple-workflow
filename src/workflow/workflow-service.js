@@ -10,7 +10,7 @@ import {
   completeRecommendationFlow,
   startRecommendationFlow,
 } from "./recommendation-flow.js";
-import { planAutoMerge } from "./auto-merge-flow.js";
+import { executeAutoMerge, planAutoMerge } from "./auto-merge-flow.js";
 import { acceptTaskCompletion } from "./human-decision-flow.js";
 import { runOpencodeRecommendation } from "./recommendation-runner.js";
 import { applyAppendRequest, buildTaskPool } from "./task-pool.js";
@@ -92,6 +92,10 @@ export function createWorkflowService({
             ? JSON.parse(JSON.stringify(run.autoMergePlanning))
             : null,
           autoMergePlanningError: run.autoMergePlanningError ?? null,
+          autoMergeExecution: run.autoMergeExecution
+            ? JSON.parse(JSON.stringify(run.autoMergeExecution))
+            : null,
+          autoMergeExecutionError: run.autoMergeExecutionError ?? null,
           executionIntentAppendRequest: run.executionIntentAppendRequest
             ? JSON.parse(JSON.stringify(run.executionIntentAppendRequest))
             : null,
@@ -258,11 +262,56 @@ export function createWorkflowService({
         ) ?? latestRecommendationRun.taskContextPackage;
       latestRecommendationRun.autoMergePlanning = planning;
       latestRecommendationRun.autoMergePlanningError = null;
+      if (planning.appendRequest.artifactType !== "autoMergePlan") {
+        emitRecommendationChanged(latestRecommendationRun);
+        return {
+          accepted: true,
+          planned: false,
+          executed: false,
+          error: null,
+          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+        };
+      }
+
+      const execution = executeAutoMerge({
+        taskContextPackage: latestRecommendationRun.taskContextPackage,
+        repositoryDir,
+      });
+      if (!execution.appendRequest) {
+        latestRecommendationRun.autoMergeExecutionError = execution.error;
+        emitRecommendationChanged(latestRecommendationRun);
+        return {
+          accepted: true,
+          planned: true,
+          executed: false,
+          error: execution.error,
+          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+        };
+      }
+
+      taskPool = applyAppendRequest(
+        buildTaskPool(await listRawTasks(tasksDir), {
+          taskContextPackages: [latestRecommendationRun.taskContextPackage],
+        }),
+        execution.appendRequest,
+        {
+          currentWorkStage: execution.appendRequest.artifactType === "autoMergeResult"
+            ? "merged"
+            : "auto-merge-execution",
+        },
+      );
+      latestRecommendationRun.taskContextPackage =
+        taskPool.taskContextPackages.find((taskPackage) =>
+          taskPackage.packageId === execution.appendRequest.packageId,
+        ) ?? latestRecommendationRun.taskContextPackage;
+      latestRecommendationRun.autoMergeExecution = execution;
+      latestRecommendationRun.autoMergeExecutionError = null;
       emitRecommendationChanged(latestRecommendationRun);
 
       return {
         accepted: true,
         planned: planning.appendRequest.artifactType === "autoMergePlan",
+        executed: execution.appendRequest.artifactType === "autoMergeResult",
         error: null,
         recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
       };

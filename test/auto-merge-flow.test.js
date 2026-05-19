@@ -1,10 +1,13 @@
 import { execFileSync } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { planAutoMerge } from "../src/workflow/auto-merge-flow.js";
+import {
+  executeAutoMerge,
+  planAutoMerge,
+} from "../src/workflow/auto-merge-flow.js";
 
 function runGit(args, cwd) {
   return execFileSync("git", args, {
@@ -20,7 +23,8 @@ async function createGitRepositoryWithWorktree(t, { withChanges = true } = {}) {
 
   runGit(["init", "-b", "main"], repositoryDir);
   await writeFile(join(repositoryDir, "README.md"), "test repository\n");
-  runGit(["add", "README.md"], repositoryDir);
+  await writeFile(join(repositoryDir, ".gitignore"), ".workflow/\n");
+  runGit(["add", "README.md", ".gitignore"], repositoryDir);
   runGit([
     "-c",
     "user.name=Simple Workflow Test",
@@ -86,6 +90,21 @@ function acceptedPackage(baseCommit) {
           },
         },
         appendedAt: "2026-05-18T10:00:08.000Z",
+      },
+    },
+  };
+}
+
+function packageReadyForExecution(baseCommit, plan) {
+  return {
+    ...acceptedPackage(baseCommit),
+    currentWorkStage: "auto-merge-execution",
+    artifacts: {
+      ...acceptedPackage(baseCommit).artifacts,
+      autoMergePlan: {
+        artifactId: "autoMergePlan",
+        body: plan,
+        appendedAt: "2026-05-19T10:00:00.000Z",
       },
     },
   };
@@ -187,4 +206,96 @@ test("rejects auto-merge when worktree head moved after acceptance", async (t) =
   assert.equal(result.error, null);
   assert.equal(result.appendRequest.artifactType, "autoMergeRejection");
   assert.equal(result.appendRequest.artifact.reasons[0].code, "WORKTREE_HEAD_MISMATCH");
+});
+
+test("executes auto-merge with a fast-forward merge", async (t) => {
+  const { repositoryDir, baseCommit } = await createGitRepositoryWithWorktree(t);
+  const planning = planAutoMerge({
+    taskContextPackage: acceptedPackage(baseCommit),
+    repositoryDir,
+    now: () => "2026-05-19T10:00:00.000Z",
+  });
+
+  const result = executeAutoMerge({
+    taskContextPackage: packageReadyForExecution(baseCommit, planning.appendRequest.artifact),
+    repositoryDir,
+    now: () => "2026-05-19T10:05:00.000Z",
+  });
+
+  assert.equal(result.error, null);
+  assert.equal(result.appendRequest.packageId, "task-context-package:tasks/task-003.yaml");
+  assert.equal(result.appendRequest.artifactType, "autoMergeResult");
+  assert.equal(result.appendRequest.artifact.mergedAt, "2026-05-19T10:05:00.000Z");
+  assert.equal(result.appendRequest.artifact.planRef, "autoMergePlan");
+  assert.equal(result.appendRequest.artifact.source.baseCommit, baseCommit);
+  assert.match(result.appendRequest.artifact.source.commit, /^[0-9a-f]{40}$/);
+  assert.equal(result.appendRequest.artifact.target.branchName, "main");
+  assert.equal(result.appendRequest.artifact.target.beforeCommit, baseCommit);
+  assert.equal(
+    result.appendRequest.artifact.target.afterCommit,
+    result.appendRequest.artifact.source.commit,
+  );
+  assert.deepEqual(result.appendRequest.artifact.changeSet.changedFiles, ["result.txt"]);
+  assert.deepEqual(result.appendRequest.artifact.checks, [
+    { name: "mainWorktreeClean", passed: true },
+    { name: "targetStillAtPlannedCommit", passed: true },
+    { name: "sourceCommitted", passed: true },
+    { name: "mergedFastForward", passed: true },
+  ]);
+  assert.equal(
+    (await readFile(join(repositoryDir, "result.txt"), "utf8")).replace(/\r\n/g, "\n"),
+    "accepted work\n",
+  );
+});
+
+test("fails auto-merge execution when target branch moved", async (t) => {
+  const { repositoryDir, baseCommit } = await createGitRepositoryWithWorktree(t);
+  const planning = planAutoMerge({
+    taskContextPackage: acceptedPackage(baseCommit),
+    repositoryDir,
+  });
+  await writeFile(join(repositoryDir, "target-moved.txt"), "new target work\n");
+  runGit(["add", "target-moved.txt"], repositoryDir);
+  runGit([
+    "-c",
+    "user.name=Simple Workflow Test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-m",
+    "move target",
+  ], repositoryDir);
+
+  const result = executeAutoMerge({
+    taskContextPackage: packageReadyForExecution(baseCommit, planning.appendRequest.artifact),
+    repositoryDir,
+  });
+
+  assert.equal(result.error, null);
+  assert.equal(result.appendRequest.artifactType, "autoMergeFailure");
+  assert.equal(result.appendRequest.artifact.reasons[0].code, "TARGET_MOVED");
+  assert.deepEqual(result.appendRequest.artifact.checkedInputs, {
+    currentWorkStage: "auto-merge-execution",
+    hasAutoMergePlan: true,
+    hasIsolatedWorkspace: true,
+    hasHumanDecision: true,
+  });
+});
+
+test("fails auto-merge execution when main worktree is dirty", async (t) => {
+  const { repositoryDir, baseCommit } = await createGitRepositoryWithWorktree(t);
+  const planning = planAutoMerge({
+    taskContextPackage: acceptedPackage(baseCommit),
+    repositoryDir,
+  });
+  await writeFile(join(repositoryDir, "dirty.txt"), "dirty\n");
+
+  const result = executeAutoMerge({
+    taskContextPackage: packageReadyForExecution(baseCommit, planning.appendRequest.artifact),
+    repositoryDir,
+  });
+
+  assert.equal(result.error, null);
+  assert.equal(result.appendRequest.artifactType, "autoMergeFailure");
+  assert.equal(result.appendRequest.artifact.reasons[0].code, "MAIN_WORKTREE_DIRTY");
 });

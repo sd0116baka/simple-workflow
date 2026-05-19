@@ -394,7 +394,13 @@ h2 {
   background: #f4fbf6;
 }
 
-.auto-merge-panel.autoMergeRejection {
+.auto-merge-panel.autoMergeResult {
+  border-color: #9fc5f8;
+  background: #f5f9ff;
+}
+
+.auto-merge-panel.autoMergeRejection,
+.auto-merge-panel.autoMergeFailure {
   border-color: #f2b8ae;
   background: #fff7f5;
 }

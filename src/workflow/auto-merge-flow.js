@@ -27,6 +27,14 @@ function changedFilesInWorktree(cwd) {
     .map((line) => line.slice(3));
 }
 
+function repositoryChangedFiles(cwd) {
+  const output = runGit(["status", "--porcelain", "--untracked-files=all"], { cwd });
+  return output
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => line.slice(3));
+}
+
 function checkedInputs(taskContextPackage) {
   return {
     currentWorkStage: taskContextPackage?.currentWorkStage ?? null,
@@ -51,6 +59,34 @@ function rejectionRequest({ taskContextPackage, reasons, now }) {
 
 function reason(code, message) {
   return { code, message };
+}
+
+function autoMergeExecutionCheckedInputs(taskContextPackage) {
+  return {
+    currentWorkStage: taskContextPackage?.currentWorkStage ?? null,
+    hasAutoMergePlan: Boolean(taskContextPackage?.artifacts?.autoMergePlan?.body),
+    hasIsolatedWorkspace: Boolean(taskContextPackage?.artifacts?.isolatedWorkspace?.body),
+    hasHumanDecision: Boolean(taskContextPackage?.artifacts?.humanDecision?.body),
+  };
+}
+
+function failureRequest({ taskContextPackage, reasons, now }) {
+  return {
+    packageId: taskContextPackage.packageId,
+    artifactType: "autoMergeFailure",
+    artifact: {
+      failedAt: now(),
+      planRef: "autoMergePlan",
+      reasons,
+      checkedInputs: autoMergeExecutionCheckedInputs(taskContextPackage),
+    },
+  };
+}
+
+function commitMessageForTask(taskContextPackage) {
+  const taskId = taskContextPackage?.taskDraft?.id ?? taskContextPackage?.packageId ?? "task";
+  const taskName = taskContextPackage?.taskDraft?.name ?? "自动合并任务成果";
+  return `chore(auto-merge): ${taskId} ${taskName}`;
 }
 
 export function planAutoMerge({
@@ -171,6 +207,180 @@ export function planAutoMerge({
           { name: "worktreeExists", passed: true },
           { name: "worktreeHeadMatchesAcceptedBase", passed: true },
           { name: "targetBranchAvailable", passed: true },
+        ],
+      },
+    },
+    error: null,
+  };
+}
+
+export function executeAutoMerge({
+  taskContextPackage,
+  repositoryDir = process.cwd(),
+  now = () => new Date().toISOString(),
+} = {}) {
+  if (!taskContextPackage?.packageId) {
+    throw new Error("taskContextPackage.packageId is required");
+  }
+
+  const reasons = [];
+  if (taskContextPackage.currentWorkStage !== "auto-merge-execution") {
+    reasons.push(reason("WRONG_STAGE", "任务不在 auto-merge-execution 环节。"));
+  }
+
+  const autoMergePlan = taskContextPackage.artifacts?.autoMergePlan;
+  if (!autoMergePlan?.body) {
+    reasons.push(reason("MISSING_AUTO_MERGE_PLAN", "任务上下文包缺少 autoMergePlan。"));
+  }
+
+  const isolatedWorkspace = taskContextPackage.artifacts?.isolatedWorkspace;
+  if (!isolatedWorkspace?.body) {
+    reasons.push(reason("MISSING_ISOLATED_WORKSPACE", "任务上下文包缺少 isolatedWorkspace。"));
+  }
+
+  const humanDecision = taskContextPackage.artifacts?.humanDecision;
+  if (!humanDecision?.body) {
+    reasons.push(reason("MISSING_HUMAN_DECISION", "任务上下文包缺少 humanDecision。"));
+  }
+
+  if (reasons.length > 0) {
+    return {
+      appendRequest: failureRequest({ taskContextPackage, reasons, now }),
+      error: null,
+    };
+  }
+
+  const plan = autoMergePlan.body;
+  const worktreePath = plan.source?.worktreePath ?? isolatedWorkspace.body.worktreePath;
+  const absoluteWorktreePath = resolveWorktreePath(worktreePath, repositoryDir);
+  if (!absoluteWorktreePath || !existsSync(absoluteWorktreePath)) {
+    return {
+      appendRequest: failureRequest({
+        taskContextPackage,
+        reasons: [reason("WORKTREE_MISSING", "隔离工作树不存在。")],
+        now,
+      }),
+      error: null,
+    };
+  }
+
+  let activeBranch;
+  let targetCommit;
+  let mainChangedFiles;
+  let worktreeChangedFiles;
+  try {
+    activeBranch = runGit(["branch", "--show-current"], { cwd: repositoryDir });
+    targetCommit = runGit(["rev-parse", plan.target.branchName], { cwd: repositoryDir });
+    mainChangedFiles = repositoryChangedFiles(repositoryDir);
+    worktreeChangedFiles = changedFilesInWorktree(absoluteWorktreePath);
+  } catch (error) {
+    return {
+      appendRequest: failureRequest({
+        taskContextPackage,
+        reasons: [reason("GIT_CHECK_FAILED", error.message)],
+        now,
+      }),
+      error: null,
+    };
+  }
+
+  if (activeBranch !== plan.target.branchName) {
+    return {
+      appendRequest: failureRequest({
+        taskContextPackage,
+        reasons: [reason("TARGET_NOT_CHECKED_OUT", "目标分支不是主工作树当前分支。")],
+        now,
+      }),
+      error: null,
+    };
+  }
+
+  if (targetCommit !== plan.target.currentCommit) {
+    return {
+      appendRequest: failureRequest({
+        taskContextPackage,
+        reasons: [reason("TARGET_MOVED", "目标分支已经不在自动合并计划记录的 commit。")],
+        now,
+      }),
+      error: null,
+    };
+  }
+
+  if (mainChangedFiles.length > 0) {
+    return {
+      appendRequest: failureRequest({
+        taskContextPackage,
+        reasons: [reason("MAIN_WORKTREE_DIRTY", "主工作区存在未提交变更。")],
+        now,
+      }),
+      error: null,
+    };
+  }
+
+  if (worktreeChangedFiles.length === 0) {
+    return {
+      appendRequest: failureRequest({
+        taskContextPackage,
+        reasons: [reason("NO_CHANGES", "隔离工作树没有可提交变更。")],
+        now,
+      }),
+      error: null,
+    };
+  }
+
+  let sourceCommit;
+  let afterCommit;
+  try {
+    runGit(["add", "-A"], { cwd: absoluteWorktreePath });
+    runGit([
+      "-c",
+      "user.name=Simple Workflow",
+      "-c",
+      "user.email=simple-workflow@example.invalid",
+      "commit",
+      "-m",
+      commitMessageForTask(taskContextPackage),
+    ], { cwd: absoluteWorktreePath });
+    sourceCommit = runGit(["rev-parse", "HEAD"], { cwd: absoluteWorktreePath });
+    runGit(["merge", "--ff-only", sourceCommit], { cwd: repositoryDir });
+    afterCommit = runGit(["rev-parse", plan.target.branchName], { cwd: repositoryDir });
+  } catch (error) {
+    return {
+      appendRequest: failureRequest({
+        taskContextPackage,
+        reasons: [reason("AUTO_MERGE_FAILED", error.message)],
+        now,
+      }),
+      error: null,
+    };
+  }
+
+  return {
+    appendRequest: {
+      packageId: taskContextPackage.packageId,
+      artifactType: "autoMergeResult",
+      artifact: {
+        mergedAt: now(),
+        planRef: "autoMergePlan",
+        source: {
+          worktreePath: normalizePathForGit(worktreePath),
+          branchName: plan.source.branchName,
+          baseCommit: plan.source.baseCommit,
+          commit: sourceCommit,
+        },
+        target: {
+          branchName: plan.target.branchName,
+          beforeCommit: plan.target.currentCommit,
+          afterCommit,
+        },
+        changeSet: {
+          changedFiles: worktreeChangedFiles,
+        },
+        checks: [
+          { name: "mainWorktreeClean", passed: true },
+          { name: "targetStillAtPlannedCommit", passed: true },
+          { name: "sourceCommitted", passed: true },
+          { name: "mergedFastForward", passed: true },
         ],
       },
     },

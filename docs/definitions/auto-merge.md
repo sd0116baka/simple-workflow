@@ -140,6 +140,8 @@ humanDecision
 
 `autoMergePlan.target.currentCommit` 必须仍然等于目标分支当前 commit。
 
+目标分支必须是主工作树当前分支。
+
 主工作区必须干净。
 
 隔离工作树必须有可提交变更。

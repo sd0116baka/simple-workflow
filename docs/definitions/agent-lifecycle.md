@@ -184,6 +184,8 @@ humanDecision
 isolatedWorkspace
 autoMergePlan
 autoMergeRejection
+autoMergeResult
+autoMergeFailure
 ```
 
 Agent loop 产物是多例：

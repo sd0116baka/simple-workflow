@@ -38,6 +38,10 @@ const autoMergeStatus = document.querySelector("#autoMergeStatus");
 const autoMergeInputs = document.querySelector("#autoMergeInputs");
 const autoMergeRaw = document.querySelector("#autoMergeRaw");
 const autoMergePanel = document.querySelector("#autoMergePanel");
+const autoMergeExecutionStatus = document.querySelector("#autoMergeExecutionStatus");
+const autoMergeExecutionInputs = document.querySelector("#autoMergeExecutionInputs");
+const autoMergeExecutionRaw = document.querySelector("#autoMergeExecutionRaw");
+const autoMergeExecutionPanel = document.querySelector("#autoMergeExecutionPanel");
 
 let tasks = [];
 let poolEntries = [];
@@ -273,6 +277,61 @@ function createAutoMergePanel(taskContextPackage) {
   return panel;
 }
 
+function createAutoMergeExecutionPanel(taskContextPackage) {
+  const result = taskContextPackage?.artifacts?.autoMergeResult;
+  const failure = taskContextPackage?.artifacts?.autoMergeFailure;
+  const record = result ?? failure;
+  if (!record?.body) return null;
+
+  const panel = document.createElement("div");
+  panel.className = `auto-merge-panel ${result ? "autoMergeResult" : "autoMergeFailure"}`;
+
+  const title = document.createElement("div");
+  title.className = "auto-merge-title";
+  title.textContent = result ? "已合入目标分支" : "自动合并执行失败";
+
+  const meta = document.createElement("div");
+  meta.className = "auto-merge-meta";
+  meta.textContent = result
+    ? [
+        `target: ${record.body.target?.branchName ?? "unknown"}`,
+        `after: ${record.body.target?.afterCommit?.slice(0, 7) ?? "unknown"}`,
+        `mergedAt: ${record.body.mergedAt ?? record.appendedAt ?? "unknown"}`,
+      ].join(" · ")
+    : [
+        `planRef: ${record.body.planRef ?? "unknown"}`,
+        `failedAt: ${record.body.failedAt ?? record.appendedAt ?? "unknown"}`,
+      ].join(" · ");
+
+  panel.append(title, meta);
+
+  const changedFiles = result ? record.body.changeSet?.changedFiles ?? [] : [];
+  if (changedFiles.length > 0) {
+    const list = document.createElement("ul");
+    list.className = "auto-merge-list";
+    for (const filePath of changedFiles) {
+      const item = document.createElement("li");
+      item.textContent = filePath;
+      list.append(item);
+    }
+    panel.append(list);
+  }
+
+  const reasons = failure ? record.body.reasons ?? [] : [];
+  if (reasons.length > 0) {
+    const list = document.createElement("ul");
+    list.className = "auto-merge-list";
+    for (const itemReason of reasons) {
+      const item = document.createElement("li");
+      item.textContent = `${itemReason.code}: ${itemReason.message}`;
+      list.append(item);
+    }
+    panel.append(list);
+  }
+
+  return panel;
+}
+
 function createTaskContextPackagePanel(taskContextPackage) {
   const panel = document.createElement("div");
   panel.className = `context-package ${taskContextPackage.currentWorkStage}`;
@@ -300,6 +359,7 @@ function createTaskContextPackagePanel(taskContextPackage) {
     <span>任务完成结论</span><strong></strong>
     <span>人工决策</span><strong></strong>
     <span>自动合并计划</span><strong></strong>
+    <span>自动合并执行</span><strong></strong>
   `;
   const values = artifacts.querySelectorAll("strong");
   values[0].textContent = taskContextPackage.qualityGate?.outcome ?? "missing";
@@ -321,6 +381,11 @@ function createTaskContextPackagePanel(taskContextPackage) {
     : taskContextPackage.artifacts?.autoMergeRejection
       ? "未通过"
       : "未检查";
+  values[7].textContent = taskContextPackage.artifacts?.autoMergeResult
+    ? "已合并"
+    : taskContextPackage.artifacts?.autoMergeFailure
+      ? "失败"
+      : "未执行";
   panel.append(artifacts);
 
   const artifactEntries = Object.entries(taskContextPackage.artifacts ?? {});
@@ -445,6 +510,49 @@ function renderAutoMerge(taskContextPackage) {
   autoMergePanel.textContent = humanDecision
     ? "等待任务进入 auto-merge 环节。"
     : "等待人工接受完成。";
+}
+
+function renderAutoMergeExecution(taskContextPackage) {
+  autoMergeExecutionPanel.replaceChildren();
+  const plan = taskContextPackage?.artifacts?.autoMergePlan ?? null;
+  const result = taskContextPackage?.artifacts?.autoMergeResult ?? null;
+  const failure = taskContextPackage?.artifacts?.autoMergeFailure ?? null;
+  autoMergeExecutionRaw.textContent = formatJsonBlock({
+    autoMergePlan: plan,
+    autoMergeResult: result,
+    autoMergeFailure: failure,
+  });
+  renderInputs(autoMergeExecutionInputs, [
+    { label: "合并计划", value: plan?.artifactId ?? "未生成" },
+    { label: "当前环节", value: taskContextPackage?.currentWorkStage ?? "未生成" },
+    { label: "执行结果", value: result?.artifactId ?? "未生成" },
+    { label: "失败记录", value: failure?.artifactId ?? "未生成" },
+  ]);
+
+  if (result) {
+    autoMergeExecutionStatus.textContent = "已合并";
+    const panel = createAutoMergeExecutionPanel(taskContextPackage);
+    autoMergeExecutionPanel.append(panel);
+    return;
+  }
+
+  if (failure) {
+    autoMergeExecutionStatus.textContent = "失败";
+    const panel = createAutoMergeExecutionPanel(taskContextPackage);
+    autoMergeExecutionPanel.append(panel);
+    return;
+  }
+
+  if (taskContextPackage?.currentWorkStage === "auto-merge-execution") {
+    autoMergeExecutionStatus.textContent = "执行中";
+    autoMergeExecutionPanel.textContent = "自动合并计划已生成，系统正在执行合并。";
+    return;
+  }
+
+  autoMergeExecutionStatus.textContent = plan ? "等待执行" : "等待输入";
+  autoMergeExecutionPanel.textContent = plan
+    ? "等待任务进入 auto-merge-execution 环节。"
+    : "等待自动合并计划。";
 }
 
 async function acceptCompletion() {
@@ -623,6 +731,7 @@ function renderRecommendationRun() {
   taskContextPackagePanel.replaceChildren();
   humanDecisionPanel.replaceChildren();
   autoMergePanel.replaceChildren();
+  autoMergeExecutionPanel.replaceChildren();
   taskContextPackageRaw.textContent = recommendationRun?.taskContextPackage
     ? JSON.stringify(recommendationRun.taskContextPackage, null, 2)
     : "尚未生成任务上下文包。";
@@ -641,6 +750,7 @@ function renderRecommendationRun() {
   ]);
   renderHumanDecision(recommendationRun?.taskContextPackage ?? null);
   renderAutoMerge(recommendationRun?.taskContextPackage ?? null);
+  renderAutoMergeExecution(recommendationRun?.taskContextPackage ?? null);
   runRecommendationButton.disabled = recommendationRun?.status === "running";
 
   if (!recommendationRun) {
@@ -658,6 +768,9 @@ function renderRecommendationRun() {
     autoMergeStatus.textContent = "等待输入";
     autoMergeRaw.textContent = "尚未进入自动合并环节。";
     autoMergePanel.textContent = "等待人工接受完成。";
+    autoMergeExecutionStatus.textContent = "等待输入";
+    autoMergeExecutionRaw.textContent = "尚未执行自动合并。";
+    autoMergeExecutionPanel.textContent = "等待合并计划。";
     return;
   }
 

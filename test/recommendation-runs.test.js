@@ -22,7 +22,8 @@ async function createGitRepository(t) {
 
   runGit(["init", "-b", "main"], repositoryDir);
   await writeFile(join(repositoryDir, "README.md"), "test repository\n");
-  runGit(["add", "README.md"], repositoryDir);
+  await writeFile(join(repositoryDir, ".gitignore"), ".workflow/\n");
+  runGit(["add", "README.md", ".gitignore"], repositoryDir);
   runGit([
     "-c",
     "user.name=Simple Workflow Test",
@@ -225,9 +226,11 @@ test("workflow service captures a successful recommendation run", async (t) => {
 
   assert.equal(accepted.accepted, true);
   assert.equal(accepted.planned, true);
+  assert.equal(accepted.executed, true);
   assert.equal(accepted.error, null);
   assert.equal(accepted.recommendationRun.autoMergePlanning.appendRequest.artifactType, "autoMergePlan");
-  assert.equal(accepted.recommendationRun.taskContextPackage.currentWorkStage, "auto-merge-execution");
+  assert.equal(accepted.recommendationRun.autoMergeExecution.appendRequest.artifactType, "autoMergeResult");
+  assert.equal(accepted.recommendationRun.taskContextPackage.currentWorkStage, "merged");
   assert.equal(
     accepted.recommendationRun.taskContextPackage.artifacts.humanDecision.body.decision,
     "accept-completion",
@@ -265,6 +268,17 @@ test("workflow service captures a successful recommendation run", async (t) => {
   assert.equal(
     "taskCompletionRef" in accepted.recommendationRun.taskContextPackage.artifacts.autoMergePlan.body,
     false,
+  );
+  assert.deepEqual(
+    accepted.recommendationRun.taskContextPackage.artifacts.autoMergeResult.body.changeSet.changedFiles,
+    [
+      ".workflow-agent/execution-agent-001.txt",
+      ".workflow-agent/execution-agent-002.txt",
+    ],
+  );
+  assert.equal(
+    accepted.recommendationRun.taskContextPackage.artifacts.autoMergeResult.body.target.afterCommit,
+    accepted.recommendationRun.taskContextPackage.artifacts.autoMergeResult.body.source.commit,
   );
 });
 
@@ -521,6 +535,7 @@ test("POST /api/human-decisions/accept-completion accepts completion", async (t)
       return {
         accepted: true,
         planned: true,
+        executed: true,
         error: null,
         recommendationRun: latestRun,
       };
@@ -546,5 +561,6 @@ test("POST /api/human-decisions/accept-completion accepts completion", async (t)
   assert.equal(response.status, 200);
   assert.equal(payload.accepted, true);
   assert.equal(payload.planned, true);
+  assert.equal(payload.executed, true);
   assert.equal(payload.recommendationRun.status, "succeeded");
 });
