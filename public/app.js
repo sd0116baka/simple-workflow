@@ -643,6 +643,7 @@ async function acceptCompletion() {
   }
   recommendationRun = payload.recommendationRun ?? null;
   renderRecommendationRun();
+  await loadTasks();
 }
 
 function renderInputs(container, inputs) {
@@ -1051,7 +1052,7 @@ function connectWorkflowEvents() {
     loadTasks().catch(showError);
   });
   events.addEventListener("recommendation-run-changed", () => {
-    loadRecommendationRun().catch(showError);
+    Promise.all([loadTasks(), loadRecommendationRun()]).catch(showError);
   });
 }
 
