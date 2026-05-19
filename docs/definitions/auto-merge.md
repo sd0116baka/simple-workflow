@@ -42,8 +42,7 @@ isolatedWorkspace
     "changeSet": {
       "changedFiles": [
         ".workflow-agent/execution-agent-001.txt"
-      ],
-      "hasChanges": true
+      ]
     },
     "checks": [
       {
@@ -107,7 +106,7 @@ isolatedWorkspace
 
 `autoMergePlan` 不包含 `taskCompletionRef`。任务完成结论通过 `decisionRef -> humanDecision.taskCompletionRef` 追溯。
 
-`hasChanges` 只出现在 `changeSet`，不重复出现在 `checks`。
+`autoMergePlan.changeSet.changedFiles` 必须是非空数组。
 
 `autoMergePlan` 只在确认有可合并变更时出现。没有变更时产出 `autoMergeRejection`。
 
