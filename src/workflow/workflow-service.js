@@ -123,6 +123,7 @@ export function createWorkflowService({
             maxIterations: 3,
           },
         },
+        repositoryDir,
       }));
     } catch (error) {
       Object.assign(run, {

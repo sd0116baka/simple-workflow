@@ -126,6 +126,7 @@ export function completeRecommendationFlow({
   runExecutionAgentSession,
   runReviewAgentSession,
   runConvergenceSession,
+  repositoryDir = process.cwd(),
   now = () => new Date().toISOString(),
 }) {
   const failed = commandResult.error || commandResult.exitCode !== 0;
@@ -162,6 +163,7 @@ export function completeRecommendationFlow({
       ? null
       : allocateIsolatedWorkspace({
           taskContextPackage: authorizedPackage,
+          repositoryDir,
         });
   taskPool = !isolatedWorkspaceAllocation?.appendRequest
     ? taskPool

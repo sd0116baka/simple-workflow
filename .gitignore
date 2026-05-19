@@ -17,6 +17,7 @@ pnpm-debug.log*
 
 # Local workflow scratch space
 .superpowers/
+.workflow/
 .tmp-test-tasks/
 .tmp-server/
 

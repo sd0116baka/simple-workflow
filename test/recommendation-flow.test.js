@@ -1,11 +1,41 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   completeRecommendationFlow,
   startRecommendationFlow,
 } from "../src/workflow/recommendation-flow.js";
+
+function runGit(args, cwd) {
+  return execFileSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
+}
+
+async function createGitRepository(t) {
+  const repositoryDir = await mkdtemp(join(tmpdir(), "simple-workflow-flow-"));
+  t.after(() => rm(repositoryDir, { recursive: true, force: true }));
+
+  runGit(["init", "-b", "main"], repositoryDir);
+  await writeFile(join(repositoryDir, "README.md"), "test repository\n");
+  runGit(["add", "README.md"], repositoryDir);
+  runGit([
+    "-c",
+    "user.name=Simple Workflow Test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-m",
+    "initial commit",
+  ], repositoryDir);
+
+  return repositoryDir;
+}
 
 function taskSource() {
   return [
@@ -90,7 +120,8 @@ test("recommendation flow starts a running run with injected candidate tasks", a
   assert.match(run.prompt, /task-001/);
 });
 
-test("recommendation flow applies module append requests through the task pool", () => {
+test("recommendation flow applies module append requests through the task pool", async (t) => {
+  const repositoryDir = await createGitRepository(t);
   const completed = completeRecommendationFlow({
     run: {
       id: "recommendation-run-flow",
@@ -125,6 +156,7 @@ test("recommendation flow applies module append requests through the task pool",
       sessionId: `resumed:${role}:${sessionId}`,
       status: "succeeded",
     }),
+    repositoryDir,
     now: () => "2026-05-18T10:00:01.000Z",
   });
 
@@ -141,6 +173,7 @@ test("recommendation flow applies module append requests through the task pool",
     completed.taskContextPackage.artifacts.isolatedWorkspace.body.worktreePath,
     ".workflow/worktrees/tasks/tasks-task-001",
   );
+  assert.match(completed.taskContextPackage.artifacts.isolatedWorkspace.body.baseCommit, /^[0-9a-f]{40}$/);
   assert.equal(completed.mainAgentInitialization.appendRequest.agentRun.role, "main");
   assert.equal(completed.executionAgentRuns.length, 2);
   assert.equal(completed.executionAgentRuns[0].appendRequest.agentRun.role, "execution");

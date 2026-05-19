@@ -221,7 +221,7 @@ artifactId 由任务池生成。Agent 不生成 artifactId。
 }
 ```
 
-系统负责创建和分配 `isolatedWorkspace`。Agent 不决定工作树路径，不决定分支名，不决定主线合入。
+系统负责创建真实 git worktree，并把分配结果追加为 `isolatedWorkspace`。Agent 不决定工作树路径，不决定分支名，不决定主线合入。
 
 创建时机：
 
@@ -233,6 +233,8 @@ executionAuthorization
 ```
 
 准入通过后才创建 `isolatedWorkspace`。第一个 `execution` Agent 启动前，`isolatedWorkspace` 必须已经追加到任务上下文包。
+
+如果同一任务的 worktree 已经存在且仍被 git 注册，系统复用它，不重复创建新工作树。
 
 第一版命名规则：
 

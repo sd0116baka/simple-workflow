@@ -1,10 +1,40 @@
 import { once } from "node:events";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createApp } from "../src/server/server.js";
 import { createWorkflowService } from "../src/workflow/workflow-service.js";
+
+function runGit(args, cwd) {
+  return execFileSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
+}
+
+async function createGitRepository(t) {
+  const repositoryDir = await mkdtemp(join(tmpdir(), "simple-workflow-runs-"));
+  t.after(() => rm(repositoryDir, { recursive: true, force: true }));
+
+  runGit(["init", "-b", "main"], repositoryDir);
+  await writeFile(join(repositoryDir, "README.md"), "test repository\n");
+  runGit(["add", "README.md"], repositoryDir);
+  runGit([
+    "-c",
+    "user.name=Simple Workflow Test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-m",
+    "initial commit",
+  ], repositoryDir);
+
+  return repositoryDir;
+}
 
 async function writePrompt(name) {
   const dir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), name);
@@ -54,7 +84,8 @@ test("recommender prompt asks for a structured JSON artifact", async () => {
   assert.match(prompt, /不要修改任何文件/);
 });
 
-test("workflow service captures a successful recommendation run", async () => {
+test("workflow service captures a successful recommendation run", async (t) => {
+  const repositoryDir = await createGitRepository(t);
   const promptPath = await writePrompt("recommendation-success");
   const tasksDir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks");
   await mkdir(tasksDir, { recursive: true });
@@ -72,6 +103,7 @@ test("workflow service captures a successful recommendation run", async () => {
   );
   const service = createWorkflowService({
     tasksDir,
+    repositoryDir,
     recommendationPromptPath: promptPath,
     getRepositoryStatus: async () => ({ clean: true, entries: [] }),
     runRecommendationCommand: async ({ prompt }) => {
@@ -179,7 +211,8 @@ test("workflow service captures a successful recommendation run", async () => {
   assert.equal(service.getLatestRecommendationRun().status, "succeeded");
 });
 
-test("workflow service does not expose invalid tasks to the recommender prompt", async () => {
+test("workflow service does not expose invalid tasks to the recommender prompt", async (t) => {
+  const repositoryDir = await createGitRepository(t);
   const promptPath = await writePrompt("recommendation-candidates");
   const tasksDir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "candidate-tasks");
   await mkdir(tasksDir, { recursive: true });
@@ -209,6 +242,7 @@ test("workflow service does not expose invalid tasks to the recommender prompt",
 
   const service = createWorkflowService({
     tasksDir,
+    repositoryDir,
     recommendationPromptPath: promptPath,
     getRepositoryStatus: async () => ({ clean: true, entries: [] }),
     runRecommendationCommand: async ({ prompt }) => {

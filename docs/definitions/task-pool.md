@@ -182,7 +182,11 @@ branchName: workflow/tasks/<safe-package-id>
 
 `safe-package-id` 从 `source.path` 派生，不从任务标题派生。示例：`tasks/task-003.yaml -> tasks-task-003`。
 
-任务池只负责保存 `isolatedWorkspace` 产物。创建 git worktree、指定 Agent `cwd`、检查工作树状态、合入主线，属于后续工作流模块职责。
+系统创建真实 git worktree 后，再通过追加请求把 `isolatedWorkspace` 交给任务池保存。
+
+任务池只负责保存 `isolatedWorkspace` 产物。创建 git worktree、指定 Agent `cwd`、检查工作树状态、合入主线，属于任务池外部的工作流模块职责。
+
+`.workflow/` 是系统运行目录，必须保持在版本控制忽略列表中，避免隔离工作树本身污染主线工作区。
 
 ## 任务上下文包
 
