@@ -399,6 +399,11 @@ h2 {
   background: #f5f9ff;
 }
 
+.auto-merge-panel.taskCloseout {
+  border-color: #b8dec7;
+  background: #f4fbf6;
+}
+
 .auto-merge-panel.autoMergeRejection,
 .auto-merge-panel.autoMergeFailure {
   border-color: #f2b8ae;

@@ -1,0 +1,122 @@
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { isAbsolute, resolve } from "node:path";
+
+function runGit(args, { cwd }) {
+  return execFileSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
+}
+
+function gitSucceeds(args, { cwd }) {
+  try {
+    runGit(args, { cwd });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function normalizePathForGit(filePath) {
+  return filePath.replace(/\\/g, "/");
+}
+
+function resolveWorktreePath(worktreePath, repositoryDir) {
+  if (!worktreePath) return null;
+  return isAbsolute(worktreePath) ? worktreePath : resolve(repositoryDir, worktreePath);
+}
+
+export function closeTask({
+  taskContextPackage,
+  repositoryDir = process.cwd(),
+  now = () => new Date().toISOString(),
+} = {}) {
+  if (!taskContextPackage?.packageId) {
+    throw new Error("taskContextPackage.packageId is required");
+  }
+  if (taskContextPackage.currentWorkStage !== "merged") {
+    return {
+      appendRequest: null,
+      error: "任务不在 merged 环节，不能收尾。",
+    };
+  }
+
+  const autoMergeResult = taskContextPackage.artifacts?.autoMergeResult;
+  if (!autoMergeResult?.body) {
+    return {
+      appendRequest: null,
+      error: "任务上下文包缺少 autoMergeResult，不能收尾。",
+    };
+  }
+
+  const isolatedWorkspace = taskContextPackage.artifacts?.isolatedWorkspace;
+  if (!isolatedWorkspace?.body) {
+    return {
+      appendRequest: null,
+      error: "任务上下文包缺少 isolatedWorkspace，不能收尾。",
+    };
+  }
+
+  const sourceCommit = autoMergeResult.body.source?.commit;
+  const targetCommit = autoMergeResult.body.target?.afterCommit;
+  if (!sourceCommit || sourceCommit !== targetCommit) {
+    return {
+      appendRequest: null,
+      error: "自动合并结果未证明任务分支成果已进入目标分支，不能删除任务分支。",
+    };
+  }
+
+  const worktreePath = isolatedWorkspace.body.worktreePath;
+  const branchName = isolatedWorkspace.body.branchName;
+  const absoluteWorktreePath = resolveWorktreePath(worktreePath, repositoryDir);
+  if (!absoluteWorktreePath) {
+    return {
+      appendRequest: null,
+      error: "隔离工作树路径为空，不能收尾。",
+    };
+  }
+
+  try {
+    if (existsSync(absoluteWorktreePath)) {
+      runGit(["worktree", "remove", "--force", normalizePathForGit(absoluteWorktreePath)], {
+        cwd: repositoryDir,
+      });
+    }
+    runGit(["worktree", "prune"], { cwd: repositoryDir });
+    if (branchName && gitSucceeds(["show-ref", "--verify", "--quiet", `refs/heads/${branchName}`], {
+      cwd: repositoryDir,
+    })) {
+      runGit(["branch", "-D", branchName], { cwd: repositoryDir });
+    }
+  } catch (error) {
+    return {
+      appendRequest: null,
+      error: error.message,
+    };
+  }
+
+  return {
+    appendRequest: {
+      packageId: taskContextPackage.packageId,
+      artifactType: "taskCloseout",
+      artifact: {
+        closedAt: now(),
+        resultRef: "autoMergeResult",
+        cleanup: {
+          worktree: {
+            path: normalizePathForGit(worktreePath),
+            removed: true,
+          },
+          branch: {
+            name: branchName,
+            deleted: true,
+          },
+        },
+        finalStage: "closed",
+      },
+    },
+    error: null,
+  };
+}

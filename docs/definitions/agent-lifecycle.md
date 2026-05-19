@@ -186,6 +186,7 @@ autoMergePlan
 autoMergeRejection
 autoMergeResult
 autoMergeFailure
+taskCloseout
 ```
 
 Agent loop 产物是多例：

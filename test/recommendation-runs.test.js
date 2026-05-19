@@ -227,10 +227,12 @@ test("workflow service captures a successful recommendation run", async (t) => {
   assert.equal(accepted.accepted, true);
   assert.equal(accepted.planned, true);
   assert.equal(accepted.executed, true);
+  assert.equal(accepted.closed, true);
   assert.equal(accepted.error, null);
   assert.equal(accepted.recommendationRun.autoMergePlanning.appendRequest.artifactType, "autoMergePlan");
   assert.equal(accepted.recommendationRun.autoMergeExecution.appendRequest.artifactType, "autoMergeResult");
-  assert.equal(accepted.recommendationRun.taskContextPackage.currentWorkStage, "merged");
+  assert.equal(accepted.recommendationRun.taskCloseout.appendRequest.artifactType, "taskCloseout");
+  assert.equal(accepted.recommendationRun.taskContextPackage.currentWorkStage, "closed");
   assert.equal(
     accepted.recommendationRun.taskContextPackage.artifacts.humanDecision.body.decision,
     "accept-completion",
@@ -279,6 +281,14 @@ test("workflow service captures a successful recommendation run", async (t) => {
   assert.equal(
     accepted.recommendationRun.taskContextPackage.artifacts.autoMergeResult.body.target.afterCommit,
     accepted.recommendationRun.taskContextPackage.artifacts.autoMergeResult.body.source.commit,
+  );
+  assert.equal(
+    accepted.recommendationRun.taskContextPackage.artifacts.taskCloseout.body.cleanup.worktree.removed,
+    true,
+  );
+  assert.equal(
+    accepted.recommendationRun.taskContextPackage.artifacts.taskCloseout.body.cleanup.branch.deleted,
+    true,
   );
 });
 
@@ -536,6 +546,7 @@ test("POST /api/human-decisions/accept-completion accepts completion", async (t)
         accepted: true,
         planned: true,
         executed: true,
+        closed: true,
         error: null,
         recommendationRun: latestRun,
       };
@@ -562,5 +573,6 @@ test("POST /api/human-decisions/accept-completion accepts completion", async (t)
   assert.equal(payload.accepted, true);
   assert.equal(payload.planned, true);
   assert.equal(payload.executed, true);
+  assert.equal(payload.closed, true);
   assert.equal(payload.recommendationRun.status, "succeeded");
 });

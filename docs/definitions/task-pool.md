@@ -136,9 +136,8 @@ human-decision
 auto-merge
 auto-merge-execution
 merged
+closed
 ```
-
-`closed` 不是工作环节。关闭、接受、取消等结果应由人工决策产物表达。
 
 `task-completion` 表示 Agent 已产出任务完成结论。
 
@@ -149,6 +148,8 @@ merged
 `auto-merge-execution` 表示自动合并前置校验已通过，系统等待自动合并执行环节消费 `autoMergePlan`。
 
 `merged` 表示自动合并执行已成功追加 `autoMergeResult`，任务成果已经合入目标分支。
+
+`closed` 表示任务收尾已成功追加 `taskCloseout`，隔离工作树和任务分支已经清理。
 
 ## isolatedWorkspace
 

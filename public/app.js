@@ -42,6 +42,10 @@ const autoMergeExecutionStatus = document.querySelector("#autoMergeExecutionStat
 const autoMergeExecutionInputs = document.querySelector("#autoMergeExecutionInputs");
 const autoMergeExecutionRaw = document.querySelector("#autoMergeExecutionRaw");
 const autoMergeExecutionPanel = document.querySelector("#autoMergeExecutionPanel");
+const taskCloseoutStatus = document.querySelector("#taskCloseoutStatus");
+const taskCloseoutInputs = document.querySelector("#taskCloseoutInputs");
+const taskCloseoutRaw = document.querySelector("#taskCloseoutRaw");
+const taskCloseoutPanel = document.querySelector("#taskCloseoutPanel");
 
 let tasks = [];
 let poolEntries = [];
@@ -332,6 +336,42 @@ function createAutoMergeExecutionPanel(taskContextPackage) {
   return panel;
 }
 
+function createTaskCloseoutPanel(taskContextPackage) {
+  const closeout = taskContextPackage?.artifacts?.taskCloseout;
+  if (!closeout?.body) return null;
+
+  const panel = document.createElement("div");
+  panel.className = "auto-merge-panel taskCloseout";
+
+  const title = document.createElement("div");
+  title.className = "auto-merge-title";
+  title.textContent = "任务已收尾";
+
+  const meta = document.createElement("div");
+  meta.className = "auto-merge-meta";
+  meta.textContent = [
+    `finalStage: ${closeout.body.finalStage ?? "unknown"}`,
+    `closedAt: ${closeout.body.closedAt ?? closeout.appendedAt ?? "unknown"}`,
+  ].join(" · ");
+
+  panel.append(title, meta);
+
+  const cleanup = closeout.body.cleanup ?? {};
+  const list = document.createElement("ul");
+  list.className = "auto-merge-list";
+  for (const text of [
+    `worktree: ${cleanup.worktree?.path ?? "unknown"} · removed: ${String(cleanup.worktree?.removed ?? false)}`,
+    `branch: ${cleanup.branch?.name ?? "unknown"} · deleted: ${String(cleanup.branch?.deleted ?? false)}`,
+  ]) {
+    const item = document.createElement("li");
+    item.textContent = text;
+    list.append(item);
+  }
+  panel.append(list);
+
+  return panel;
+}
+
 function createTaskContextPackagePanel(taskContextPackage) {
   const panel = document.createElement("div");
   panel.className = `context-package ${taskContextPackage.currentWorkStage}`;
@@ -360,6 +400,7 @@ function createTaskContextPackagePanel(taskContextPackage) {
     <span>人工决策</span><strong></strong>
     <span>自动合并计划</span><strong></strong>
     <span>自动合并执行</span><strong></strong>
+    <span>任务收尾</span><strong></strong>
   `;
   const values = artifacts.querySelectorAll("strong");
   values[0].textContent = taskContextPackage.qualityGate?.outcome ?? "missing";
@@ -386,6 +427,9 @@ function createTaskContextPackagePanel(taskContextPackage) {
     : taskContextPackage.artifacts?.autoMergeFailure
       ? "失败"
       : "未执行";
+  values[8].textContent = taskContextPackage.artifacts?.taskCloseout
+    ? "已关闭"
+    : "未收尾";
   panel.append(artifacts);
 
   const artifactEntries = Object.entries(taskContextPackage.artifacts ?? {});
@@ -553,6 +597,39 @@ function renderAutoMergeExecution(taskContextPackage) {
   autoMergeExecutionPanel.textContent = plan
     ? "等待任务进入 auto-merge-execution 环节。"
     : "等待自动合并计划。";
+}
+
+function renderTaskCloseout(taskContextPackage) {
+  taskCloseoutPanel.replaceChildren();
+  const autoMergeResult = taskContextPackage?.artifacts?.autoMergeResult ?? null;
+  const closeout = taskContextPackage?.artifacts?.taskCloseout ?? null;
+  taskCloseoutRaw.textContent = formatJsonBlock({
+    autoMergeResult,
+    taskCloseout: closeout,
+  });
+  renderInputs(taskCloseoutInputs, [
+    { label: "自动合并结果", value: autoMergeResult?.artifactId ?? "未生成" },
+    { label: "当前环节", value: taskContextPackage?.currentWorkStage ?? "未生成" },
+    { label: "收尾产物", value: closeout?.artifactId ?? "未生成" },
+  ]);
+
+  if (closeout) {
+    taskCloseoutStatus.textContent = "已关闭";
+    const panel = createTaskCloseoutPanel(taskContextPackage);
+    taskCloseoutPanel.append(panel);
+    return;
+  }
+
+  if (taskContextPackage?.currentWorkStage === "merged") {
+    taskCloseoutStatus.textContent = "收尾中";
+    taskCloseoutPanel.textContent = "自动合并已完成，系统正在清理隔离工作树和任务分支。";
+    return;
+  }
+
+  taskCloseoutStatus.textContent = autoMergeResult ? "等待收尾" : "等待输入";
+  taskCloseoutPanel.textContent = autoMergeResult
+    ? "等待任务进入 merged 环节。"
+    : "等待自动合并结果。";
 }
 
 async function acceptCompletion() {
@@ -732,6 +809,7 @@ function renderRecommendationRun() {
   humanDecisionPanel.replaceChildren();
   autoMergePanel.replaceChildren();
   autoMergeExecutionPanel.replaceChildren();
+  taskCloseoutPanel.replaceChildren();
   taskContextPackageRaw.textContent = recommendationRun?.taskContextPackage
     ? JSON.stringify(recommendationRun.taskContextPackage, null, 2)
     : "尚未生成任务上下文包。";
@@ -751,6 +829,7 @@ function renderRecommendationRun() {
   renderHumanDecision(recommendationRun?.taskContextPackage ?? null);
   renderAutoMerge(recommendationRun?.taskContextPackage ?? null);
   renderAutoMergeExecution(recommendationRun?.taskContextPackage ?? null);
+  renderTaskCloseout(recommendationRun?.taskContextPackage ?? null);
   runRecommendationButton.disabled = recommendationRun?.status === "running";
 
   if (!recommendationRun) {
@@ -771,6 +850,9 @@ function renderRecommendationRun() {
     autoMergeExecutionStatus.textContent = "等待输入";
     autoMergeExecutionRaw.textContent = "尚未执行自动合并。";
     autoMergeExecutionPanel.textContent = "等待合并计划。";
+    taskCloseoutStatus.textContent = "等待输入";
+    taskCloseoutRaw.textContent = "尚未收尾。";
+    taskCloseoutPanel.textContent = "等待自动合并结果。";
     return;
   }
 
