@@ -382,6 +382,43 @@ h2 {
   margin-top: 6px;
 }
 
+.auto-merge-panel {
+  padding: 12px;
+  border: 1px solid #dbe1ec;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.auto-merge-panel.autoMergePlan {
+  border-color: #b8dec7;
+  background: #f4fbf6;
+}
+
+.auto-merge-panel.autoMergeRejection {
+  border-color: #f2b8ae;
+  background: #fff7f5;
+}
+
+.auto-merge-title {
+  font-weight: 700;
+}
+
+.auto-merge-meta {
+  margin-top: 5px;
+  color: #607089;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+
+.auto-merge-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+}
+
+.auto-merge-list li + li {
+  margin-top: 6px;
+}
+
 .context-package-panel {
   min-height: 260px;
   max-height: 520px;

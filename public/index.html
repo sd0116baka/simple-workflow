@@ -159,6 +159,27 @@
               </div>
             </div>
           </section>
+
+          <section class="stage-row">
+            <div class="stage-heading">
+              <h3>自动合并前置校验</h3>
+              <span id="autoMergeStatus">等待输入</span>
+            </div>
+            <div class="stage-columns">
+              <div class="stage-cell">
+                <div class="detail-heading">
+                  <h3>输入 / 自动合并 JSON</h3>
+                  <button id="planAutoMergeButton" class="primary-button inline-button" type="button">生成合并计划</button>
+                </div>
+                <div id="autoMergeInputs" class="stage-inputs">等待人工接受完成。</div>
+                <pre id="autoMergeRaw" class="code-block parsed">尚未进入自动合并环节。</pre>
+              </div>
+              <div class="stage-cell">
+                <div class="detail-heading"><h3>合并计划</h3></div>
+                <div id="autoMergePanel" class="debug-result">等待人工接受完成。</div>
+              </div>
+            </div>
+          </section>
         </div>
       </section>
     </main>

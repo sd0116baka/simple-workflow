@@ -241,6 +241,36 @@ test("workflow service captures a successful recommendation run", async (t) => {
       ".workflow-agent/execution-agent-002.txt",
     ],
   );
+
+  const planned = await service.planAutoMerge();
+
+  assert.equal(planned.planned, true);
+  assert.equal(planned.error, null);
+  assert.equal(planned.recommendationRun.autoMergePlanning.appendRequest.artifactType, "autoMergePlan");
+  assert.equal(planned.recommendationRun.taskContextPackage.currentWorkStage, "auto-merge-execution");
+  assert.deepEqual(
+    planned.recommendationRun.taskContextPackage.artifacts.autoMergePlan.body.changeSet.changedFiles,
+    [
+      ".workflow-agent/execution-agent-001.txt",
+      ".workflow-agent/execution-agent-002.txt",
+    ],
+  );
+  assert.equal(
+    "hasChanges" in planned.recommendationRun.taskContextPackage.artifacts.autoMergePlan.body.changeSet,
+    false,
+  );
+  assert.equal(
+    "strategy" in planned.recommendationRun.taskContextPackage.artifacts.autoMergePlan.body,
+    false,
+  );
+  assert.equal(
+    "nextRequiredStage" in planned.recommendationRun.taskContextPackage.artifacts.autoMergePlan.body,
+    false,
+  );
+  assert.equal(
+    "taskCompletionRef" in planned.recommendationRun.taskContextPackage.artifacts.autoMergePlan.body,
+    false,
+  );
 });
 
 test("workflow service does not expose invalid tasks to the recommender prompt", async (t) => {
@@ -519,5 +549,41 @@ test("POST /api/human-decisions/accept-completion accepts completion", async (t)
 
   assert.equal(response.status, 200);
   assert.equal(payload.accepted, true);
+  assert.equal(payload.recommendationRun.status, "succeeded");
+});
+
+test("POST /api/auto-merge/plan creates auto-merge plan", async (t) => {
+  const latestRun = {
+    id: "recommendation-run-test",
+    status: "succeeded",
+  };
+  const workflowService = {
+    async planAutoMerge() {
+      return {
+        planned: true,
+        error: null,
+        recommendationRun: latestRun,
+      };
+    },
+    getLatestRecommendationRun() {
+      return latestRun;
+    },
+    onEvent() {
+      return () => {};
+    },
+  };
+  const server = createApp({ workflowService });
+  server.listen(0);
+  t.after(() => server.close());
+  await once(server, "listening");
+
+  const response = await fetch(
+    `http://localhost:${server.address().port}/api/auto-merge/plan`,
+    { method: "POST" },
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.planned, true);
   assert.equal(payload.recommendationRun.status, "succeeded");
 });
