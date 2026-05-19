@@ -89,6 +89,15 @@ h2 {
   background: #f0f4fa;
 }
 
+.danger-button {
+  border-color: #f2b8ae;
+  color: #b42318;
+}
+
+.danger-button:hover {
+  background: #fff0ed;
+}
+
 .secondary-button:disabled {
   color: #7d8da5;
   border-color: #d4dce8;
@@ -309,6 +318,11 @@ h2 {
 .recommendation-summary.failed {
   background: #fff0ed;
   color: #b42318;
+}
+
+.recommendation-summary.cancelled {
+  background: #fff7ed;
+  color: #9a3412;
 }
 
 .recommendation-summary.blocked {
@@ -825,6 +839,12 @@ h2 {
   width: auto;
   min-height: 30px;
   padding: 0 12px;
+}
+
+.inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .validation-summary {

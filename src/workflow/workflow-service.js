@@ -34,11 +34,12 @@ export function createWorkflowService({
   getRepositoryStatus = () => readRepositoryStatus({ cwd: repositoryDir }),
   recommendationPromptPath = join(repositoryDir, "project_profiles", "recommender-agent.prompt.md"),
   taskContextPackageStoreDir = join(repositoryDir, ".workflow", "task-context-packages"),
-  runRecommendationCommand = ({ prompt, onProgress }) =>
+  runRecommendationCommand = ({ prompt, onProgress, signal }) =>
     runOpencodeRecommendation({
       prompt,
       cwd: repositoryDir,
       onProgress,
+      signal,
     }),
   runExecutionAgentSession = runOpencodeExecutionAgentSession,
   watchDebounceMs = 100,
@@ -48,6 +49,7 @@ export function createWorkflowService({
   let debounceTimer = null;
   let latestRecommendationRun = null;
   let recommendationRunSequence = 0;
+  const recommendationRunControllers = new Map();
 
   function emit(event) {
     for (const listener of listeners) {
@@ -228,7 +230,8 @@ export function createWorkflowService({
   async function finishRecommendationRun(run, startedCommand, onProgress) {
     try {
       const result = await startedCommand;
-      Object.assign(run, await completeRecommendationFlow({
+      if (run.status === "cancelled") return;
+      const completedRun = await completeRecommendationFlow({
         run,
         commandResult: result,
         tasks: await listRawTasks(tasksDir),
@@ -242,14 +245,20 @@ export function createWorkflowService({
         runExecutionAgentSession,
         repositoryDir,
         onProgress,
-      }));
+        signal: recommendationRunControllers.get(run.id)?.signal,
+      });
+      if (run.status === "cancelled") return;
+      Object.assign(run, completedRun);
       await persistTaskContextPackage(run.taskContextPackage);
     } catch (error) {
+      if (run.status === "cancelled") return;
       Object.assign(run, {
         status: "failed",
         finishedAt: new Date().toISOString(),
         error: error.message,
       });
+    } finally {
+      recommendationRunControllers.delete(run.id);
     }
     emitRecommendationChanged(run);
   }
@@ -289,15 +298,47 @@ export function createWorkflowService({
         run.progress = run.progress.slice(-200);
         emitRecommendationChanged(run);
       };
+      const controller = new AbortController();
+      recommendationRunControllers.set(run.id, controller);
       const startedCommand = Promise.resolve().then(() =>
         runRecommendationCommand({
           prompt: run.prompt,
           run: toRecommendationSnapshot(run),
           onProgress: appendProgress,
+          signal: controller.signal,
         }),
       );
       finishRecommendationRun(run, startedCommand, appendProgress);
       return toRecommendationSnapshot(run);
+    },
+
+    cancelRecommendationRun() {
+      const run = latestRecommendationRun;
+      if (!run || run.status !== "running") {
+        return {
+          cancelled: false,
+          error: "没有正在运行的推荐器流程。",
+          recommendationRun: toRecommendationSnapshot(run),
+        };
+      }
+      run.status = "cancelled";
+      run.finishedAt = new Date().toISOString();
+      run.error = "cancelled";
+      run.progress.push({
+        type: "cancel_requested",
+        stream: "system",
+        message: "用户请求取消运行",
+        terminalLine: "process: cancellation requested by user",
+        timestamp: new Date().toISOString(),
+      });
+      run.progress = run.progress.slice(-200);
+      recommendationRunControllers.get(run.id)?.abort();
+      emitRecommendationChanged(run);
+      return {
+        cancelled: true,
+        error: null,
+        recommendationRun: toRecommendationSnapshot(run),
+      };
     },
 
     getLatestRecommendationRun() {

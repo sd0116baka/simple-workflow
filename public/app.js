@@ -16,6 +16,7 @@ const refreshButton = document.querySelector("#refreshButton");
 const recommendationStatus = document.querySelector("#recommendationStatus");
 const recommendationResult = document.querySelector("#recommendationResult");
 const runRecommendationButton = document.querySelector("#runRecommendationButton");
+const cancelRecommendationButton = document.querySelector("#cancelRecommendationButton");
 const taskPoolRaw = document.querySelector("#taskPoolRaw");
 const startupCheckRaw = document.querySelector("#startupCheckRaw");
 const recommendationRaw = document.querySelector("#recommendationRaw");
@@ -936,6 +937,11 @@ function renderRecommendationRun() {
   renderAutoMergeExecution(taskContextPackage);
   renderTaskCloseout(taskContextPackage);
   runRecommendationButton.disabled = recommendationRun?.status === "running";
+  if (cancelRecommendationButton) {
+    cancelRecommendationButton.hidden = recommendationRun?.status !== "running";
+    cancelRecommendationButton.disabled = false;
+    cancelRecommendationButton.textContent = "取消运行";
+  }
 
   if (!recommendationRun) {
     recommendationStatus.textContent = "未运行";
@@ -976,6 +982,8 @@ function renderRecommendationRun() {
       ? `探针正在运行... ${formatElapsed(recommendationRun.startedAt)}`
       : recommendationRun.status === "blocked"
         ? "启动检查未通过，推荐器未运行。"
+      : recommendationRun.status === "cancelled"
+        ? `用户已取消 · 用时 ${formatElapsed(recommendationRun.startedAt, recommendationRun.finishedAt)}`
       : `exitCode: ${String(recommendationRun.exitCode)} · 用时 ${formatElapsed(recommendationRun.startedAt, recommendationRun.finishedAt)}`;
 
   const meta = document.createElement("div");
@@ -1141,6 +1149,9 @@ async function syncRecommendationRunSilently() {
 
 async function createRecommendationRun() {
   runRecommendationButton.disabled = true;
+  if (cancelRecommendationButton) {
+    cancelRecommendationButton.hidden = true;
+  }
   recommendationStatus.textContent = "启动中";
   if (recommendationResult) recommendationResult.textContent = "正在启动推荐器...";
   const response = await fetch("/api/recommendation-runs", { method: "POST" });
@@ -1148,6 +1159,19 @@ async function createRecommendationRun() {
     throw new Error(`启动推荐器失败：${response.status}`);
   }
   const payload = await response.json();
+  recommendationRun = payload.recommendationRun ?? null;
+  renderRecommendationRun();
+}
+
+async function cancelRecommendationRun() {
+  if (!cancelRecommendationButton) return;
+  cancelRecommendationButton.disabled = true;
+  cancelRecommendationButton.textContent = "取消中";
+  const response = await fetch("/api/recommendation-runs/cancel", { method: "POST" });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error ?? `取消运行失败：${response.status}`);
+  }
   recommendationRun = payload.recommendationRun ?? null;
   renderRecommendationRun();
 }
@@ -1206,6 +1230,10 @@ runRecommendationButton.addEventListener("click", () => {
   createRecommendationRun().catch(showError);
 });
 
+cancelRecommendationButton?.addEventListener("click", () => {
+  cancelRecommendationRun().catch(showError);
+});
+
 function connectWorkflowEvents() {
   if (!("EventSource" in window)) return;
   const events = new EventSource("/api/events");
@@ -1241,6 +1269,10 @@ function showError(error) {
   recommendationStatus.textContent = "失败";
   if (recommendationResult) recommendationResult.textContent = error.message;
   runRecommendationButton.disabled = false;
+  if (cancelRecommendationButton) {
+    cancelRecommendationButton.disabled = false;
+    cancelRecommendationButton.textContent = "取消运行";
+  }
 }
 
 Promise.all([loadTasks(), loadRecommendationRun()]).catch(showError);

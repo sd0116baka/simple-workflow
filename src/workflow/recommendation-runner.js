@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { terminateProcessTree } from "./process-control.js";
 
 export const OPENCODE_RECOMMENDATION_ARGS = ["run", "--format", "json"];
 
@@ -90,8 +91,19 @@ export function runOpencodeRecommendation({
   cwd = process.cwd(),
   env = process.env,
   onProgress,
+  signal,
 } = {}) {
   return new Promise((resolve) => {
+    if (signal?.aborted) {
+      resolve({
+        stdout: "",
+        stderr: "",
+        exitCode: null,
+        error: "cancelled",
+      });
+      return;
+    }
+
     const child = spawn(command, args, {
       cwd,
       env,
@@ -103,6 +115,7 @@ export function runOpencodeRecommendation({
     let stderr = "";
     let stdoutBuffer = "";
     let settled = false;
+    let cancelled = false;
     let lastOutputAt = Date.now();
     const commandLine = [command, ...args].join(" ");
 
@@ -127,8 +140,23 @@ export function runOpencodeRecommendation({
       if (settled) return;
       settled = true;
       clearInterval(heartbeat);
+      signal?.removeEventListener("abort", abortRun);
       resolve(result);
     }
+
+    function abortRun() {
+      if (settled) return;
+      cancelled = true;
+      onProgress?.({
+        type: "process_cancelled",
+        stream: "system",
+        message: "用户取消运行",
+        terminalLine: "process: cancelled by user",
+      });
+      terminateProcessTree(child);
+    }
+
+    signal?.addEventListener("abort", abortRun, { once: true });
 
     child.stdout?.setEncoding("utf8");
     child.stderr?.setEncoding("utf8");
@@ -168,7 +196,7 @@ export function runOpencodeRecommendation({
         stdout: extractTextFromJsonEvents(stdout),
         stderr,
         exitCode: null,
-        error: error.message,
+        error: cancelled ? "cancelled" : error.message,
       });
     });
 
@@ -186,7 +214,7 @@ export function runOpencodeRecommendation({
         stdout: extractTextFromJsonEvents(stdout),
         stderr,
         exitCode,
-        error: null,
+        error: cancelled ? "cancelled" : null,
       });
     });
 

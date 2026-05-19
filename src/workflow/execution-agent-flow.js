@@ -2,6 +2,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { createStubAgentSession, normalizeAgentStatus } from "./agent-runner.js";
+import { terminateProcessTree } from "./process-control.js";
 import { extractTextFromJsonEvents } from "./recommendation-runner.js";
 import { parseGitPorcelainStatus } from "./repository-status.js";
 
@@ -210,6 +211,7 @@ export function runOpencodeExecutionAgentSession({
   env = process.env,
   shell = process.platform === "win32",
   onProgress,
+  signal,
 }) {
   const prompt = buildExecutionAgentPrompt({
     taskContextPackage,
@@ -217,6 +219,25 @@ export function runOpencodeExecutionAgentSession({
     inputArtifactRefs,
   });
   return new Promise((resolve) => {
+    if (signal?.aborted) {
+      resolve({
+        role,
+        packageId,
+        sessionId: `opencode-session-cancelled:${runId}`,
+        status: "cancelled",
+        summary: "execution agent 已取消。",
+        tests: [],
+        notes: [],
+        rawOutput: {
+          stdout: "",
+          stderr: "",
+          exitCode: null,
+          error: "cancelled",
+        },
+      });
+      return;
+    }
+
     const child = spawn(command, args, {
       cwd,
       env,
@@ -226,6 +247,7 @@ export function runOpencodeExecutionAgentSession({
     let stdout = "";
     let stderr = "";
     let settled = false;
+    let cancelled = false;
     let lastOutputAt = Date.now();
     const commandLine = [command, ...args].join(" ");
 
@@ -250,9 +272,10 @@ export function runOpencodeExecutionAgentSession({
       if (settled) return;
       settled = true;
       clearInterval(heartbeat);
+      signal?.removeEventListener("abort", abortRun);
       const extractedText = extractTextFromJsonEvents(stdout);
       const report = parseExecutionReportText(extractedText);
-      const status = normalizeAgentStatus({ exitCode, error });
+      const status = cancelled ? "cancelled" : normalizeAgentStatus({ exitCode, error });
       const sessionId = findSessionIdInJsonEvents(stdout) ?? `opencode-session-unavailable:${runId}`;
 
       resolve({
@@ -269,10 +292,24 @@ export function runOpencodeExecutionAgentSession({
           stdout: extractedText,
           stderr,
           exitCode,
-          error,
+          error: cancelled ? "cancelled" : error,
         },
       });
     }
+
+    function abortRun() {
+      if (settled) return;
+      cancelled = true;
+      onProgress?.({
+        type: "execution_process_cancelled",
+        stream: "execution-agent",
+        message: `${runId} 已由用户取消`,
+        terminalLine: `${runId}: cancelled by user`,
+      });
+      terminateProcessTree(child);
+    }
+
+    signal?.addEventListener("abort", abortRun, { once: true });
 
     child.stdout?.setEncoding("utf8");
     child.stderr?.setEncoding("utf8");
@@ -303,7 +340,7 @@ export function runOpencodeExecutionAgentSession({
         message: `${runId} 启动失败：${error.message}`,
         terminalLine: `${runId}: error ${error.message}`,
       });
-      finish({ error: error.message });
+      finish({ error: cancelled ? "cancelled" : error.message });
     });
     child.on("close", (exitCode) => {
       onProgress?.({
@@ -325,6 +362,7 @@ export async function runExecutionAgent({
   repositoryDir = process.cwd(),
   now = () => new Date().toISOString(),
   onProgress,
+  signal,
 } = {}) {
   if (!taskContextPackage?.packageId) {
     throw new Error("taskContextPackage.packageId is required");
@@ -367,6 +405,7 @@ export async function runExecutionAgent({
     runId,
     inputArtifactRefs,
     onProgress,
+    signal,
   });
   const changedFiles = gitChangedFiles(cwd);
   const finishedAt = now();

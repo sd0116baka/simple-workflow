@@ -133,6 +133,7 @@ export async function completeRecommendationFlow({
   repositoryDir = process.cwd(),
   now = () => new Date().toISOString(),
   onProgress,
+  signal,
 }) {
   const failed = commandResult.error || commandResult.exitCode !== 0;
   const parsed = failed
@@ -204,6 +205,7 @@ export async function completeRecommendationFlow({
         repositoryDir,
         now,
         onProgress,
+        signal,
       });
   taskPool = !executionAgentRun?.appendRequest
     ? taskPool
@@ -251,6 +253,7 @@ export async function completeRecommendationFlow({
         repositoryDir,
         now,
         onProgress,
+        signal,
       });
   taskPool = !nextExecutionAgentRun?.appendRequest
     ? taskPool

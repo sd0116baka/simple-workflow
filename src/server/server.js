@@ -98,6 +98,12 @@ export function createApp({
         return;
       }
 
+      if (request.method === "POST" && request.url?.startsWith("/api/recommendation-runs/cancel")) {
+        const result = workflowService.cancelRecommendationRun();
+        sendJson(response, result.cancelled ? 200 : 409, result);
+        return;
+      }
+
       if (request.method === "POST" && request.url?.startsWith("/api/recommendation-runs")) {
         sendJson(response, 201, { recommendationRun: await workflowService.createRecommendationRun() });
         return;

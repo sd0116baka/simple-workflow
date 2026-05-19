@@ -490,6 +490,42 @@ test("workflow service emits running progress for recommendation runs", async ()
   assert.equal(running.progress[0].message, "开始运行 opencode");
 });
 
+test("workflow service cancels a running recommendation run", async () => {
+  const promptPath = await writePrompt("recommendation-cancel");
+  const service = createWorkflowService({
+    tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks"),
+    recommendationPromptPath: promptPath,
+    getRepositoryStatus: async () => ({ clean: true, entries: [] }),
+    runRecommendationCommand: ({ signal, onProgress }) => new Promise((resolve) => {
+      signal.addEventListener("abort", () => {
+        onProgress({
+          type: "process_cancelled",
+          stream: "system",
+          message: "用户取消运行",
+          terminalLine: "process: cancelled by user",
+        });
+        resolve({
+          stdout: "",
+          stderr: "",
+          exitCode: null,
+          error: "cancelled",
+        });
+      }, { once: true });
+    }),
+  });
+
+  await service.createRecommendationRun();
+  const result = service.cancelRecommendationRun();
+  await new Promise((resolve) => setImmediate(resolve));
+  const latest = service.getLatestRecommendationRun();
+
+  assert.equal(result.cancelled, true);
+  assert.equal(latest.status, "cancelled");
+  assert.equal(latest.error, "cancelled");
+  assert.equal(latest.progress.some((entry) => entry.type === "cancel_requested"), true);
+  assert.equal(latest.progress.some((entry) => entry.type === "process_cancelled"), true);
+});
+
 test("workflow service marks non-zero recommendation exits as failed", async () => {
   const promptPath = await writePrompt("recommendation-failure");
   const service = createWorkflowService({
@@ -587,6 +623,49 @@ test("POST /api/recommendation-runs starts a run and latest returns the snapshot
   assert.equal(createPayload.recommendationRun.status, "running");
   assert.equal(latestResponse.status, 200);
   assert.equal(latestPayload.recommendationRun.id, "recommendation-run-test");
+});
+
+test("POST /api/recommendation-runs/cancel cancels the latest run", async (t) => {
+  const latestRun = {
+    id: "recommendation-run-test",
+    status: "cancelled",
+    startedAt: "2026-05-16T00:00:00.000Z",
+    finishedAt: "2026-05-16T00:00:01.000Z",
+    command: "opencode",
+    args: ["run", "--format", "json"],
+    progress: [],
+    stdout: "",
+    stderr: "",
+    exitCode: null,
+    error: "cancelled",
+  };
+  const workflowService = {
+    cancelRecommendationRun() {
+      return {
+        cancelled: true,
+        error: null,
+        recommendationRun: latestRun,
+      };
+    },
+    getLatestRecommendationRun() {
+      return latestRun;
+    },
+    onEvent() {
+      return () => {};
+    },
+  };
+  const server = createApp({ workflowService });
+  server.listen(0);
+  t.after(() => server.close());
+  await once(server, "listening");
+
+  const baseUrl = `http://localhost:${server.address().port}`;
+  const response = await fetch(`${baseUrl}/api/recommendation-runs/cancel`, { method: "POST" });
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.cancelled, true);
+  assert.equal(payload.recommendationRun.status, "cancelled");
 });
 
 test("POST /api/human-decisions/accept-completion accepts completion", async (t) => {
