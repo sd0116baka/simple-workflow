@@ -290,6 +290,11 @@ test("workflow service captures a successful recommendation run", async (t) => {
     accepted.recommendationRun.taskContextPackage.artifacts.taskCloseout.body.cleanup.branch.deleted,
     true,
   );
+
+  const taskPoolAfterCloseout = await service.listTaskPool();
+  assert.equal(taskPoolAfterCloseout.entries[0].status, "closed");
+  assert.equal(taskPoolAfterCloseout.taskContextPackages[0].currentWorkStage, "closed");
+  assert.deepEqual(taskPoolAfterCloseout.views.candidateTasks, []);
 });
 
 test("workflow service does not expose invalid tasks to the recommender prompt", async (t) => {

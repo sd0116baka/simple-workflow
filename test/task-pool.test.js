@@ -226,6 +226,49 @@ test("task pool applies append requests to the target task context package", () 
   assert.equal(taskPackage.timeline[0].artifactId, "executionIntent");
 });
 
+test("task pool overlays existing workflow package status onto entries and candidates", () => {
+  const pool = buildTaskPool(
+    [
+      {
+        id: "task-003",
+        fileName: "task-003.yaml",
+        parsed: {
+          id: "task-003",
+          title: "监听任务文件变化",
+          type: "feature",
+          priority: "high",
+          description: "监听 tasks 目录变化",
+          acceptance: ["修改任务源文件后界面自动刷新"],
+        },
+        parseError: null,
+        validation: { status: "valid", errors: [] },
+      },
+    ],
+    {
+      taskContextPackages: [
+        {
+          packageId: "task-context-package:tasks/task-003.yaml",
+          currentWorkStage: "closed",
+          artifacts: {
+            taskCloseout: {
+              artifactId: "taskCloseout",
+              body: {},
+              appendedAt: "2026-05-19T00:00:00.000Z",
+            },
+          },
+          agentRuns: [],
+          timeline: [],
+        },
+      ],
+    },
+  );
+
+  assert.equal(pool.entries[0].status, "closed");
+  assert.equal(pool.taskContextPackages[0].currentWorkStage, "closed");
+  assert.equal(pool.taskContextPackages[0].artifacts.taskCloseout.artifactId, "taskCloseout");
+  assert.deepEqual(pool.views.candidateTasks, []);
+});
+
 test("task pool records agent runs and generated multi artifact refs", () => {
   const pool = buildTaskPool([
     {

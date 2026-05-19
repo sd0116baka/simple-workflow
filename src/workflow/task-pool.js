@@ -71,10 +71,19 @@ function toEntry(task) {
   };
 }
 
+function entryStatusFromPackage(entry, taskPackage) {
+  if (entry.status !== "ready") return entry.status;
+  return taskPackage.currentWorkStage === "task-pool"
+    ? "ready"
+    : taskPackage.currentWorkStage;
+}
+
 function buildViews(taskContextPackages) {
   return {
     candidateTasks: taskContextPackages
-      .filter((taskPackage) => taskPackage.qualityGate.outcome === "pass")
+      .filter((taskPackage) =>
+        taskPackage.qualityGate.outcome === "pass"
+          && taskPackage.currentWorkStage !== "closed")
       .map((taskPackage) => ({
         packageId: taskPackage.packageId,
         taskDraft: clone(taskPackage.taskDraft),
@@ -99,9 +108,17 @@ export function buildTaskPool(tasks, existingTaskPool = null) {
   const taskContextPackages = entries.map((entry) =>
     toTaskContextPackage(entry, existingPackages.get(entry.packageId) ?? null),
   );
+  const packagesById = new Map(taskContextPackages.map((taskPackage) => [
+    taskPackage.packageId,
+    taskPackage,
+  ]));
+  const entriesWithWorkflowStatus = entries.map((entry) => ({
+    ...entry,
+    status: entryStatusFromPackage(entry, packagesById.get(entry.packageId)),
+  }));
 
   return {
-    entries,
+    entries: entriesWithWorkflowStatus,
     taskContextPackages,
     views: buildViews(taskContextPackages),
   };

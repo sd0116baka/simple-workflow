@@ -156,7 +156,11 @@ export function createWorkflowService({
     },
 
     async listTaskPool() {
-      return buildTaskPool(await listRawTasks(tasksDir));
+      return buildTaskPool(await listRawTasks(tasksDir), {
+        taskContextPackages: latestRecommendationRun?.taskContextPackage
+          ? [latestRecommendationRun.taskContextPackage]
+          : [],
+      });
     },
 
     async getStartupCheck() {
