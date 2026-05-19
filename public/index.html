@@ -25,30 +25,22 @@
             <div class="stage-heading">
               <div>
                 <h3 id="selectedTitle">未选择任务</h3>
-                <p id="selectedMeta">选择任务、原始内容、解析结果在同一环节横向对照。</p>
+                <p id="selectedMeta">从 tasks/ 目录读取任务真源，选择文件后展示原始 YAML 文本。</p>
               </div>
               <div class="stage-status">
                 <span id="taskCount">0 个文件</span>
                 <span id="parseStatus">等待载入</span>
               </div>
             </div>
-            <div class="stage-columns source-stage-columns">
+            <div class="stage-columns source-stage-columns raw-source-columns">
               <div class="stage-cell">
                 <div class="detail-heading"><h3>选择任务</h3></div>
                 <div id="taskSourceInputs" class="stage-inputs">等待载入...</div>
                 <div id="taskList" class="task-list"></div>
               </div>
-              <div class="stage-cell">
+              <div class="stage-cell raw-source-cell">
                 <div class="detail-heading"><h3>原始 YAML</h3></div>
                 <pre id="rawText" class="code-block">等待载入...</pre>
-              </div>
-              <div class="stage-cell">
-                <div class="detail-heading">
-                  <h3>解析结果 / 校验结果</h3>
-                  <span id="validationStatus">等待载入</span>
-                </div>
-                <pre id="parsedText" class="code-block parsed">等待载入...</pre>
-                <div id="validationResult" class="validation-result">等待载入...</div>
               </div>
             </div>
           </section>

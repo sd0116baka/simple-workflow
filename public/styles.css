@@ -647,6 +647,10 @@ h2 {
   grid-template-columns: minmax(220px, 0.55fr) minmax(0, 1fr) minmax(0, 1fr);
 }
 
+.raw-source-columns {
+  grid-template-columns: minmax(220px, 0.45fr) minmax(0, 1fr);
+}
+
 .stage-cell {
   min-width: 0;
 }

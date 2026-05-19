@@ -996,16 +996,10 @@ function selectTask(fileName) {
   selectedTitle.textContent = task.fileName;
   selectedMeta.textContent = `${task.format.toUpperCase()} 任务真源`;
   rawText.textContent = task.rawText || "(空文件)";
-  if (task.parseError) {
-    parseStatus.textContent = "解析失败";
-    parsedText.classList.add("parse-error");
-    parsedText.textContent = task.parseError;
-  } else {
-    parseStatus.textContent = "已解析";
-    parsedText.classList.remove("parse-error");
-    parsedText.textContent = JSON.stringify(task.parsed, null, 2);
-  }
-  renderValidation(task.validation);
+  parseStatus.textContent = "原始文本";
+  if (parsedText) parsedText.textContent = "";
+  if (validationResult) validationResult.textContent = "";
+  if (validationStatus) validationStatus.textContent = "未展示";
   renderList();
 }
 
@@ -1040,10 +1034,10 @@ function renderValidation(validation) {
 
 async function loadTasks() {
   rawText.textContent = "正在读取 tasks/ ...";
-  parsedText.textContent = "正在读取 tasks/ ...";
-  validationResult.textContent = "正在读取 tasks/ ...";
+  if (parsedText) parsedText.textContent = "";
+  if (validationResult) validationResult.textContent = "";
   parseStatus.textContent = "等待载入";
-  validationStatus.textContent = "等待载入";
+  if (validationStatus) validationStatus.textContent = "等待载入";
   startupCheckPanel.textContent = "正在读取启动检查...";
   startupCheckStatus.textContent = "等待载入";
   const [tasksResponse, poolResponse, startupCheckResponse] = await Promise.all([
@@ -1082,10 +1076,10 @@ async function loadTasks() {
     selectedTitle.textContent = "未发现任务";
     selectedMeta.textContent = "在 tasks/ 目录添加 YAML 文件后刷新。";
     rawText.textContent = "";
-    parsedText.textContent = "";
-    validationResult.textContent = "";
+    if (parsedText) parsedText.textContent = "";
+    if (validationResult) validationResult.textContent = "";
     parseStatus.textContent = "无任务";
-    validationStatus.textContent = "无任务";
+    if (validationStatus) validationStatus.textContent = "无任务";
   }
 
   renderRecommendationRun();
@@ -1183,11 +1177,11 @@ function showError(error) {
   selectedTitle.textContent = "读取失败";
   selectedMeta.textContent = "请查看服务端日志。";
   rawText.textContent = error.message;
-  parsedText.textContent = "";
-  validationResult.textContent = "";
+  if (parsedText) parsedText.textContent = "";
+  if (validationResult) validationResult.textContent = "";
   startupCheckPanel.textContent = "";
   parseStatus.textContent = "失败";
-  validationStatus.textContent = "失败";
+  if (validationStatus) validationStatus.textContent = "失败";
   startupCheckStatus.textContent = "失败";
   recommendationStatus.textContent = "失败";
   if (recommendationResult) recommendationResult.textContent = error.message;
