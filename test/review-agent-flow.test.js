@@ -90,6 +90,41 @@ test("increments review agent run id from existing review reports", () => {
   assert.equal(result.appendRequest.agentRun.runId, "review-agent:002");
 });
 
+test("uses latest convergence advice when reviewing a later execution", () => {
+  const taskPackage = reviewablePackage();
+  taskPackage.artifacts.convergenceAdvice = [
+    {
+      artifactId: "convergenceAdvice:001",
+      body: {},
+      appendedAt: "2026-05-18T10:00:03.000Z",
+    },
+  ];
+  taskPackage.artifacts.executionReport.push({
+    artifactId: "executionReport:002",
+    body: {},
+    appendedAt: "2026-05-18T10:00:04.000Z",
+  });
+  taskPackage.artifacts.reviewReport = [
+    {
+      artifactId: "reviewReport:001",
+      body: {},
+      appendedAt: "2026-05-18T10:00:02.000Z",
+    },
+  ];
+
+  const result = runReviewAgent({
+    taskContextPackage: taskPackage,
+  });
+
+  assert.equal(result.appendRequest.agentRun.runId, "review-agent:002");
+  assert.deepEqual(result.appendRequest.agentRun.inputArtifactRefs, [
+    "taskDraft",
+    "executionAuthorization",
+    "convergenceAdvice:001",
+    "executionReport:002",
+  ]);
+});
+
 test("does not run review agent before execution report exists", () => {
   const taskPackage = reviewablePackage();
   delete taskPackage.artifacts.executionReport;

@@ -220,6 +220,38 @@ export function completeRecommendationFlow({
     : applyAppendRequest(taskPool, nextExecutionAgentRun.appendRequest, {
         currentWorkStage: "execution-agent",
       });
+  const secondExecutionCompletedPackage = failed || !parsed.appendRequest
+    ? null
+    : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
+  const nextReviewAgentRun = !secondExecutionCompletedPackage || !nextExecutionAgentRun?.appendRequest
+    ? null
+    : runReviewAgent({
+        taskContextPackage: secondExecutionCompletedPackage,
+        runAgentSession: runReviewAgentSession,
+        now,
+      });
+  taskPool = !nextReviewAgentRun?.appendRequest
+    ? taskPool
+    : applyAppendRequest(taskPool, nextReviewAgentRun.appendRequest, {
+        currentWorkStage: "review-agent",
+      });
+  const secondReviewedPackage = failed || !parsed.appendRequest
+    ? null
+    : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
+  const nextConvergenceRun = !secondReviewedPackage || !nextReviewAgentRun?.appendRequest
+    ? null
+    : runConvergence({
+        taskContextPackage: secondReviewedPackage,
+        runAgentSession: runConvergenceSession,
+        now,
+      });
+  taskPool = !nextConvergenceRun?.appendRequest
+    ? taskPool
+    : applyAppendRequest(taskPool, nextConvergenceRun.appendRequest, {
+        currentWorkStage: nextConvergenceRun.appendRequest.artifactType === "taskCompletion"
+          ? "task-completion"
+          : "convergence",
+      });
   const taskContextPackage = failed || !parsed.appendRequest
     ? null
     : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
@@ -227,8 +259,14 @@ export function completeRecommendationFlow({
     executionAgentRun,
     nextExecutionAgentRun,
   ].filter(Boolean);
-  const reviewAgentRuns = [reviewAgentRun].filter(Boolean);
-  const convergenceRuns = [convergenceRun].filter(Boolean);
+  const reviewAgentRuns = [
+    reviewAgentRun,
+    nextReviewAgentRun,
+  ].filter(Boolean);
+  const convergenceRuns = [
+    convergenceRun,
+    nextConvergenceRun,
+  ].filter(Boolean);
 
   return {
     ...run,

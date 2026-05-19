@@ -71,6 +71,8 @@ execution-agent:001
 review-agent:001
 main-agent:convergence:001
 execution-agent:002
+review-agent:002
+main-agent:convergence:002
 ```
 
 `main-agent:initialization` 表示任务级 main Agent 会话初始化，不属于执行轮次。
@@ -82,6 +84,10 @@ execution-agent:002
 `main-agent:convergence:001` 表示第 1 轮收敛建议。
 
 `execution-agent:002` 表示收敛建议后的第 2 轮执行。
+
+`review-agent:002` 表示第 2 轮审查。
+
+`main-agent:convergence:002` 表示第 2 轮收敛；它可以继续产出下一轮 `convergenceAdvice`，也可以产出终态 `taskCompletion`。
 
 `role` 枚举值：
 
@@ -178,6 +184,12 @@ reviewReport:001
 convergenceAdvice:001
 ```
 
+任务成功收敛产物是单例：
+
+```text
+taskCompletion
+```
+
 artifactId 由任务池生成。Agent 不生成 artifactId。
 
 ## 收敛环节
@@ -199,9 +211,17 @@ convergenceAdvice:001
 convergenceAdvice:002
 ```
 
-它会作为下一轮 `execution` Agent 的输入，帮助执行过程收敛。
+它会作为下一轮 `execution` Agent 和 `review` Agent 的输入，帮助执行过程收敛。
 
 收敛环节不会结束工作流。状态机收到 `convergenceAdvice:N` 后，可以继续调用下一轮 `execution` Agent，并把该建议放进下一轮 `execution` Agent 的 `inputArtifactRefs`。
+
+如果 `main` Agent 在收敛环节判断任务已经满足完成条件，它不再产出 `convergenceAdvice`，而是产出：
+
+```text
+taskCompletion
+```
+
+`taskCompletion` 表示任务成功收敛。它是终态产物，不作为下一轮 Agent 输入。
 
 ## inputArtifactRefs 业务规则
 
@@ -223,13 +243,13 @@ review 第 N 轮，N >= 2：
 taskDraft, executionAuthorization, convergenceAdvice:N-1, executionReport:N
 
 convergence 第 N 轮：
-taskDraft, executionIntent, executionAuthorization, executionReport:N, reviewReport:N
+taskDraft, executionIntent, executionAuthorization, convergenceAdvice:N-1, executionReport:N, reviewReport:N
 
 execution 第 N+1 轮：
 taskDraft, executionIntent, executionAuthorization, convergenceAdvice:N
 ```
 
-`convergenceAdvice:0` 不存在。第一轮 execution 使用 `executionIntent`，第一轮 review 不使用 `convergenceAdvice`。
+`convergenceAdvice:0` 不存在。第一轮 execution、第一轮 review 和第一轮 convergence 都不使用 `convergenceAdvice`。
 
 代码、文档、diff、测试输出等外部材料，如果没有被追加成任务上下文包 artifact，不进入 `inputArtifactRefs`。
 

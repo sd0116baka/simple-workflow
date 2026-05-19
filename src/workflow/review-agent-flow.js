@@ -7,18 +7,34 @@ function latestExecutionReport(taskContextPackage) {
     : null;
 }
 
+function latestConvergenceAdvice(taskContextPackage) {
+  const advice = taskContextPackage?.artifacts?.convergenceAdvice;
+  return Array.isArray(advice) && advice.length > 0
+    ? advice[advice.length - 1]
+    : null;
+}
+
 function nextReviewRunId(taskContextPackage) {
   const existingReports = taskContextPackage?.artifacts?.reviewReport ?? [];
   const nextIndex = Array.isArray(existingReports) ? existingReports.length + 1 : 1;
   return `review-agent:${String(nextIndex).padStart(3, "0")}`;
 }
 
-function inputArtifactRefsForReview(executionReport) {
-  return [
+function inputArtifactRefsForReview(taskContextPackage, executionReport) {
+  const refs = [
     "taskDraft",
     "executionAuthorization",
     executionReport.artifactId,
   ];
+  const convergenceAdvice = latestConvergenceAdvice(taskContextPackage);
+  return convergenceAdvice
+    ? [
+        "taskDraft",
+        "executionAuthorization",
+        convergenceAdvice.artifactId,
+        executionReport.artifactId,
+      ]
+    : refs;
 }
 
 export function runReviewAgent({
@@ -59,7 +75,7 @@ export function runReviewAgent({
         runId: nextReviewRunId(taskContextPackage),
         role: "review",
         sessionId: session.sessionId,
-        inputArtifactRefs: inputArtifactRefsForReview(executionReport),
+        inputArtifactRefs: inputArtifactRefsForReview(taskContextPackage, executionReport),
         outputArtifactRefs: [],
         status: session.status,
         startedAt,

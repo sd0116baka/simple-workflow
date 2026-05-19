@@ -93,6 +93,48 @@ test("increments convergence run id from existing advice", () => {
   assert.equal(result.appendRequest.agentRun.runId, "main-agent:convergence:002");
 });
 
+test("completes task after a reviewed execution that used convergence advice", () => {
+  const taskPackage = convergenceReadyPackage();
+  taskPackage.artifacts.convergenceAdvice = [
+    {
+      artifactId: "convergenceAdvice:001",
+      body: {},
+      appendedAt: "2026-05-18T10:00:03.000Z",
+    },
+  ];
+  taskPackage.artifacts.executionReport.push({
+    artifactId: "executionReport:002",
+    body: {},
+    appendedAt: "2026-05-18T10:00:04.000Z",
+  });
+  taskPackage.artifacts.reviewReport.push({
+    artifactId: "reviewReport:002",
+    body: {
+      outcome: "passed",
+    },
+    appendedAt: "2026-05-18T10:00:05.000Z",
+  });
+
+  const result = runConvergence({
+    taskContextPackage: taskPackage,
+  });
+
+  assert.equal(result.appendRequest.artifactType, "taskCompletion");
+  assert.deepEqual(result.appendRequest.artifact.basis, [
+    "executionReport:002",
+    "reviewReport:002",
+  ]);
+  assert.equal(result.appendRequest.agentRun.runId, "main-agent:convergence:002");
+  assert.deepEqual(result.appendRequest.agentRun.inputArtifactRefs, [
+    "taskDraft",
+    "executionIntent",
+    "executionAuthorization",
+    "convergenceAdvice:001",
+    "executionReport:002",
+    "reviewReport:002",
+  ]);
+});
+
 test("does not run convergence before review report exists", () => {
   const taskPackage = convergenceReadyPackage();
   delete taskPackage.artifacts.reviewReport;

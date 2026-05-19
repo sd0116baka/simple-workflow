@@ -18,14 +18,59 @@ function nextConvergenceRunId(taskContextPackage) {
   return `main-agent:convergence:${String(nextIndex).padStart(3, "0")}`;
 }
 
-function inputArtifactRefsForConvergence(executionReport, reviewReport) {
-  return [
+function inputArtifactRefsForConvergence(taskContextPackage, executionReport, reviewReport) {
+  const refs = [
     "taskDraft",
     "executionIntent",
     "executionAuthorization",
     executionReport.artifactId,
     reviewReport.artifactId,
   ];
+  const convergenceAdvice = latestArtifact(taskContextPackage, "convergenceAdvice");
+  return convergenceAdvice
+    ? [
+        "taskDraft",
+        "executionIntent",
+        "executionAuthorization",
+        convergenceAdvice.artifactId,
+        executionReport.artifactId,
+        reviewReport.artifactId,
+      ]
+    : refs;
+}
+
+function shouldCompleteTask(taskContextPackage, reviewReport) {
+  return Boolean(
+    reviewReport?.body?.outcome === "passed"
+      && latestArtifact(taskContextPackage, "convergenceAdvice"),
+  );
+}
+
+function convergenceArtifact(taskContextPackage, executionReport, reviewReport) {
+  if (shouldCompleteTask(taskContextPackage, reviewReport)) {
+    return {
+      artifactType: "taskCompletion",
+      artifact: {
+        summary: "stub task completed",
+        basis: [
+          executionReport.artifactId,
+          reviewReport.artifactId,
+        ],
+      },
+    };
+  }
+
+  return {
+    artifactType: "convergenceAdvice",
+    artifact: {
+      summary: "stub convergence advice",
+      nextAction: "等待真实 main agent 根据执行和审查结果给出下一轮执行意见。",
+      basis: [
+        executionReport.artifactId,
+        reviewReport.artifactId,
+      ],
+    },
+  };
 }
 
 export function runConvergence({
@@ -69,24 +114,26 @@ export function runConvergence({
     taskContextPackage,
   });
   const finishedAt = now();
+  const { artifactType, artifact } = convergenceArtifact(
+    taskContextPackage,
+    executionReport,
+    reviewReport,
+  );
 
   return {
     appendRequest: {
       packageId: taskContextPackage.packageId,
-      artifactType: "convergenceAdvice",
-      artifact: {
-        summary: "stub convergence advice",
-        nextAction: "等待真实 main agent 根据执行和审查结果给出下一轮执行意见。",
-        basis: [
-          executionReport.artifactId,
-          reviewReport.artifactId,
-        ],
-      },
+      artifactType,
+      artifact,
       agentRun: {
         runId: nextConvergenceRunId(taskContextPackage),
         role: "main",
         sessionId: session.sessionId,
-        inputArtifactRefs: inputArtifactRefsForConvergence(executionReport, reviewReport),
+        inputArtifactRefs: inputArtifactRefsForConvergence(
+          taskContextPackage,
+          executionReport,
+          reviewReport,
+        ),
         outputArtifactRefs: [],
         status: session.status,
         startedAt,

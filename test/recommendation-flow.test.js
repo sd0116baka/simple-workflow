@@ -140,20 +140,27 @@ test("recommendation flow applies module append requests through the task pool",
   assert.equal(completed.executionAgentRuns.length, 2);
   assert.equal(completed.executionAgentRuns[0].appendRequest.agentRun.role, "execution");
   assert.equal(completed.executionAgentRuns[1].appendRequest.agentRun.runId, "execution-agent:002");
-  assert.equal(completed.reviewAgentRuns.length, 1);
+  assert.equal(completed.reviewAgentRuns.length, 2);
   assert.equal(completed.reviewAgentRuns[0].appendRequest.agentRun.role, "review");
-  assert.equal(completed.convergenceRuns.length, 1);
+  assert.equal(completed.reviewAgentRuns[1].appendRequest.agentRun.runId, "review-agent:002");
+  assert.equal(completed.convergenceRuns.length, 2);
   assert.equal(completed.convergenceRuns[0].appendRequest.agentRun.runId, "main-agent:convergence:001");
-  assert.equal(completed.taskContextPackage.currentWorkStage, "execution-agent");
+  assert.equal(completed.convergenceRuns[1].appendRequest.agentRun.runId, "main-agent:convergence:002");
+  assert.equal(completed.convergenceRuns[1].appendRequest.artifactType, "taskCompletion");
+  assert.equal(completed.taskContextPackage.currentWorkStage, "task-completion");
   assert.equal(completed.taskContextPackage.agentRuns[0].sessionId, "session:main:task-context-package:tasks/task-001.yaml");
   assert.equal(completed.taskContextPackage.agentRuns[1].sessionId, "session:execution:task-context-package:tasks/task-001.yaml");
   assert.equal(completed.taskContextPackage.agentRuns[2].sessionId, "session:review:task-context-package:tasks/task-001.yaml");
   assert.equal(completed.taskContextPackage.agentRuns[3].sessionId, "resumed:main:session:main:task-context-package:tasks/task-001.yaml");
   assert.equal(completed.taskContextPackage.agentRuns[4].sessionId, "session:execution:task-context-package:tasks/task-001.yaml");
+  assert.equal(completed.taskContextPackage.agentRuns[5].sessionId, "session:review:task-context-package:tasks/task-001.yaml");
+  assert.equal(completed.taskContextPackage.agentRuns[6].sessionId, "resumed:main:session:main:task-context-package:tasks/task-001.yaml");
   assert.equal(completed.taskContextPackage.artifacts.executionReport[0].artifactId, "executionReport:001");
   assert.equal(completed.taskContextPackage.artifacts.executionReport[1].artifactId, "executionReport:002");
   assert.equal(completed.taskContextPackage.artifacts.reviewReport[0].artifactId, "reviewReport:001");
+  assert.equal(completed.taskContextPackage.artifacts.reviewReport[1].artifactId, "reviewReport:002");
   assert.equal(completed.taskContextPackage.artifacts.convergenceAdvice[0].artifactId, "convergenceAdvice:001");
+  assert.equal(completed.taskContextPackage.artifacts.taskCompletion.artifactId, "taskCompletion");
   assert.deepEqual(completed.taskContextPackage.agentRuns[1].outputArtifactRefs, ["executionReport:001"]);
   assert.deepEqual(completed.taskContextPackage.agentRuns[2].outputArtifactRefs, ["reviewReport:001"]);
   assert.deepEqual(completed.taskContextPackage.agentRuns[3].outputArtifactRefs, ["convergenceAdvice:001"]);
@@ -164,4 +171,20 @@ test("recommendation flow applies module append requests through the task pool",
     "convergenceAdvice:001",
   ]);
   assert.deepEqual(completed.taskContextPackage.agentRuns[4].outputArtifactRefs, ["executionReport:002"]);
+  assert.deepEqual(completed.taskContextPackage.agentRuns[5].inputArtifactRefs, [
+    "taskDraft",
+    "executionAuthorization",
+    "convergenceAdvice:001",
+    "executionReport:002",
+  ]);
+  assert.deepEqual(completed.taskContextPackage.agentRuns[5].outputArtifactRefs, ["reviewReport:002"]);
+  assert.deepEqual(completed.taskContextPackage.agentRuns[6].inputArtifactRefs, [
+    "taskDraft",
+    "executionIntent",
+    "executionAuthorization",
+    "convergenceAdvice:001",
+    "executionReport:002",
+    "reviewReport:002",
+  ]);
+  assert.deepEqual(completed.taskContextPackage.agentRuns[6].outputArtifactRefs, ["taskCompletion"]);
 });

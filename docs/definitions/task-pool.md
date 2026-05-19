@@ -129,6 +129,8 @@ execution-admission
 main-agent
 execution-agent
 review-agent
+convergence
+task-completion
 human-decision
 ```
 
