@@ -133,21 +133,72 @@ export function isDirectRun(moduleUrl, argvPath) {
   return argvPath ? moduleUrl === pathToFileURL(argvPath).href : false;
 }
 
+function quotePowerShellSingle(value) {
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+export function restartCommand({
+  currentPid = process.pid,
+  cwd = rootDir,
+  nodePath = process.execPath,
+  serverPath = fileURLToPath(import.meta.url),
+  platform = process.platform,
+} = {}) {
+  if (platform === "win32") {
+    const script = [
+      "$ErrorActionPreference = 'Stop'",
+      `Wait-Process -Id ${currentPid} -ErrorAction SilentlyContinue`,
+      "Start-Sleep -Milliseconds 300",
+      [
+        "Start-Process",
+        `-FilePath ${quotePowerShellSingle(nodePath)}`,
+        `-ArgumentList @(${quotePowerShellSingle(serverPath)})`,
+        `-WorkingDirectory ${quotePowerShellSingle(cwd)}`,
+        "-WindowStyle Hidden",
+      ].join(" "),
+    ].join("; ");
+    return {
+      command: "powershell.exe",
+      args: ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+    };
+  }
+
+  const script = [
+    `while kill -0 ${currentPid} 2>/dev/null; do sleep 0.2; done`,
+    `cd "$1"`,
+    `nohup "$2" "$3" >/dev/null 2>&1 &`,
+  ].join("; ");
+  return {
+    command: "sh",
+    args: ["-c", script, "simple-workflow-restart", cwd, nodePath, serverPath],
+  };
+}
+
+function spawnRestartProcess(options) {
+  const { command, args } = restartCommand(options);
+  spawn(command, args, {
+    cwd: options.cwd,
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true,
+  }).unref();
+}
+
 if (isDirectRun(import.meta.url, process.argv[1])) {
   const workflowService = createWorkflowService({ tasksDir, repositoryDir: rootDir });
   await workflowService.startWatching();
   let server = null;
   const restartServer = () => {
     setTimeout(() => {
+      spawnRestartProcess({
+        currentPid: process.pid,
+        cwd: rootDir,
+        nodePath: process.execPath,
+        serverPath: fileURLToPath(import.meta.url),
+        platform: process.platform,
+      });
       workflowService.stopWatching();
       server.close(() => {
-        const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-        spawn(npmCommand, ["run", "start"], {
-          cwd: rootDir,
-          detached: true,
-          stdio: "ignore",
-          windowsHide: true,
-        }).unref();
         process.exit(0);
       });
       server.closeAllConnections?.();

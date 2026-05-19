@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createApp } from "../src/server/server.js";
+import { createApp, restartCommand } from "../src/server/server.js";
 import { createWorkflowService } from "../src/workflow/workflow-service.js";
 
 function runGit(args, cwd) {
@@ -651,4 +651,25 @@ test("POST /api/server/restart returns unavailable without restart handler", asy
 
   assert.equal(response.status, 501);
   assert.match(payload.error, /not available/);
+});
+
+test("restart command waits for the current Windows process before starting node", () => {
+  const command = restartCommand({
+    currentPid: 1234,
+    cwd: "D:\\Project\\simple-workflow",
+    nodePath: "C:\\Program Files\\nodejs\\node.exe",
+    serverPath: "D:\\Project\\simple-workflow\\src\\server\\server.js",
+    platform: "win32",
+  });
+
+  assert.equal(command.command, "powershell.exe");
+  assert.deepEqual(command.args.slice(0, 3), [
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+  ]);
+  assert.match(command.args.at(-1), /Wait-Process -Id 1234/);
+  assert.match(command.args.at(-1), /node\.exe/);
+  assert.match(command.args.at(-1), /src\\server\\server\.js/);
+  assert.doesNotMatch(command.args.at(-1), /npm/);
 });
