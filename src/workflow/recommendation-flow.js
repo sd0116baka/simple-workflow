@@ -5,6 +5,7 @@ import { initializeMainAgent } from "./main-agent-flow.js";
 import { parseRecommendationIntent } from "./recommendation-intent.js";
 import { buildRecommendationPrompt } from "./recommendation-prompt.js";
 import { OPENCODE_RECOMMENDATION_ARGS } from "./recommendation-runner.js";
+import { runReviewAgent } from "./review-agent-flow.js";
 import { applyAppendRequest, buildTaskPool, findTaskContextPackage } from "./task-pool.js";
 
 export function createBlockedRecommendationRun({ id, startupCheck, now = () => new Date().toISOString() }) {
@@ -26,6 +27,8 @@ export function createBlockedRecommendationRun({ id, startupCheck, now = () => n
     mainAgentInitializationError: null,
     executionAgentRun: null,
     executionAgentError: null,
+    reviewAgentRun: null,
+    reviewAgentError: null,
     taskContextPackage: null,
     stdout: "",
     stderr: "",
@@ -58,6 +61,8 @@ export function createRunningRecommendationRun({
     mainAgentInitializationError: null,
     executionAgentRun: null,
     executionAgentError: null,
+    reviewAgentRun: null,
+    reviewAgentError: null,
     taskContextPackage: null,
     stdout: "",
     stderr: "",
@@ -104,6 +109,7 @@ export function completeRecommendationFlow({
   projectProfile,
   runMainAgentSession,
   runExecutionAgentSession,
+  runReviewAgentSession,
   now = () => new Date().toISOString(),
 }) {
   const failed = commandResult.error || commandResult.exitCode !== 0;
@@ -163,6 +169,21 @@ export function completeRecommendationFlow({
     : applyAppendRequest(taskPool, executionAgentRun.appendRequest, {
         currentWorkStage: "execution-agent",
       });
+  const executionCompletedPackage = failed || !parsed.appendRequest
+    ? null
+    : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
+  const reviewAgentRun = !executionCompletedPackage || !executionAgentRun?.appendRequest
+    ? null
+    : runReviewAgent({
+        taskContextPackage: executionCompletedPackage,
+        runAgentSession: runReviewAgentSession,
+        now,
+      });
+  taskPool = !reviewAgentRun?.appendRequest
+    ? taskPool
+    : applyAppendRequest(taskPool, reviewAgentRun.appendRequest, {
+        currentWorkStage: "review-agent",
+      });
   const taskContextPackage = failed || !parsed.appendRequest
     ? null
     : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
@@ -183,6 +204,8 @@ export function completeRecommendationFlow({
     mainAgentInitializationError: mainAgentInitialization?.error ?? null,
     executionAgentRun,
     executionAgentError: executionAgentRun?.error ?? null,
+    reviewAgentRun,
+    reviewAgentError: reviewAgentRun?.error ?? null,
     taskContextPackage,
   };
 }
