@@ -11,6 +11,7 @@ const parsedText = document.querySelector("#parsedText");
 const parseStatus = document.querySelector("#parseStatus");
 const validationResult = document.querySelector("#validationResult");
 const validationStatus = document.querySelector("#validationStatus");
+const seedStateFixturesButton = document.querySelector("#seedStateFixturesButton");
 const restartButton = document.querySelector("#restartButton");
 const refreshButton = document.querySelector("#refreshButton");
 const recommendationStatus = document.querySelector("#recommendationStatus");
@@ -1374,6 +1375,27 @@ async function restartServer() {
   restartButton.textContent = "重启";
 }
 
+async function seedStateFixtures() {
+  if (!seedStateFixturesButton) return;
+  seedStateFixturesButton.disabled = true;
+  seedStateFixturesButton.textContent = "生成中";
+  const response = await fetch("/api/test-fixtures/state-stubs", { method: "POST" });
+  const payload = await response.json();
+  if (!response.ok) {
+    seedStateFixturesButton.disabled = false;
+    seedStateFixturesButton.textContent = "生成测试状态";
+    throw new Error(payload.error ?? `生成测试状态失败：${response.status}`);
+  }
+  selectedFileName = payload.tasks?.[0]?.sourcePath?.replace(/^tasks\//, "") ?? selectedFileName;
+  recommendationRun = null;
+  await Promise.all([loadTasks(), loadRecommendationRun()]);
+  seedStateFixturesButton.textContent = `已生成 ${payload.count ?? 0} 个状态`;
+  setTimeout(() => {
+    seedStateFixturesButton.disabled = false;
+    seedStateFixturesButton.textContent = "生成测试状态";
+  }, 1500);
+}
+
 restartButton.addEventListener("click", () => {
   restartServer().catch((error) => {
     restartButton.disabled = false;
@@ -1385,6 +1407,10 @@ restartButton.addEventListener("click", () => {
 
 refreshButton.addEventListener("click", () => {
   Promise.all([loadTasks(), loadRecommendationRun()]).catch(showError);
+});
+
+seedStateFixturesButton?.addEventListener("click", () => {
+  seedStateFixtures().catch(showError);
 });
 
 runRecommendationButton.addEventListener("click", () => {
@@ -1445,6 +1471,10 @@ function showError(error) {
   recommendationStatus.textContent = "失败";
   if (recommendationResult) recommendationResult.textContent = error.message;
   runRecommendationButton.disabled = false;
+  if (seedStateFixturesButton) {
+    seedStateFixturesButton.disabled = false;
+    seedStateFixturesButton.textContent = "生成测试状态";
+  }
   if (cancelRecommendationButton) {
     cancelRecommendationButton.disabled = false;
     cancelRecommendationButton.textContent = "取消运行";

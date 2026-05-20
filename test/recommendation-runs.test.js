@@ -1240,6 +1240,40 @@ test("POST /api/server/restart returns unavailable without restart handler", asy
   assert.match(payload.error, /not available/);
 });
 
+test("POST /api/test-fixtures/state-stubs seeds test state fixtures", async (t) => {
+  const workflowService = {
+    async seedTestStateFixtures() {
+      return {
+        count: 15,
+        tasks: [
+          {
+            packageId: "task-context-package:tasks/stub-task-pool.yaml",
+            sourcePath: "tasks/stub-task-pool.yaml",
+            currentWorkStage: "task-pool",
+          },
+        ],
+      };
+    },
+    onEvent() {
+      return () => {};
+    },
+  };
+  const server = createApp({ workflowService });
+  server.listen(0);
+  t.after(() => server.close());
+  await once(server, "listening");
+
+  const response = await fetch(
+    `http://localhost:${server.address().port}/api/test-fixtures/state-stubs`,
+    { method: "POST" },
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 201);
+  assert.equal(payload.count, 15);
+  assert.equal(payload.tasks[0].currentWorkStage, "task-pool");
+});
+
 test("static assets are not cached during workflow UI development", async (t) => {
   const workflowService = {
     onEvent() {

@@ -31,6 +31,14 @@ npm.cmd run testenv:reset
 
 该命令只重建测试仓库，不启动服务。
 
+## 状态种子
+
+网页右上角的“生成测试状态”按钮会在测试仓库中生成一组 stub 任务和任务上下文包。
+
+这些任务分别停在 `task-pool`、`task-recommender`、`execution-admission`、`isolated-workspace`、`main-agent`、`execution-agent`、`review-agent`、`convergence`、`task-completion`、`human-decision`、`auto-merge`、`auto-merge-execution`、`merged`、`closed`、`cancelled` 等环节，方便检查各个面板展示。
+
+该按钮只允许写入 `.workflow/test-environment/repository`，避免误写项目仓库。
+
 ## 边界
 
 测试环境位于 `.workflow/test-environment/`，该目录已被 `.gitignore` 忽略。

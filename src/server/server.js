@@ -180,6 +180,16 @@ export function createApp({
         return;
       }
 
+      if (request.method === "POST" && request.url?.startsWith("/api/test-fixtures/state-stubs")) {
+        try {
+          const result = await workflowService.seedTestStateFixtures();
+          sendJson(response, 201, result);
+        } catch (error) {
+          sendJson(response, 409, { error: error.message });
+        }
+        return;
+      }
+
       if (request.method === "GET" && request.url?.startsWith("/api/recommendation-runs/latest")) {
         sendJson(response, 200, { recommendationRun: workflowService.getLatestRecommendationRun() });
         return;

@@ -32,6 +32,7 @@ import {
 } from "./task-context-package-store.js";
 import { applyAppendRequest, buildTaskPool } from "./task-pool.js";
 import { listRawTasks } from "./task-source.js";
+import { seedTestStateFixtures } from "./state-fixtures.js";
 
 const TASK_EXTENSIONS = new Set([".yaml", ".yml"]);
 
@@ -433,6 +434,22 @@ export function createWorkflowService({
 
     async getStartupCheck() {
       return getStartupCheck();
+    },
+
+    async seedTestStateFixtures() {
+      const result = await seedTestStateFixtures({
+        repositoryDir,
+        tasksDir,
+        storeDir: taskContextPackageStoreDir,
+      });
+      latestRecommendationRun = null;
+      emit({
+        type: "tasks-changed",
+        eventType: "seed-test-state-fixtures",
+        fileName: "stub-state-fixtures",
+        timestamp: new Date().toISOString(),
+      });
+      return result;
     },
 
     async createRecommendationRun() {
