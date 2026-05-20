@@ -2,8 +2,8 @@ import { execFileSync } from "node:child_process";
 import { isAbsolute, relative, resolve } from "node:path";
 import { removeWorkspaceAndBranch } from "./task-closeout-flow.js";
 
-function latestTaskCompletion(taskContextPackage) {
-  return taskContextPackage?.artifacts?.taskCompletion ?? null;
+function latestConvergenceSuccess(taskContextPackage) {
+  return taskContextPackage?.artifacts?.convergenceSuccess ?? null;
 }
 
 function latestArtifact(taskContextPackage, artifactType) {
@@ -39,7 +39,7 @@ function changedFilesInWorktree(cwd) {
     .map((line) => line.slice(3));
 }
 
-export function requestHumanDecisionForTaskCompletion({
+export function requestHumanDecisionForConvergenceSuccess({
   taskContextPackage,
   now = () => new Date().toISOString(),
 } = {}) {
@@ -47,11 +47,11 @@ export function requestHumanDecisionForTaskCompletion({
     throw new Error("taskContextPackage.packageId is required");
   }
 
-  const taskCompletion = latestTaskCompletion(taskContextPackage);
-  if (!taskCompletion) {
+  const convergenceSuccess = latestConvergenceSuccess(taskContextPackage);
+  if (!convergenceSuccess) {
     return {
       appendRequest: null,
-      error: "任务上下文包缺少 taskCompletion，不能请求人工接受完成。",
+      error: "任务上下文包缺少 convergenceSuccess，不能请求人工接受收敛成功。",
     };
   }
 
@@ -61,8 +61,8 @@ export function requestHumanDecisionForTaskCompletion({
       artifactType: "humanDecisionRequest",
       artifact: {
         requestedAt: now(),
-        reason: "Agent 已产出 taskCompletion，需要人工决定是否接受任务完成。",
-        taskCompletionRef: taskCompletion.artifactId,
+        reason: "Agent 已产出 convergenceSuccess，需要人工决定是否接受收敛成功。",
+        convergenceSuccessRef: convergenceSuccess.artifactId,
         decisionOptions: [
           "accept-completion",
           "request-changes",
@@ -172,7 +172,7 @@ export function provideHumanConvergenceGuidance({
   };
 }
 
-export function acceptTaskCompletion({
+export function acceptConvergenceSuccess({
   taskContextPackage,
   repositoryDir = process.cwd(),
   now = () => new Date().toISOString(),
@@ -183,29 +183,29 @@ export function acceptTaskCompletion({
   if (taskContextPackage.currentWorkStage !== "human-decision") {
     return {
       appendRequest: null,
-      error: "任务不在 human-decision 环节，不能接受完成。",
+      error: "任务不在 human-decision 环节，不能接受收敛成功。",
     };
   }
 
-  const taskCompletion = latestTaskCompletion(taskContextPackage);
-  if (!taskCompletion) {
+  const convergenceSuccess = latestConvergenceSuccess(taskContextPackage);
+  if (!convergenceSuccess) {
     return {
       appendRequest: null,
-      error: "任务上下文包缺少 taskCompletion，不能接受完成。",
+      error: "任务上下文包缺少 convergenceSuccess，不能接受收敛成功。",
     };
   }
   const humanDecisionRequest = taskContextPackage.artifacts?.humanDecisionRequest;
   if (!humanDecisionRequest?.body) {
     return {
       appendRequest: null,
-      error: "任务上下文包缺少 humanDecisionRequest，不能接受完成。",
+      error: "任务上下文包缺少 humanDecisionRequest，不能接受收敛成功。",
     };
   }
   const isolatedWorkspace = taskContextPackage.artifacts?.isolatedWorkspace;
   if (!isolatedWorkspace?.body) {
     return {
       appendRequest: null,
-      error: "任务上下文包缺少 isolatedWorkspace，不能接受完成。",
+      error: "任务上下文包缺少 isolatedWorkspace，不能接受收敛成功。",
     };
   }
 
@@ -219,7 +219,7 @@ export function acceptTaskCompletion({
       artifact: {
         decision: "accept-completion",
         decidedAt: now(),
-        taskCompletionRef: taskCompletion.artifactId,
+        convergenceSuccessRef: convergenceSuccess.artifactId,
         acceptedWork: {
           isolatedWorkspaceRef: isolatedWorkspace.artifactId,
           worktreePath: isolatedWorkspace.body.worktreePath,

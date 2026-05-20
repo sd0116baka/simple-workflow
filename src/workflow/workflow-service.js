@@ -16,11 +16,11 @@ import {
 } from "./execution-agent-flow.js";
 import { executeAutoMerge, planAutoMerge } from "./auto-merge-flow.js";
 import {
-  acceptTaskCompletion,
+  acceptConvergenceSuccess,
   cancelTaskAfterConvergenceFailure,
   provideHumanConvergenceGuidance,
   requestHumanDecisionForConvergenceFailure,
-  requestHumanDecisionForTaskCompletion,
+  requestHumanDecisionForConvergenceSuccess,
 } from "./human-decision-flow.js";
 import { runOpencodeRecommendation } from "./recommendation-runner.js";
 import { closeTask } from "./task-closeout-flow.js";
@@ -110,10 +110,10 @@ export function createWorkflowService({
           convergenceErrors: run.convergenceErrors
             ? [...run.convergenceErrors]
             : [],
-          completionHumanDecisionRequest: run.completionHumanDecisionRequest
-            ? JSON.parse(JSON.stringify(run.completionHumanDecisionRequest))
+          successHumanDecisionRequest: run.successHumanDecisionRequest
+            ? JSON.parse(JSON.stringify(run.successHumanDecisionRequest))
             : null,
-          completionHumanDecisionError: run.completionHumanDecisionError ?? null,
+          successHumanDecisionError: run.successHumanDecisionError ?? null,
           failureHumanDecisionRequest: run.failureHumanDecisionRequest
             ? JSON.parse(JSON.stringify(run.failureHumanDecisionRequest))
             : null,
@@ -388,9 +388,7 @@ export function createWorkflowService({
     });
     if (!convergence.appendRequest) return { execution, review, convergence };
     await applyAndPersistAppendRequest(convergence.appendRequest, {
-      currentWorkStage: convergence.appendRequest.artifactType === "taskCompletion"
-        ? "task-completion"
-        : "convergence",
+      currentWorkStage: "convergence",
     });
     latestRecommendationRun.convergenceRuns.push(convergence);
     latestRecommendationRun.convergenceErrors = [
@@ -398,12 +396,12 @@ export function createWorkflowService({
       convergence.error,
     ].filter(Boolean);
 
-    if (convergence.appendRequest.artifactType === "taskCompletion") {
-      const request = requestHumanDecisionForTaskCompletion({
+    if (convergence.appendRequest.artifactType === "convergenceSuccess") {
+      const request = requestHumanDecisionForConvergenceSuccess({
         taskContextPackage: latestRecommendationRun.taskContextPackage,
       });
-      latestRecommendationRun.completionHumanDecisionRequest = request;
-      latestRecommendationRun.completionHumanDecisionError = request.error ?? null;
+      latestRecommendationRun.successHumanDecisionRequest = request;
+      latestRecommendationRun.successHumanDecisionError = request.error ?? null;
       if (request.appendRequest) {
         await applyAndPersistAppendRequest(request.appendRequest, {
           currentWorkStage: "human-decision",
@@ -439,12 +437,12 @@ export function createWorkflowService({
       return getStartupCheck();
     },
 
-    async seedTestStateFixtures({ currentWorkStage = "task-pool" } = {}) {
+    async seedTestStateFixtures({ fixtureKey = "task-pool" } = {}) {
       const result = await seedTestStateFixtures({
         repositoryDir,
         tasksDir,
         storeDir: taskContextPackageStoreDir,
-        currentWorkStage,
+        fixtureKey,
       });
       latestRecommendationRun = null;
       emit({
@@ -544,7 +542,7 @@ export function createWorkflowService({
       return toRecommendationSnapshot(latestRecommendationRun);
     },
 
-    async acceptTaskCompletion({ packageId = null } = {}) {
+    async acceptConvergenceSuccess({ packageId = null } = {}) {
       const taskContextPackage = await findAcceptableTaskContextPackage(packageId);
       if (!taskContextPackage) {
         return {
@@ -558,12 +556,12 @@ export function createWorkflowService({
 
       ensureLatestRecommendationRun(taskContextPackage);
 
-      const decision = acceptTaskCompletion({
+      const decision = acceptConvergenceSuccess({
         taskContextPackage,
         repositoryDir,
       });
       if (!decision.appendRequest) {
-        latestRecommendationRun.completionHumanDecisionError = decision.error;
+        latestRecommendationRun.successHumanDecisionError = decision.error;
         emitRecommendationChanged(latestRecommendationRun);
         return {
           accepted: false,
@@ -576,7 +574,7 @@ export function createWorkflowService({
         decision.appendRequest,
         { currentWorkStage: "auto-merge-planning" },
       );
-      latestRecommendationRun.completionHumanDecisionError = null;
+      latestRecommendationRun.successHumanDecisionError = null;
 
       const planning = planAutoMerge({
         taskContextPackage: latestRecommendationRun.taskContextPackage,

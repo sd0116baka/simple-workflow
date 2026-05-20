@@ -21,7 +21,7 @@ test("seeds one selected stub task and replaces previous fixtures", async (t) =>
     repositoryDir,
     tasksDir,
     storeDir,
-    currentWorkStage: "human-decision",
+    fixtureKey: "convergence-failure",
     now: () => "2026-05-20T10:00:00.000Z",
   });
   const tasks = await listRawTasks(tasksDir);
@@ -46,7 +46,7 @@ test("seeds one selected stub task and replaces previous fixtures", async (t) =>
     repositoryDir,
     tasksDir,
     storeDir,
-    currentWorkStage: "closed",
+    fixtureKey: "closed",
     now: () => "2026-05-20T10:01:00.000Z",
   });
   const replacedTasks = await listRawTasks(tasksDir);
@@ -69,7 +69,7 @@ test("cleans generated stub tasks and packages", async (t) => {
     repositoryDir,
     tasksDir,
     storeDir,
-    currentWorkStage: "cancelled",
+    fixtureKey: "cancelled",
   });
   const result = await cleanupTestStateFixtures({ repositoryDir, tasksDir, storeDir });
   const tasks = await listRawTasks(tasksDir);
@@ -81,6 +81,35 @@ test("cleans generated stub tasks and packages", async (t) => {
   assert.equal(packages.length, 0);
 });
 
+test("convergence success fixture requests human decision and settles there", async (t) => {
+  const rootDir = await mkdtemp(join(tmpdir(), "simple-workflow-fixtures-completion-"));
+  t.after(() => rm(rootDir, { recursive: true, force: true }));
+  const repositoryDir = join(rootDir, ".workflow", "test-environment", "repository");
+  const tasksDir = join(repositoryDir, "tasks");
+  const storeDir = join(repositoryDir, ".workflow", "task-context-packages");
+
+  const result = await seedTestStateFixtures({
+    repositoryDir,
+    tasksDir,
+    storeDir,
+    fixtureKey: "convergence-success",
+  });
+  const packages = await loadTaskContextPackages({ storeDir });
+
+  assert.equal(result.tasks[0].sourcePath, "tasks/stub-convergence-success.yaml");
+  assert.equal(result.tasks[0].currentWorkStage, "human-decision");
+  assert.equal(packages[0].currentWorkStage, "human-decision");
+  assert.equal(packages[0].artifacts.convergenceSuccess.artifactId, "convergenceSuccess");
+  assert.equal(
+    packages[0].artifacts.humanDecisionRequest.body.convergenceSuccessRef,
+    "convergenceSuccess",
+  );
+  assert.deepEqual(packages[0].artifacts.humanDecisionRequest.body.decisionOptions, [
+    "accept-completion",
+    "request-changes",
+  ]);
+});
+
 test("refuses to seed state fixtures outside the managed test environment", async (t) => {
   const repositoryDir = await mkdtemp(join(tmpdir(), "simple-workflow-real-repo-"));
   t.after(() => rm(repositoryDir, { recursive: true, force: true }));
@@ -90,7 +119,7 @@ test("refuses to seed state fixtures outside the managed test environment", asyn
       repositoryDir,
       tasksDir: join(repositoryDir, "tasks"),
       storeDir: join(repositoryDir, ".workflow", "task-context-packages"),
-      currentWorkStage: "task-pool",
+      fixtureKey: "task-pool",
     }),
     /测试状态种子只能写入/,
   );

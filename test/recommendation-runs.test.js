@@ -179,7 +179,7 @@ test("workflow service captures a successful recommendation run", async (t) => {
   const baseCommitSegment = finished.taskContextPackage.artifacts.isolatedWorkspace.body.baseCommit.slice(0, 12);
   const firstExecutionProbe = `.workflow-agent/task-001/${baseCommitSegment}/execution-agent-001.txt`;
   const secondExecutionProbe = `.workflow-agent/task-001/${baseCommitSegment}/execution-agent-002.txt`;
-  assert.equal(finished.completionHumanDecisionRequest.appendRequest.artifactType, "humanDecisionRequest");
+  assert.equal(finished.successHumanDecisionRequest.appendRequest.artifactType, "humanDecisionRequest");
   assert.equal(finished.executionAgentRuns.length, 2);
   assert.equal(finished.reviewAgentRuns.length, 2);
   assert.equal(finished.convergenceRuns.length, 2);
@@ -247,11 +247,11 @@ test("workflow service captures a successful recommendation run", async (t) => {
   assert.equal(finished.taskContextPackage.artifacts.reviewReport[0].artifactId, "reviewReport:001");
   assert.equal(finished.taskContextPackage.artifacts.reviewReport[1].artifactId, "reviewReport:002");
   assert.equal(finished.taskContextPackage.artifacts.convergenceAdvice[0].artifactId, "convergenceAdvice:001");
-  assert.equal(finished.taskContextPackage.artifacts.taskCompletion.artifactId, "taskCompletion");
+  assert.equal(finished.taskContextPackage.artifacts.convergenceSuccess.artifactId, "convergenceSuccess");
   assert.equal(finished.taskContextPackage.timeline[2].artifactId, "isolatedWorkspace");
   assert.equal(
-    finished.taskContextPackage.artifacts.humanDecisionRequest.body.taskCompletionRef,
-    "taskCompletion",
+    finished.taskContextPackage.artifacts.humanDecisionRequest.body.convergenceSuccessRef,
+    "convergenceSuccess",
   );
   assert.equal(finished.exitCode, 0);
   assert.equal(service.getLatestRecommendationRun().status, "succeeded");
@@ -266,7 +266,7 @@ test("workflow service captures a successful recommendation run", async (t) => {
     },
     runExecutionAgentSession: runStubExecutionAgentSession,
   });
-  const accepted = await resumedHumanDecisionService.acceptTaskCompletion({
+  const accepted = await resumedHumanDecisionService.acceptConvergenceSuccess({
     packageId: "task-context-package:tasks/task-001.yaml",
   });
 
@@ -314,7 +314,7 @@ test("workflow service captures a successful recommendation run", async (t) => {
     false,
   );
   assert.equal(
-    "taskCompletionRef" in accepted.recommendationRun.taskContextPackage.artifacts.autoMergePlan.body,
+    "convergenceSuccessRef" in accepted.recommendationRun.taskContextPackage.artifacts.autoMergePlan.body,
     false,
   );
   assert.deepEqual(
@@ -853,14 +853,14 @@ test("POST /api/recommendation-runs/cancel cancels the latest run", async (t) =>
   assert.equal(payload.recommendationRun.status, "cancelled");
 });
 
-test("POST /api/human-decisions/accept-completion accepts completion", async (t) => {
+test("POST /api/human-decisions/accept-completion accepts convergence success", async (t) => {
   const latestRun = {
     id: "recommendation-run-test",
     status: "succeeded",
   };
   let observedPackageId = null;
   const workflowService = {
-    async acceptTaskCompletion({ packageId }) {
+    async acceptConvergenceSuccess({ packageId }) {
       observedPackageId = packageId;
       return {
         accepted: true,
@@ -1107,8 +1107,8 @@ test("workflow service replans accepted work when a no-change package later chan
         },
         appendedAt: "2026-05-19T10:00:00.000Z",
       },
-      taskCompletion: {
-        artifactId: "taskCompletion",
+      convergenceSuccess: {
+        artifactId: "convergenceSuccess",
         body: {
           summary: "agent reported completion",
           basis: ["executionReport:001", "reviewReport:001"],
@@ -1120,7 +1120,7 @@ test("workflow service replans accepted work when a no-change package later chan
         body: {
           decision: "accept-completion",
           decidedAt: "2026-05-19T10:02:00.000Z",
-          taskCompletionRef: "taskCompletion",
+          convergenceSuccessRef: "convergenceSuccess",
           acceptedWork: {
             isolatedWorkspaceRef: "isolatedWorkspace",
             worktreePath,
@@ -1241,16 +1241,16 @@ test("POST /api/server/restart returns unavailable without restart handler", asy
 });
 
 test("POST /api/test-fixtures/state-stubs seeds test state fixtures", async (t) => {
-  let observedStage = null;
+  let observedFixtureKey = null;
   const workflowService = {
-    async seedTestStateFixtures({ currentWorkStage }) {
-      observedStage = currentWorkStage;
+    async seedTestStateFixtures({ fixtureKey }) {
+      observedFixtureKey = fixtureKey;
       return {
         count: 1,
         tasks: [
           {
-            packageId: "task-context-package:tasks/stub-human-decision.yaml",
-            sourcePath: "tasks/stub-human-decision.yaml",
+            packageId: "task-context-package:tasks/stub-convergence-failure.yaml",
+            sourcePath: "tasks/stub-convergence-failure.yaml",
             currentWorkStage: "human-decision",
           },
         ],
@@ -1272,7 +1272,7 @@ test("POST /api/test-fixtures/state-stubs seeds test state fixtures", async (t) 
       headers: {
         "content-type": "application/json",
       },
-      body: JSON.stringify({ currentWorkStage: "human-decision" }),
+      body: JSON.stringify({ fixtureKey: "convergence-failure" }),
     },
   );
   const payload = await response.json();
@@ -1280,7 +1280,7 @@ test("POST /api/test-fixtures/state-stubs seeds test state fixtures", async (t) 
   assert.equal(response.status, 201);
   assert.equal(payload.count, 1);
   assert.equal(payload.tasks[0].currentWorkStage, "human-decision");
-  assert.equal(observedStage, "human-decision");
+  assert.equal(observedFixtureKey, "convergence-failure");
 });
 
 test("DELETE /api/test-fixtures/state-stubs cleans test state fixtures", async (t) => {

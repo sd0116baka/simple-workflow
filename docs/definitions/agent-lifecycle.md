@@ -87,7 +87,7 @@ main-agent:convergence:002
 
 `review-agent:002` 表示第 2 轮审查。
 
-`main-agent:convergence:002` 表示第 2 轮收敛；它可以继续产出下一轮 `convergenceAdvice`，也可以产出终态 `taskCompletion`。
+`main-agent:convergence:002` 表示第 2 轮收敛；它可以继续产出下一轮 `convergenceAdvice`，也可以产出终态 `convergenceSuccess`。
 
 `role` 枚举值：
 
@@ -200,7 +200,7 @@ convergenceAdvice:001
 任务成功收敛产物是单例：
 
 ```text
-taskCompletion
+convergenceSuccess
 ```
 
 人工决策请求产物是单例：
@@ -297,7 +297,7 @@ tasks/task-003.yaml -> tasks-task-003
 
 `main` Agent 不读取 `isolatedWorkspace`。
 
-`accept-completion` 后，后续 integration flow 读取 `isolatedWorkspace`、`taskCompletion`、人工决策产物、最新 `executionReport` 和最新 `reviewReport`，由系统负责合入主线。
+`accept-completion` 后，后续 integration flow 读取 `isolatedWorkspace`、`convergenceSuccess`、人工决策产物、最新 `executionReport` 和最新 `reviewReport`，由系统负责合入主线。
 
 未来如果需要从某一轮接收成果、重试或并行探索，再新增 `workspaceCheckpoint` 或 `workspaceFork`。第一版不引入多工作树。
 
@@ -327,16 +327,16 @@ convergenceAdvice:002
 如果 `main` Agent 在收敛环节判断任务已经满足完成条件，它不再产出 `convergenceAdvice`，而是产出：
 
 ```text
-taskCompletion
+convergenceSuccess
 ```
 
-`taskCompletion` 表示任务成功收敛。它是终态产物，不作为下一轮 Agent 输入。
+`convergenceSuccess` 表示收敛成功。它是收敛环节的成功证据，不作为下一轮 Agent 输入。
 
-`taskCompletion` 不是任务最终关闭凭据。它只表示 Agent 认为任务已经完成。
+`convergenceSuccess` 不是任务最终关闭凭据。它只表示当前结果满足收敛成功条件。
 
-系统收到 `taskCompletion` 后，必须追加 `humanDecisionRequest`，把是否接受完成交给人工决定。
+系统收到 `convergenceSuccess` 后，必须追加 `humanDecisionRequest`，把是否接受收敛成功交给人工决定，并把 `currentWorkStage` 推进到 `human-decision`。
 
-人工接受完成后，系统追加 `humanDecision`：
+人工接受收敛成功后，系统追加 `humanDecision`：
 
 ```json
 {
@@ -344,7 +344,7 @@ taskCompletion
   "body": {
     "decision": "accept-completion",
     "decidedAt": "2026-05-19T10:00:00.000Z",
-    "taskCompletionRef": "taskCompletion",
+    "convergenceSuccessRef": "convergenceSuccess",
     "acceptedWork": {
       "isolatedWorkspaceRef": "isolatedWorkspace",
       "worktreePath": ".workflow/worktrees/tasks/tasks-task-003",

@@ -22,8 +22,8 @@
           <option value="execution-agent">execution-agent</option>
           <option value="review-agent">review-agent</option>
           <option value="convergence">convergence</option>
-          <option value="task-completion">task-completion</option>
-          <option value="human-decision">human-decision</option>
+          <option value="convergence-success">convergence-success -> human-decision</option>
+          <option value="convergence-failure">convergence-failure -> human-decision</option>
           <option value="auto-merge-planning">auto-merge-planning</option>
           <option value="auto-merge-execution">auto-merge-execution</option>
           <option value="merged">merged</option>
@@ -168,12 +168,12 @@
             <div class="stage-columns">
               <div class="stage-cell">
                 <div class="detail-heading"><h3>输入 / 完成结论 JSON</h3></div>
-                <div id="humanDecisionInputs" class="stage-inputs">等待任务完成结论。</div>
+                <div id="humanDecisionInputs" class="stage-inputs">等待收敛成功证据。</div>
                 <pre id="humanDecisionRaw" class="code-block parsed">尚未请求人工决策。</pre>
               </div>
               <div class="stage-cell">
                 <div class="detail-heading"><h3>人工拍板</h3></div>
-                <div id="humanDecisionPanel" class="debug-result">等待任务完成结论。</div>
+                <div id="humanDecisionPanel" class="debug-result">等待收敛成功证据。</div>
               </div>
             </div>
           </section>
@@ -186,12 +186,12 @@
             <div class="stage-columns">
               <div class="stage-cell">
                 <div class="detail-heading"><h3>输入 / 自动合并 JSON</h3></div>
-                <div id="autoMergeInputs" class="stage-inputs">等待人工接受完成。</div>
+                <div id="autoMergeInputs" class="stage-inputs">等待人工接受收敛成功。</div>
                 <pre id="autoMergeRaw" class="code-block parsed">尚未进入自动合并环节。</pre>
               </div>
               <div class="stage-cell">
                 <div class="detail-heading"><h3>合并计划</h3></div>
-                <div id="autoMergePanel" class="debug-result">等待人工接受完成。</div>
+                <div id="autoMergePanel" class="debug-result">等待人工接受收敛成功。</div>
               </div>
             </div>
           </section>

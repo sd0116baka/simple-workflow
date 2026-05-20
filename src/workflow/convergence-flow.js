@@ -91,7 +91,7 @@ function shouldFailConvergence(taskContextPackage, reviewReport, maxIterations) 
 function convergenceArtifact(taskContextPackage, executionReport, reviewReport, maxIterations) {
   if (shouldCompleteTask(taskContextPackage, reviewReport)) {
     return {
-      artifactType: "taskCompletion",
+      artifactType: "convergenceSuccess",
       artifact: {
         summary: "stub task completed",
         basis: [

@@ -119,7 +119,7 @@ test("completes task after a reviewed execution that used convergence advice", (
     taskContextPackage: taskPackage,
   });
 
-  assert.equal(result.appendRequest.artifactType, "taskCompletion");
+  assert.equal(result.appendRequest.artifactType, "convergenceSuccess");
   assert.deepEqual(result.appendRequest.artifact.basis, [
     "executionReport:002",
     "reviewReport:002",

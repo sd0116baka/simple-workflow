@@ -3,21 +3,33 @@ import { join, normalize, resolve } from "node:path";
 import { saveTaskContextPackage } from "./task-context-package-store.js";
 
 const STAGE_FIXTURES = [
-  { id: "stub-task-pool", title: "Stub task-pool", currentWorkStage: "task-pool" },
-  { id: "stub-task-recommender", title: "Stub task-recommender", currentWorkStage: "task-recommender" },
-  { id: "stub-execution-admission", title: "Stub execution-admission", currentWorkStage: "execution-admission" },
-  { id: "stub-isolated-workspace", title: "Stub isolated-workspace", currentWorkStage: "isolated-workspace" },
-  { id: "stub-main-agent", title: "Stub main-agent", currentWorkStage: "main-agent" },
-  { id: "stub-execution-agent", title: "Stub execution-agent", currentWorkStage: "execution-agent" },
-  { id: "stub-review-agent", title: "Stub review-agent", currentWorkStage: "review-agent" },
-  { id: "stub-convergence", title: "Stub convergence", currentWorkStage: "convergence" },
-  { id: "stub-task-completion", title: "Stub task-completion", currentWorkStage: "task-completion" },
-  { id: "stub-human-decision", title: "Stub human-decision", currentWorkStage: "human-decision" },
-  { id: "stub-auto-merge-planning", title: "Stub auto-merge-planning", currentWorkStage: "auto-merge-planning" },
-  { id: "stub-auto-merge-execution", title: "Stub auto-merge-execution", currentWorkStage: "auto-merge-execution" },
-  { id: "stub-merged", title: "Stub merged", currentWorkStage: "merged" },
-  { id: "stub-closed", title: "Stub closed", currentWorkStage: "closed" },
-  { id: "stub-cancelled", title: "Stub cancelled", currentWorkStage: "cancelled" },
+  { id: "stub-task-pool", title: "Stub task-pool", fixtureKey: "task-pool", currentWorkStage: "task-pool" },
+  { id: "stub-task-recommender", title: "Stub task-recommender", fixtureKey: "task-recommender", currentWorkStage: "task-recommender" },
+  { id: "stub-execution-admission", title: "Stub execution-admission", fixtureKey: "execution-admission", currentWorkStage: "execution-admission" },
+  { id: "stub-isolated-workspace", title: "Stub isolated-workspace", fixtureKey: "isolated-workspace", currentWorkStage: "isolated-workspace" },
+  { id: "stub-main-agent", title: "Stub main-agent", fixtureKey: "main-agent", currentWorkStage: "main-agent" },
+  { id: "stub-execution-agent", title: "Stub execution-agent", fixtureKey: "execution-agent", currentWorkStage: "execution-agent" },
+  { id: "stub-review-agent", title: "Stub review-agent", fixtureKey: "review-agent", currentWorkStage: "review-agent" },
+  { id: "stub-convergence", title: "Stub convergence", fixtureKey: "convergence", currentWorkStage: "convergence" },
+  {
+    id: "stub-convergence-success",
+    title: "Stub convergence-success",
+    fixtureKey: "convergence-success",
+    currentWorkStage: "human-decision",
+    humanDecisionScenario: "convergence-success",
+  },
+  {
+    id: "stub-convergence-failure",
+    title: "Stub convergence-failure",
+    fixtureKey: "convergence-failure",
+    currentWorkStage: "human-decision",
+    humanDecisionScenario: "convergence-failure",
+  },
+  { id: "stub-auto-merge-planning", title: "Stub auto-merge-planning", fixtureKey: "auto-merge-planning", currentWorkStage: "auto-merge-planning" },
+  { id: "stub-auto-merge-execution", title: "Stub auto-merge-execution", fixtureKey: "auto-merge-execution", currentWorkStage: "auto-merge-execution" },
+  { id: "stub-merged", title: "Stub merged", fixtureKey: "merged", currentWorkStage: "merged" },
+  { id: "stub-closed", title: "Stub closed", fixtureKey: "closed", currentWorkStage: "closed" },
+  { id: "stub-cancelled", title: "Stub cancelled", fixtureKey: "cancelled", currentWorkStage: "cancelled" },
 ];
 
 function assertTestEnvironment(repositoryDir) {
@@ -125,7 +137,12 @@ function addAgentRun(taskPackage, agentRun) {
   });
 }
 
-function populateArtifacts(taskPackage, { id, currentWorkStage, timestamp }) {
+function populateArtifacts(taskPackage, {
+  id,
+  currentWorkStage,
+  humanDecisionScenario,
+  timestamp,
+}) {
   if (currentWorkStage === "task-pool") return;
 
   addArtifact(taskPackage, "executionIntent", artifact("executionIntent", {
@@ -207,9 +224,9 @@ function populateArtifacts(taskPackage, { id, currentWorkStage, timestamp }) {
   if (currentWorkStage === "execution-agent") return;
 
   addMultiArtifact(taskPackage, "reviewReport", artifact("reviewReport:001", {
-    outcome: currentWorkStage === "human-decision" ? "failed" : "passed",
+    outcome: humanDecisionScenario === "convergence-failure" ? "failed" : "passed",
     summary: "fixture review report",
-    findings: currentWorkStage === "human-decision"
+    findings: humanDecisionScenario === "convergence-failure"
       ? [{ code: "fixture-not-converged", message: "用于测试收敛失败人工处理。" }]
       : [],
   }, timestamp));
@@ -227,7 +244,7 @@ function populateArtifacts(taskPackage, { id, currentWorkStage, timestamp }) {
 
   if (currentWorkStage === "review-agent") return;
 
-  if (currentWorkStage === "human-decision") {
+  if (humanDecisionScenario === "convergence-failure") {
     addMultiArtifact(taskPackage, "convergenceFailure", artifact("convergenceFailure:001", {
       summary: "fixture convergence failure",
       reasonCode: "fixture-not-converged",
@@ -276,17 +293,15 @@ function populateArtifacts(taskPackage, { id, currentWorkStage, timestamp }) {
 
   if (currentWorkStage === "convergence") return;
 
-  addArtifact(taskPackage, "taskCompletion", artifact("taskCompletion", {
+  addArtifact(taskPackage, "convergenceSuccess", artifact("convergenceSuccess", {
     summary: "fixture task completed",
     basis: ["executionReport:001", "reviewReport:001"],
   }, timestamp));
 
-  if (currentWorkStage === "task-completion") return;
-
   addArtifact(taskPackage, "humanDecisionRequest", artifact("humanDecisionRequest", {
     requestedAt: timestamp,
-    reason: "fixture 任务完成，需要人工接受。",
-    taskCompletionRef: "taskCompletion",
+    reason: "fixture 收敛成功，需要人工接受。",
+    convergenceSuccessRef: "convergenceSuccess",
     decisionOptions: ["accept-completion", "request-changes"],
   }, timestamp));
 
@@ -295,7 +310,7 @@ function populateArtifacts(taskPackage, { id, currentWorkStage, timestamp }) {
   addArtifact(taskPackage, "humanDecision", artifact("humanDecision", {
     decision: "accept-completion",
     decidedAt: timestamp,
-    taskCompletionRef: "taskCompletion",
+    convergenceSuccessRef: "convergenceSuccess",
     acceptedWork: {
       isolatedWorkspaceRef: "isolatedWorkspace",
       worktreePath: `.workflow/worktrees/tasks/${id}`,
@@ -398,7 +413,7 @@ export async function seedTestStateFixtures({
   repositoryDir,
   tasksDir,
   storeDir,
-  currentWorkStage,
+  fixtureKey,
   now = () => new Date().toISOString(),
 } = {}) {
   if (!repositoryDir || !tasksDir || !storeDir) {
@@ -409,7 +424,7 @@ export async function seedTestStateFixtures({
   await cleanupTestStateFixtures({ repositoryDir, tasksDir, storeDir });
 
   const timestamp = now();
-  const fixture = STAGE_FIXTURES.find((item) => item.currentWorkStage === currentWorkStage)
+  const fixture = STAGE_FIXTURES.find((item) => item.fixtureKey === fixtureKey)
     ?? STAGE_FIXTURES[0];
   const fileName = `${fixture.id}.yaml`;
   await writeFile(join(tasksDir, fileName), yamlForFixture(fixture), "utf8");

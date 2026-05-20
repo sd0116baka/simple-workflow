@@ -69,8 +69,8 @@ function acceptedPackage(baseCommit) {
         },
         appendedAt: "2026-05-18T10:00:04.000Z",
       },
-      taskCompletion: {
-        artifactId: "taskCompletion",
+      convergenceSuccess: {
+        artifactId: "convergenceSuccess",
         body: {
           summary: "stub task completed",
         },
@@ -81,7 +81,7 @@ function acceptedPackage(baseCommit) {
         body: {
           decision: "accept-completion",
           decidedAt: "2026-05-18T10:00:08.000Z",
-          taskCompletionRef: "taskCompletion",
+          convergenceSuccessRef: "convergenceSuccess",
           acceptedWork: {
             isolatedWorkspaceRef: "isolatedWorkspace",
             worktreePath: ".workflow/worktrees/tasks/tasks-task-003",
@@ -141,7 +141,7 @@ test("plans auto-merge when accepted worktree has changes", async (t) => {
   assert.equal("hasChanges" in result.appendRequest.artifact.changeSet, false);
   assert.equal("strategy" in result.appendRequest.artifact, false);
   assert.equal("nextRequiredStage" in result.appendRequest.artifact, false);
-  assert.equal("taskCompletionRef" in result.appendRequest.artifact, false);
+  assert.equal("convergenceSuccessRef" in result.appendRequest.artifact, false);
 });
 
 test("plans auto-merge when accepted work was already committed by a failed execution", async (t) => {
@@ -201,7 +201,7 @@ test("rejects auto-merge when worktree has no changes", async (t) => {
   assert.deepEqual(result.appendRequest.artifact.checkedInputs, {
     currentWorkStage: "auto-merge-planning",
     hasHumanDecision: true,
-    hasTaskCompletion: true,
+    hasConvergenceSuccess: true,
     hasIsolatedWorkspace: true,
   });
 });

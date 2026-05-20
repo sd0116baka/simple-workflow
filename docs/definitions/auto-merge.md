@@ -13,7 +13,7 @@
 必须存在：
 
 ```text
-taskCompletion
+convergenceSuccess
 humanDecision
 isolatedWorkspace
 ```
@@ -93,7 +93,7 @@ isolatedWorkspace
     "checkedInputs": {
       "currentWorkStage": "auto-merge-planning",
       "hasHumanDecision": true,
-      "hasTaskCompletion": true,
+      "hasConvergenceSuccess": true,
       "hasIsolatedWorkspace": true
     }
   },
@@ -109,7 +109,7 @@ isolatedWorkspace
 
 `autoMergePlan` 不包含 `nextRequiredStage`。
 
-`autoMergePlan` 不包含 `taskCompletionRef`。任务完成结论通过 `decisionRef -> humanDecision.taskCompletionRef` 追溯。
+`autoMergePlan` 不包含 `convergenceSuccessRef`。收敛成功证据通过 `decisionRef -> humanDecision.convergenceSuccessRef` 追溯。
 
 `autoMergePlan.changeSet.changedFiles` 必须是非空数组。
 

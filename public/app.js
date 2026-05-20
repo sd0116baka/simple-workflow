@@ -223,7 +223,7 @@ function createHumanDecisionPanel(taskContextPackage) {
   const title = document.createElement("div");
   title.className = "human-decision-title";
   title.textContent = decision?.body
-    ? decision.body.decision === "cancel-task" ? "已取消任务" : "已接受完成"
+    ? decision.body.decision === "cancel-task" ? "已取消任务" : "已接受收敛成功"
     : "等待人工决策";
 
   const reason = document.createElement("div");
@@ -231,7 +231,7 @@ function createHumanDecisionPanel(taskContextPackage) {
   reason.textContent = decision?.body
     ? decision.body.decision === "cancel-task"
       ? "任务已取消，执行侧资源已恢复到执行前状态。"
-      : "任务完成结论已由人工接受，等待自动合并环节处理。"
+      : "收敛成功证据已由人工接受，等待自动合并环节处理。"
     : request.body.reason ?? "需要人工确认下一步。";
 
   const meta = document.createElement("div");
@@ -243,7 +243,7 @@ function createHumanDecisionPanel(taskContextPackage) {
         `decidedAt: ${decision.body.decidedAt ?? decision.appendedAt ?? "unknown"}`,
       ].join(" · ")
     : [
-        `target: ${request.body.taskCompletionRef ?? request.body.targetRef ?? "unknown"}`,
+        `target: ${request.body.convergenceSuccessRef ?? request.body.targetRef ?? "unknown"}`,
         `requestedAt: ${request.body.requestedAt ?? request.appendedAt ?? "unknown"}`,
       ].join(" · ");
 
@@ -311,7 +311,7 @@ function createHumanDecisionPanel(taskContextPackage) {
     const acceptButton = document.createElement("button");
     acceptButton.type = "button";
     acceptButton.className = "primary-button human-decision-action";
-    acceptButton.textContent = "接受完成";
+    acceptButton.textContent = "接受收敛成功";
     acceptButton.addEventListener("click", () => {
       acceptCompletion().catch(showError);
     });
@@ -510,7 +510,7 @@ function createTaskContextPackagePanel(taskContextPackage) {
     <span>执行意图</span><strong></strong>
     <span>执行授权</span><strong></strong>
     <span>隔离工作树</span><strong></strong>
-    <span>任务完成结论</span><strong></strong>
+    <span>收敛成功证据</span><strong></strong>
     <span>人工决策</span><strong></strong>
     <span>自动合并计划</span><strong></strong>
     <span>自动合并执行</span><strong></strong>
@@ -525,9 +525,9 @@ function createTaskContextPackagePanel(taskContextPackage) {
       ? "未授权"
       : "未追加";
   values[3].textContent = taskContextPackage.artifacts?.isolatedWorkspace ? "已分配" : "未分配";
-  values[4].textContent = taskContextPackage.artifacts?.taskCompletion ? "待确认" : "未生成";
+  values[4].textContent = taskContextPackage.artifacts?.convergenceSuccess ? "待确认" : "未生成";
   values[5].textContent = taskContextPackage.artifacts?.humanDecision
-    ? "已接受完成"
+    ? "已接受收敛成功"
     : taskContextPackage.artifacts?.humanDecisionRequest
       ? "等待人工决策"
       : "未请求";
@@ -594,18 +594,18 @@ function renderHumanDecision(taskContextPackage) {
   humanDecisionPanel.replaceChildren();
   const request = taskContextPackage?.artifacts?.humanDecisionRequest ?? null;
   const decision = taskContextPackage?.artifacts?.humanDecision ?? null;
-  const taskCompletion = taskContextPackage?.artifacts?.taskCompletion ?? null;
+  const convergenceSuccess = taskContextPackage?.artifacts?.convergenceSuccess ?? null;
   const convergenceFailures = taskContextPackage?.artifacts?.convergenceFailure ?? [];
   const humanConvergenceGuidance = taskContextPackage?.artifacts?.humanConvergenceGuidance ?? [];
   humanDecisionRaw.textContent = formatJsonBlock({
-    taskCompletion,
+    convergenceSuccess,
     convergenceFailure: convergenceFailures.at?.(-1) ?? null,
     humanConvergenceGuidance: humanConvergenceGuidance.at?.(-1) ?? null,
     humanDecisionRequest: request,
     humanDecision: decision,
   });
   renderInputs(humanDecisionInputs, [
-    { label: "任务完成结论", value: taskCompletion?.artifactId ?? "未生成" },
+    { label: "收敛成功证据", value: convergenceSuccess?.artifactId ?? "未生成" },
     { label: "收敛失败", value: convergenceFailures.at?.(-1)?.artifactId ?? "未生成" },
     { label: "人工决策请求", value: request?.artifactId ?? "未请求" },
     { label: "人工决策", value: decision?.body?.decision ?? "未决策" },
@@ -615,17 +615,17 @@ function renderHumanDecision(taskContextPackage) {
   if (decision) {
     humanDecisionStatus.textContent = decision.body?.decision === "cancel-task"
       ? "已取消"
-      : "已接受完成";
+      : "已接受收敛成功";
     const panel = createHumanDecisionPanel(taskContextPackage);
     humanDecisionPanel.append(panel);
     return;
   }
 
   if (!request) {
-    humanDecisionStatus.textContent = taskCompletion ? "未请求" : "等待完成";
-    humanDecisionPanel.textContent = taskCompletion
-      ? "已生成任务完成结论，但尚未请求人工决策。"
-      : "等待任务完成结论。";
+    humanDecisionStatus.textContent = convergenceSuccess ? "未请求" : "等待收敛结果";
+    humanDecisionPanel.textContent = convergenceSuccess
+      ? "已生成收敛成功证据，但尚未请求人工决策。"
+      : "等待收敛成功证据。";
     return;
   }
 
@@ -667,14 +667,14 @@ function renderAutoMerge(taskContextPackage) {
 
   if (taskContextPackage?.currentWorkStage === "auto-merge-planning") {
     autoMergeStatus.textContent = "自动检查中";
-    autoMergePanel.textContent = "人工已接受完成，系统正在生成自动合并计划。";
+    autoMergePanel.textContent = "人工已接受收敛成功，系统正在生成自动合并计划。";
     return;
   }
 
   autoMergeStatus.textContent = humanDecision ? "等待自动合并" : "等待输入";
   autoMergePanel.textContent = humanDecision
     ? "等待任务进入 auto-merge-planning 环节。"
-    : "等待人工接受完成。";
+    : "等待人工接受收敛成功。";
 }
 
 function renderAutoMergeExecution(taskContextPackage) {
@@ -776,7 +776,7 @@ async function acceptCompletion() {
   });
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload.error ?? `接受完成失败：${response.status}`);
+    throw new Error(payload.error ?? `接受收敛成功失败：${response.status}`);
   }
   recommendationRun = payload.recommendationRun ?? null;
   if (recommendationRun?.taskContextPackage) {
@@ -1115,10 +1115,10 @@ function renderRecommendationRun() {
       taskContextPackagePanel.textContent = "等待执行准入器输出。";
       humanDecisionStatus.textContent = "等待输入";
       humanDecisionRaw.textContent = "尚未请求人工决策。";
-      humanDecisionPanel.textContent = "等待任务完成结论。";
+      humanDecisionPanel.textContent = "等待收敛成功证据。";
       autoMergeStatus.textContent = "等待输入";
       autoMergeRaw.textContent = "尚未进入自动合并环节。";
-      autoMergePanel.textContent = "等待人工接受完成。";
+      autoMergePanel.textContent = "等待人工接受收敛成功。";
       autoMergeExecutionStatus.textContent = "等待输入";
       autoMergeExecutionRaw.textContent = "尚未执行自动合并。";
       autoMergeExecutionPanel.textContent = "等待合并计划。";
@@ -1381,13 +1381,13 @@ async function seedStateFixtures() {
   if (!seedStateFixturesButton) return;
   seedStateFixturesButton.disabled = true;
   seedStateFixturesButton.textContent = "生成中";
-  const currentWorkStage = seedStateFixtureSelect?.value ?? "task-pool";
+  const fixtureKey = seedStateFixtureSelect?.value ?? "task-pool";
   const response = await fetch("/api/test-fixtures/state-stubs", {
     method: "POST",
     headers: {
       "content-type": "application/json",
     },
-    body: JSON.stringify({ currentWorkStage }),
+    body: JSON.stringify({ fixtureKey }),
   });
   const payload = await response.json();
   if (!response.ok) {
@@ -1398,7 +1398,10 @@ async function seedStateFixtures() {
   selectedFileName = payload.tasks?.[0]?.sourcePath?.replace(/^tasks\//, "") ?? selectedFileName;
   recommendationRun = null;
   await Promise.all([loadTasks(), loadRecommendationRun()]);
-  seedStateFixturesButton.textContent = `已生成 ${currentWorkStage}`;
+  const generatedStage = payload.tasks?.[0]?.currentWorkStage ?? fixtureKey;
+  seedStateFixturesButton.textContent = generatedStage === fixtureKey
+    ? `已生成 ${generatedStage}`
+    : `已生成 ${fixtureKey} -> ${generatedStage}`;
   setTimeout(() => {
     seedStateFixturesButton.disabled = false;
     seedStateFixturesButton.textContent = "生成状态桩";

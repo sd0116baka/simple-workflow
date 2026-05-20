@@ -132,7 +132,7 @@ export function createApp({
 
       if (request.method === "POST" && request.url?.startsWith("/api/human-decisions/accept-completion")) {
         const body = await readJsonBody(request);
-        const result = await workflowService.acceptTaskCompletion({
+        const result = await workflowService.acceptConvergenceSuccess({
           packageId: body.packageId,
         });
         sendJson(response, result.accepted ? 200 : 409, result);
@@ -184,7 +184,7 @@ export function createApp({
         try {
           const body = await readJsonBody(request);
           const result = await workflowService.seedTestStateFixtures({
-            currentWorkStage: body.currentWorkStage,
+            fixtureKey: body.fixtureKey,
           });
           sendJson(response, 201, result);
         } catch (error) {

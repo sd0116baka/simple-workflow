@@ -63,7 +63,7 @@ function checkedInputs(taskContextPackage) {
   return {
     currentWorkStage: taskContextPackage?.currentWorkStage ?? null,
     hasHumanDecision: Boolean(taskContextPackage?.artifacts?.humanDecision?.body),
-    hasTaskCompletion: Boolean(taskContextPackage?.artifacts?.taskCompletion?.body),
+    hasConvergenceSuccess: Boolean(taskContextPackage?.artifacts?.convergenceSuccess?.body),
     hasIsolatedWorkspace: Boolean(taskContextPackage?.artifacts?.isolatedWorkspace?.body),
   };
 }
@@ -132,12 +132,12 @@ export function planAutoMerge({
   if (!humanDecision?.body) {
     reasons.push(reason("MISSING_HUMAN_DECISION", "任务上下文包缺少 humanDecision。"));
   } else if (humanDecision.body.decision !== "accept-completion") {
-    reasons.push(reason("HUMAN_DECISION_NOT_ACCEPTED", "人工决策没有接受任务完成。"));
+    reasons.push(reason("HUMAN_DECISION_NOT_ACCEPTED", "人工决策没有接受收敛成功。"));
   }
 
-  const taskCompletion = taskContextPackage.artifacts?.taskCompletion;
-  if (!taskCompletion?.body) {
-    reasons.push(reason("MISSING_TASK_COMPLETION", "任务上下文包缺少 taskCompletion。"));
+  const convergenceSuccess = taskContextPackage.artifacts?.convergenceSuccess;
+  if (!convergenceSuccess?.body) {
+    reasons.push(reason("MISSING_CONVERGENCE_SUCCESS", "任务上下文包缺少 convergenceSuccess。"));
   }
 
   const isolatedWorkspace = taskContextPackage.artifacts?.isolatedWorkspace;

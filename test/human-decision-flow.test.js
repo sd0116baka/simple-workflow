@@ -6,11 +6,11 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  acceptTaskCompletion,
+  acceptConvergenceSuccess,
   cancelTaskAfterConvergenceFailure,
   provideHumanConvergenceGuidance,
   requestHumanDecisionForConvergenceFailure,
-  requestHumanDecisionForTaskCompletion,
+  requestHumanDecisionForConvergenceSuccess,
 } from "../src/workflow/human-decision-flow.js";
 
 function runGit(args, cwd) {
@@ -78,8 +78,8 @@ function completedPackage() {
         },
         appendedAt: "2026-05-18T10:00:04.000Z",
       },
-      taskCompletion: {
-        artifactId: "taskCompletion",
+      convergenceSuccess: {
+        artifactId: "convergenceSuccess",
         body: {
           summary: "stub task completed",
         },
@@ -89,7 +89,7 @@ function completedPackage() {
         artifactId: "humanDecisionRequest",
         body: {
           requestedAt: "2026-05-18T10:00:07.000Z",
-          taskCompletionRef: "taskCompletion",
+          convergenceSuccessRef: "convergenceSuccess",
           decisionOptions: ["accept-completion", "request-changes"],
         },
         appendedAt: "2026-05-18T10:00:07.000Z",
@@ -100,7 +100,7 @@ function completedPackage() {
 
 function convergenceFailedPackage() {
   const taskPackage = completedPackage();
-  delete taskPackage.artifacts.taskCompletion;
+  delete taskPackage.artifacts.convergenceSuccess;
   taskPackage.artifacts.convergenceFailure = [
     {
       artifactId: "convergenceFailure:001",
@@ -124,8 +124,8 @@ function convergenceFailedPackage() {
   return taskPackage;
 }
 
-test("requests human decision after task completion", () => {
-  const result = requestHumanDecisionForTaskCompletion({
+test("requests human decision after convergence success", () => {
+  const result = requestHumanDecisionForConvergenceSuccess({
     taskContextPackage: completedPackage(),
     now: () => "2026-05-18T10:00:07.000Z",
   });
@@ -134,17 +134,17 @@ test("requests human decision after task completion", () => {
   assert.equal(result.appendRequest.packageId, "task-context-package:tasks/task-003.yaml");
   assert.equal(result.appendRequest.artifactType, "humanDecisionRequest");
   assert.equal(result.appendRequest.artifact.requestedAt, "2026-05-18T10:00:07.000Z");
-  assert.equal(result.appendRequest.artifact.taskCompletionRef, "taskCompletion");
+  assert.equal(result.appendRequest.artifact.convergenceSuccessRef, "convergenceSuccess");
   assert.deepEqual(result.appendRequest.artifact.decisionOptions, [
     "accept-completion",
     "request-changes",
   ]);
 });
 
-test("accepts task completion and prepares auto-merge input", async (t) => {
+test("accepts convergence success and prepares auto-merge input", async (t) => {
   const repositoryDir = await createGitRepositoryWithWorktree(t);
 
-  const result = acceptTaskCompletion({
+  const result = acceptConvergenceSuccess({
     taskContextPackage: completedPackage(),
     repositoryDir,
     now: () => "2026-05-18T10:00:08.000Z",
@@ -155,7 +155,7 @@ test("accepts task completion and prepares auto-merge input", async (t) => {
   assert.equal(result.appendRequest.artifactType, "humanDecision");
   assert.equal(result.appendRequest.artifact.decision, "accept-completion");
   assert.equal(result.appendRequest.artifact.decidedAt, "2026-05-18T10:00:08.000Z");
-  assert.equal(result.appendRequest.artifact.taskCompletionRef, "taskCompletion");
+  assert.equal(result.appendRequest.artifact.convergenceSuccessRef, "convergenceSuccess");
   assert.deepEqual(result.appendRequest.artifact.acceptedWork, {
     isolatedWorkspaceRef: "isolatedWorkspace",
     worktreePath: ".workflow/worktrees/tasks/tasks-task-003",
@@ -169,12 +169,12 @@ test("accepts task completion and prepares auto-merge input", async (t) => {
   assert.equal(result.appendRequest.artifact.nextRequiredStage, "auto-merge-planning");
 });
 
-test("does not accept task completion outside human-decision stage", async (t) => {
+test("does not accept convergence success outside human-decision stage", async (t) => {
   const repositoryDir = await createGitRepositoryWithWorktree(t);
   const taskPackage = completedPackage();
-  taskPackage.currentWorkStage = "task-completion";
+  taskPackage.currentWorkStage = "convergence";
 
-  const result = acceptTaskCompletion({
+  const result = acceptConvergenceSuccess({
     taskContextPackage: taskPackage,
     repositoryDir,
   });
@@ -183,16 +183,16 @@ test("does not accept task completion outside human-decision stage", async (t) =
   assert.match(result.error, /human-decision/);
 });
 
-test("does not request human decision before task completion exists", () => {
+test("does not request human decision before convergence success exists", () => {
   const taskPackage = completedPackage();
-  delete taskPackage.artifacts.taskCompletion;
+  delete taskPackage.artifacts.convergenceSuccess;
 
-  const result = requestHumanDecisionForTaskCompletion({
+  const result = requestHumanDecisionForConvergenceSuccess({
     taskContextPackage: taskPackage,
   });
 
   assert.equal(result.appendRequest, null);
-  assert.match(result.error, /缺少 taskCompletion/);
+  assert.match(result.error, /缺少 convergenceSuccess/);
 });
 
 test("requests human decision after convergence failure", () => {

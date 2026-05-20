@@ -4,7 +4,7 @@ import { evaluateExecutionAdmission } from "./execution-admission.js";
 import { runExecutionAgent } from "./execution-agent-flow.js";
 import {
   requestHumanDecisionForConvergenceFailure,
-  requestHumanDecisionForTaskCompletion,
+  requestHumanDecisionForConvergenceSuccess,
 } from "./human-decision-flow.js";
 import { allocateIsolatedWorkspace } from "./isolated-workspace-flow.js";
 import { initializeMainAgent } from "./main-agent-flow.js";
@@ -39,8 +39,8 @@ export function createBlockedRecommendationRun({ id, startupCheck, now = () => n
     reviewAgentErrors: [],
     convergenceRuns: [],
     convergenceErrors: [],
-    completionHumanDecisionRequest: null,
-    completionHumanDecisionError: null,
+    successHumanDecisionRequest: null,
+    successHumanDecisionError: null,
     failureHumanDecisionRequest: null,
     failureHumanDecisionError: null,
     taskContextPackage: null,
@@ -81,8 +81,8 @@ export function createRunningRecommendationRun({
     reviewAgentErrors: [],
     convergenceRuns: [],
     convergenceErrors: [],
-    completionHumanDecisionRequest: null,
-    completionHumanDecisionError: null,
+    successHumanDecisionRequest: null,
+    successHumanDecisionError: null,
     failureHumanDecisionRequest: null,
     failureHumanDecisionError: null,
     taskContextPackage: null,
@@ -324,18 +324,16 @@ export async function completeRecommendationFlow({
   taskPool = !nextConvergenceRun?.appendRequest
     ? taskPool
     : applyAppendRequest(taskPool, nextConvergenceRun.appendRequest, {
-        currentWorkStage: nextConvergenceRun.appendRequest.artifactType === "taskCompletion"
-          ? "task-completion"
-          : "convergence",
+        currentWorkStage: "convergence",
       });
   const completedPackage = failed || !parsed.appendRequest
     ? null
     : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
   const terminalConvergenceRun = nextConvergenceRun ?? convergenceRun;
-  const completionHumanDecisionRequest =
-    !completedPackage || terminalConvergenceRun?.appendRequest?.artifactType !== "taskCompletion"
+  const successHumanDecisionRequest =
+    !completedPackage || terminalConvergenceRun?.appendRequest?.artifactType !== "convergenceSuccess"
       ? null
-      : requestHumanDecisionForTaskCompletion({
+      : requestHumanDecisionForConvergenceSuccess({
           taskContextPackage: completedPackage,
           now,
         });
@@ -346,9 +344,9 @@ export async function completeRecommendationFlow({
           taskContextPackage: completedPackage,
           now,
         });
-  taskPool = !completionHumanDecisionRequest?.appendRequest
+  taskPool = !successHumanDecisionRequest?.appendRequest
     ? taskPool
-    : applyAppendRequest(taskPool, completionHumanDecisionRequest.appendRequest, {
+    : applyAppendRequest(taskPool, successHumanDecisionRequest.appendRequest, {
         currentWorkStage: "human-decision",
       });
   taskPool = !failureHumanDecisionRequest?.appendRequest
@@ -400,8 +398,8 @@ export async function completeRecommendationFlow({
     convergenceErrors: convergenceRuns
       .map((agentRun) => agentRun.error)
       .filter(Boolean),
-    completionHumanDecisionRequest,
-    completionHumanDecisionError: completionHumanDecisionRequest?.error ?? null,
+    successHumanDecisionRequest,
+    successHumanDecisionError: successHumanDecisionRequest?.error ?? null,
     failureHumanDecisionRequest,
     failureHumanDecisionError: failureHumanDecisionRequest?.error ?? null,
     taskContextPackage,
