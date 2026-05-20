@@ -574,7 +574,7 @@ export function createWorkflowService({
 
       let taskPool = await applyAndPersistAppendRequest(
         decision.appendRequest,
-        { currentWorkStage: "auto-merge" },
+        { currentWorkStage: "auto-merge-planning" },
       );
       latestRecommendationRun.completionHumanDecisionError = null;
 
@@ -599,7 +599,7 @@ export function createWorkflowService({
         {
           currentWorkStage: planning.appendRequest.artifactType === "autoMergePlan"
             ? "auto-merge-execution"
-            : "auto-merge",
+            : "auto-merge-planning",
         },
       );
       latestRecommendationRun.autoMergePlanning = planning;
@@ -705,7 +705,7 @@ export function createWorkflowService({
       const planning = planAutoMerge({
         taskContextPackage: {
           ...latestRecommendationRun.taskContextPackage,
-          currentWorkStage: "auto-merge",
+          currentWorkStage: "auto-merge-planning",
         },
         repositoryDir,
       });
@@ -724,7 +724,7 @@ export function createWorkflowService({
         {
           currentWorkStage: planning.appendRequest.artifactType === "autoMergePlan"
             ? "auto-merge-execution"
-            : "auto-merge",
+            : "auto-merge-planning",
         },
       );
       latestRecommendationRun.autoMergePlanning = planning;

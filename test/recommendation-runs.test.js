@@ -285,7 +285,7 @@ test("workflow service captures a successful recommendation run", async (t) => {
   );
   assert.equal(
     accepted.recommendationRun.taskContextPackage.artifacts.humanDecision.body.nextRequiredStage,
-    "auto-merge",
+    "auto-merge-planning",
   );
   assert.deepEqual(
     accepted.recommendationRun.taskContextPackage.artifacts.humanDecision.body.worktreeSnapshot.changedFiles,
@@ -1131,7 +1131,7 @@ test("workflow service replans accepted work when a no-change package later chan
             cwd: worktreePath,
             changedFiles: [],
           },
-          nextRequiredStage: "auto-merge",
+          nextRequiredStage: "auto-merge-planning",
         },
         appendedAt: "2026-05-19T10:02:00.000Z",
       },

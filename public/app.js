@@ -665,7 +665,7 @@ function renderAutoMerge(taskContextPackage) {
     return;
   }
 
-  if (taskContextPackage?.currentWorkStage === "auto-merge") {
+  if (taskContextPackage?.currentWorkStage === "auto-merge-planning") {
     autoMergeStatus.textContent = "自动检查中";
     autoMergePanel.textContent = "人工已接受完成，系统正在生成自动合并计划。";
     return;
@@ -673,7 +673,7 @@ function renderAutoMerge(taskContextPackage) {
 
   autoMergeStatus.textContent = humanDecision ? "等待自动合并" : "等待输入";
   autoMergePanel.textContent = humanDecision
-    ? "等待任务进入 auto-merge 环节。"
+    ? "等待任务进入 auto-merge-planning 环节。"
     : "等待人工接受完成。";
 }
 

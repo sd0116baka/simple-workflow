@@ -230,7 +230,7 @@ export function acceptTaskCompletion({
           cwd: normalizePathForGit(relative(repositoryDir, cwd)),
           changedFiles,
         },
-        nextRequiredStage: "auto-merge",
+        nextRequiredStage: "auto-merge-planning",
       },
     },
     error: null,

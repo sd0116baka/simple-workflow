@@ -1,6 +1,6 @@
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { join, normalize, resolve } from "node:path";
-import { packageFileName, saveTaskContextPackage } from "./task-context-package-store.js";
+import { saveTaskContextPackage } from "./task-context-package-store.js";
 
 const STAGE_FIXTURES = [
   { id: "stub-task-pool", title: "Stub task-pool", currentWorkStage: "task-pool" },
@@ -13,7 +13,7 @@ const STAGE_FIXTURES = [
   { id: "stub-convergence", title: "Stub convergence", currentWorkStage: "convergence" },
   { id: "stub-task-completion", title: "Stub task-completion", currentWorkStage: "task-completion" },
   { id: "stub-human-decision", title: "Stub human-decision", currentWorkStage: "human-decision" },
-  { id: "stub-auto-merge", title: "Stub auto-merge", currentWorkStage: "auto-merge" },
+  { id: "stub-auto-merge-planning", title: "Stub auto-merge-planning", currentWorkStage: "auto-merge-planning" },
   { id: "stub-auto-merge-execution", title: "Stub auto-merge-execution", currentWorkStage: "auto-merge-execution" },
   { id: "stub-merged", title: "Stub merged", currentWorkStage: "merged" },
   { id: "stub-closed", title: "Stub closed", currentWorkStage: "closed" },
@@ -306,10 +306,10 @@ function populateArtifacts(taskPackage, { id, currentWorkStage, timestamp }) {
       cwd: `.workflow/worktrees/tasks/${id}`,
       changedFiles: [`fixtures/${id}.txt`],
     },
-    nextRequiredStage: "auto-merge",
+    nextRequiredStage: "auto-merge-planning",
   }, timestamp));
 
-  if (currentWorkStage === "auto-merge") return;
+  if (currentWorkStage === "auto-merge-planning") return;
 
   addArtifact(taskPackage, "autoMergePlan", artifact("autoMergePlan", {
     plannedAt: timestamp,
@@ -452,15 +452,19 @@ async function removeExistingStubTaskFiles(tasksDir) {
 }
 
 async function removeExistingStubPackages(storeDir) {
+  let entries = [];
+  try {
+    entries = await readdir(storeDir, { withFileTypes: true });
+  } catch (error) {
+    if (error.code === "ENOENT") return 0;
+    throw error;
+  }
+
   let removed = 0;
-  for (const fixture of STAGE_FIXTURES) {
-    const targetPath = join(storeDir, packageFileName(packageIdFor(`${fixture.id}.yaml`)));
-    try {
-      await rm(targetPath);
-      removed += 1;
-    } catch (error) {
-      if (error.code !== "ENOENT") throw error;
-    }
+  for (const entry of entries) {
+    if (!entry.isFile() || !/^tasks-stub-.*\.ya?ml\.json$/i.test(entry.name)) continue;
+    await rm(join(storeDir, entry.name), { force: true });
+    removed += 1;
   }
   return removed;
 }

@@ -357,13 +357,13 @@ taskCompletion
         ".workflow-agent/execution-agent-001.txt"
       ]
     },
-    "nextRequiredStage": "auto-merge"
+    "nextRequiredStage": "auto-merge-planning"
   },
   "appendedAt": "2026-05-19T10:00:00.000Z"
 }
 ```
 
-追加 `humanDecision` 后，`currentWorkStage` 推进到 `auto-merge`。自动合并环节另行消费该产物，本环节不合并主线。
+追加 `humanDecision` 后，`currentWorkStage` 推进到 `auto-merge-planning`。自动合并规划环节另行消费该产物，本环节不合并主线。
 
 如果 `main` Agent 在收敛环节判断当前结果不能继续自动收敛，或状态机判断已经达到终止条件，它不产出下一轮 `convergenceAdvice`，而是产出：
 

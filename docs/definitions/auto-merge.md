@@ -8,7 +8,7 @@
 
 ## 前置校验输入
 
-输入是处于 `auto-merge` 环节的任务上下文包。
+输入是处于 `auto-merge-planning` 环节的任务上下文包。
 
 必须存在：
 
@@ -91,7 +91,7 @@ isolatedWorkspace
       }
     ],
     "checkedInputs": {
-      "currentWorkStage": "auto-merge",
+      "currentWorkStage": "auto-merge-planning",
       "hasHumanDecision": true,
       "hasTaskCompletion": true,
       "hasIsolatedWorkspace": true
@@ -101,7 +101,7 @@ isolatedWorkspace
 }
 ```
 
-追加 `autoMergeRejection` 后，`currentWorkStage` 保持 `auto-merge`。
+追加 `autoMergeRejection` 后，`currentWorkStage` 保持 `auto-merge-planning`。
 
 ## 前置校验字段规则
 

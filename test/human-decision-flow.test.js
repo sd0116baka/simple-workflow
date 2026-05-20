@@ -166,7 +166,7 @@ test("accepts task completion and prepares auto-merge input", async (t) => {
     cwd: ".workflow/worktrees/tasks/tasks-task-003",
     changedFiles: ["result.txt"],
   });
-  assert.equal(result.appendRequest.artifact.nextRequiredStage, "auto-merge");
+  assert.equal(result.appendRequest.artifact.nextRequiredStage, "auto-merge-planning");
 });
 
 test("does not accept task completion outside human-decision stage", async (t) => {

@@ -56,7 +56,7 @@ async function createGitRepositoryWithWorktree(t, { withChanges = true } = {}) {
 function acceptedPackage(baseCommit) {
   return {
     packageId: "task-context-package:tasks/task-003.yaml",
-    currentWorkStage: "auto-merge",
+    currentWorkStage: "auto-merge-planning",
     artifacts: {
       isolatedWorkspace: {
         artifactId: "isolatedWorkspace",
@@ -199,7 +199,7 @@ test("rejects auto-merge when worktree has no changes", async (t) => {
     },
   ]);
   assert.deepEqual(result.appendRequest.artifact.checkedInputs, {
-    currentWorkStage: "auto-merge",
+    currentWorkStage: "auto-merge-planning",
     hasHumanDecision: true,
     hasTaskCompletion: true,
     hasIsolatedWorkspace: true,

@@ -124,8 +124,8 @@ export function planAutoMerge({
   }
 
   const reasons = [];
-  if (taskContextPackage.currentWorkStage !== "auto-merge") {
-    reasons.push(reason("WRONG_STAGE", "任务不在 auto-merge 环节。"));
+  if (taskContextPackage.currentWorkStage !== "auto-merge-planning") {
+    reasons.push(reason("WRONG_STAGE", "任务不在 auto-merge-planning 环节。"));
   }
 
   const humanDecision = taskContextPackage.artifacts?.humanDecision;
