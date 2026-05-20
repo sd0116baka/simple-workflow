@@ -200,8 +200,7 @@ function activeTaskContextPackage() {
   if (recommendationRun?.taskContextPackage) return recommendationRun.taskContextPackage;
   return poolTaskContextPackages.find((taskPackage) =>
     taskPackage.currentWorkStage === "human-decision"
-      && taskPackage.artifacts?.humanDecisionRequest?.body
-      && !taskPackage.artifacts?.humanDecision?.body,
+      && taskPackage.artifacts?.humanDecisionRequest?.body,
   ) ?? null;
 }
 
@@ -211,10 +210,27 @@ function taskContextPackageLabel(taskContextPackage) {
   return `${sourceFile} · ${taskContextPackage.currentWorkStage}`;
 }
 
+function decisionMatchesRequest(decision, request) {
+  if (!decision?.body || !request?.body) return false;
+  if (request.body.targetType) {
+    return decision.body.targetType === request.body.targetType
+      && decision.body.targetRef === request.body.targetRef;
+  }
+  if (request.body.convergenceSuccessRef) {
+    return decision.body.convergenceSuccessRef === request.body.convergenceSuccessRef
+      && decision.body.decision === "accept-convergence";
+  }
+  if (request.body.targetRef) {
+    return decision.body.targetRef === request.body.targetRef;
+  }
+  return false;
+}
+
 function createHumanDecisionPanel(taskContextPackage) {
   const request = taskContextPackage?.artifacts?.humanDecisionRequest;
-  const decision = taskContextPackage?.artifacts?.humanDecision;
-  if (!request?.body && !decision?.body) return null;
+  const historicalDecision = taskContextPackage?.artifacts?.humanDecision;
+  const decision = decisionMatchesRequest(historicalDecision, request) ? historicalDecision : null;
+  if (!request?.body && !historicalDecision?.body) return null;
   const isGuidanceRequest = request?.body?.decisionOptions?.includes("continue-convergence-with-guidance");
   const isConvergenceSuccessRequest = request?.body?.decisionOptions?.includes("accept-convergence");
 
@@ -244,7 +260,11 @@ function createHumanDecisionPanel(taskContextPackage) {
         `decidedAt: ${decision.body.decidedAt ?? decision.appendedAt ?? "unknown"}`,
       ].join(" · ")
     : [
-        `target: ${request.body.convergenceSuccessRef ?? request.body.targetRef ?? "unknown"}`,
+        `target: ${
+          request.body.targetType
+            ? `${request.body.targetType}:${request.body.targetRef ?? "unknown"}`
+            : request.body.convergenceSuccessRef ?? request.body.targetRef ?? "unknown"
+        }`,
         `requestedAt: ${request.body.requestedAt ?? request.appendedAt ?? "unknown"}`,
       ].join(" · ");
 
@@ -259,7 +279,7 @@ function createHumanDecisionPanel(taskContextPackage) {
       options.append(badge);
     }
     notice.append(options);
-  } else if (request.body.decisionOptions?.length > 0) {
+  } else if (request?.body?.decisionOptions?.length > 0) {
     const options = document.createElement("div");
     options.className = "human-decision-options";
     for (const option of request.body.decisionOptions) {
@@ -384,24 +404,6 @@ function createAutoMergePanel(taskContextPackage) {
       list.append(item);
     }
     panel.append(list);
-  }
-
-  if (rejection && reasons.some((itemReason) => itemReason.code === "NO_CHANGES")) {
-    const replanButton = document.createElement("button");
-    replanButton.type = "button";
-    replanButton.className = "primary-button human-decision-action";
-    replanButton.dataset.action = "replan-auto-merge";
-    replanButton.textContent = "重新生成合并计划";
-    replanButton.addEventListener("click", (event) => {
-      event.preventDefault();
-      if (replanButton.dataset.pending === "true") return;
-      replanAutoMerge(replanButton).catch(showError);
-    });
-
-    const replanFeedback = document.createElement("div");
-    replanFeedback.className = "auto-merge-feedback";
-    replanFeedback.dataset.feedback = "replan-auto-merge";
-    panel.append(replanButton, replanFeedback);
   }
 
   return panel;
@@ -610,7 +612,8 @@ function formatJsonBlock(value) {
 function renderHumanDecision(taskContextPackage) {
   humanDecisionPanel.replaceChildren();
   const request = taskContextPackage?.artifacts?.humanDecisionRequest ?? null;
-  const decision = taskContextPackage?.artifacts?.humanDecision ?? null;
+  const historicalDecision = taskContextPackage?.artifacts?.humanDecision ?? null;
+  const decision = decisionMatchesRequest(historicalDecision, request) ? historicalDecision : null;
   const convergenceSuccess = taskContextPackage?.artifacts?.convergenceSuccess ?? null;
   const convergenceFailures = taskContextPackage?.artifacts?.convergenceFailure ?? [];
   const humanConvergenceGuidance = taskContextPackage?.artifacts?.humanConvergenceGuidance ?? [];
@@ -619,7 +622,7 @@ function renderHumanDecision(taskContextPackage) {
     convergenceFailure: convergenceFailures.at?.(-1) ?? null,
     humanConvergenceGuidance: humanConvergenceGuidance.at?.(-1) ?? null,
     humanDecisionRequest: request,
-    humanDecision: decision,
+    humanDecision: historicalDecision,
   });
   renderInputs(humanDecisionInputs, [
     { label: "收敛成功证据", value: convergenceSuccess?.artifactId ?? "未生成" },

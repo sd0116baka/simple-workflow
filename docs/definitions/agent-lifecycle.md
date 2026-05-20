@@ -396,6 +396,15 @@ humanConvergenceGuidance
 
 取消收尾成功后，任务推进到不再进入推荐、执行、收敛候选的 `cancelled` 终态。取消成功不允许保留执行侧残留；如果系统不能完成收尾，取消流程必须失败，不能把任务标记为已取消。
 
+自动合并前置校验或执行失败时，系统同样追加 `humanDecisionRequest` 并进入 `human-decision`。请求目标分别是 `autoMergeRejection` 或 `autoMergeFailure`，可选动作仍是：
+
+```text
+continue-convergence-with-guidance
+cancel-task
+```
+
+自动合并失败原因只作为 `reasons` 数据保存，不展开成多个专用兜底状态。人工选择继续时，`humanConvergenceGuidance` 引用对应的 `autoMergeRejection` / `autoMergeFailure`，并把任务带回下一轮收敛；人工选择取消时，仍进入统一的任务收尾。
+
 ## inputArtifactRefs 业务规则
 
 `inputArtifactRefs` 表示本次 Agent 工作所依据的任务事实、授权、上一轮结果和收敛意见。

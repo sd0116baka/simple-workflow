@@ -19,6 +19,7 @@ import {
   acceptConvergenceSuccess,
   cancelTaskAfterHumanDecisionRequest,
   provideHumanConvergenceGuidance,
+  requestHumanDecisionForAutoMergeIssue,
   requestHumanDecisionForConvergenceFailure,
   requestHumanDecisionForConvergenceSuccess,
 } from "./human-decision-flow.js";
@@ -134,6 +135,10 @@ export function createWorkflowService({
             ? JSON.parse(JSON.stringify(run.autoMergeExecution))
             : null,
           autoMergeExecutionError: run.autoMergeExecutionError ?? null,
+          autoMergeHumanDecisionRequest: run.autoMergeHumanDecisionRequest
+            ? JSON.parse(JSON.stringify(run.autoMergeHumanDecisionRequest))
+            : null,
+          autoMergeHumanDecisionError: run.autoMergeHumanDecisionError ?? null,
           taskCloseout: run.taskCloseout
             ? JSON.parse(JSON.stringify(run.taskCloseout))
             : null,
@@ -226,7 +231,7 @@ export function createWorkflowService({
     return taskContextPackages.find((candidate) =>
       candidate.currentWorkStage === "human-decision"
         && candidate.artifacts?.humanDecisionRequest?.body
-        && !candidate.artifacts?.humanDecision?.body,
+        && candidate.artifacts.humanDecisionRequest.body.decisionOptions?.includes("accept-convergence"),
     ) ?? null;
   }
 
@@ -246,8 +251,7 @@ export function createWorkflowService({
     const matchesGuidableDecision = (candidate) => {
       const request = candidate.artifacts?.humanDecisionRequest?.body;
       return candidate.currentWorkStage === "human-decision"
-        && request?.decisionOptions?.includes("continue-convergence-with-guidance")
-        && !candidate.artifacts?.humanDecision?.body;
+        && request?.decisionOptions?.includes("continue-convergence-with-guidance");
     };
     if (packageId) {
       const candidate = taskContextPackages.find((item) => item.packageId === packageId) ?? null;
@@ -267,8 +271,7 @@ export function createWorkflowService({
     const matchesCancellableDecision = (candidate) => {
       const request = candidate.artifacts?.humanDecisionRequest?.body;
       return candidate.currentWorkStage === "human-decision"
-        && request?.decisionOptions?.includes("cancel-task")
-        && !candidate.artifacts?.humanDecision?.body;
+        && request?.decisionOptions?.includes("cancel-task");
     };
     if (packageId) {
       const candidate = taskContextPackages.find((item) => item.packageId === packageId) ?? null;
@@ -327,6 +330,21 @@ export function createWorkflowService({
       await persistTaskContextPackage(taskContextPackage);
     }
     return taskPool;
+  }
+
+  async function requestHumanDecisionForLatestAutoMergeIssue(artifactType) {
+    const request = requestHumanDecisionForAutoMergeIssue({
+      taskContextPackage: latestRecommendationRun.taskContextPackage,
+      artifactType,
+    });
+    latestRecommendationRun.autoMergeHumanDecisionRequest = request;
+    latestRecommendationRun.autoMergeHumanDecisionError = request.error ?? null;
+    if (request.appendRequest) {
+      await applyAndPersistAppendRequest(request.appendRequest, {
+        currentWorkStage: "human-decision",
+      });
+    }
+    return request;
   }
 
   async function finishRecommendationRun(run, startedCommand, onProgress) {
@@ -616,6 +634,7 @@ export function createWorkflowService({
       latestRecommendationRun.autoMergePlanning = planning;
       latestRecommendationRun.autoMergePlanningError = null;
       if (planning.appendRequest.artifactType !== "autoMergePlan") {
+        await requestHumanDecisionForLatestAutoMergeIssue(planning.appendRequest.artifactType);
         emitRecommendationChanged(latestRecommendationRun);
         return {
           accepted: true,
@@ -654,6 +673,7 @@ export function createWorkflowService({
       latestRecommendationRun.autoMergeExecution = execution;
       latestRecommendationRun.autoMergeExecutionError = null;
       if (execution.appendRequest.artifactType !== "autoMergeResult") {
+        await requestHumanDecisionForLatestAutoMergeIssue(execution.appendRequest.artifactType);
         emitRecommendationChanged(latestRecommendationRun);
         return {
           accepted: true,
@@ -741,6 +761,9 @@ export function createWorkflowService({
       latestRecommendationRun.autoMergePlanning = planning;
       latestRecommendationRun.autoMergePlanningError = null;
       latestRecommendationRun.taskCloseoutError = null;
+      if (planning.appendRequest.artifactType !== "autoMergePlan") {
+        await requestHumanDecisionForLatestAutoMergeIssue(planning.appendRequest.artifactType);
+      }
       emitRecommendationChanged(latestRecommendationRun);
 
       return {

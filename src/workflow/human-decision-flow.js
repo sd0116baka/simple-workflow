@@ -16,8 +16,28 @@ function latestConvergenceFailure(taskContextPackage) {
   return latestArtifact(taskContextPackage, "convergenceFailure");
 }
 
-function latestConvergenceResult(taskContextPackage) {
+function artifactByType(taskContextPackage, artifactType) {
+  if (artifactType === "convergenceFailure" || artifactType === "humanConvergenceGuidance") {
+    return latestArtifact(taskContextPackage, artifactType);
+  }
+  return taskContextPackage?.artifacts?.[artifactType] ?? null;
+}
+
+function latestHumanDecisionTarget(taskContextPackage) {
   const humanDecisionRequest = taskContextPackage?.artifacts?.humanDecisionRequest;
+  const requestedTargetType = humanDecisionRequest?.body?.targetType;
+  const requestedTargetRef = humanDecisionRequest?.body?.targetRef;
+  if (requestedTargetType && requestedTargetRef) {
+    const targetArtifact = artifactByType(taskContextPackage, requestedTargetType);
+    if (targetArtifact?.artifactId === requestedTargetRef) {
+      return {
+        kind: requestedTargetType,
+        artifact: targetArtifact,
+        requestRefField: "targetRef",
+      };
+    }
+  }
+
   const requestedSuccessRef = humanDecisionRequest?.body?.convergenceSuccessRef;
   if (requestedSuccessRef) {
     const convergenceSuccess = latestConvergenceSuccess(taskContextPackage);
@@ -59,6 +79,18 @@ function latestConvergenceResult(taskContextPackage) {
     };
   }
   return null;
+}
+
+function humanDecisionRequestMatchesTarget(humanDecisionRequest, target) {
+  if (!humanDecisionRequest?.body || !target?.artifact) return false;
+  if (target.kind === "convergenceSuccess") {
+    return humanDecisionRequest.body.convergenceSuccessRef === target.artifact.artifactId;
+  }
+  if (humanDecisionRequest.body.targetType) {
+    return humanDecisionRequest.body.targetType === target.kind
+      && humanDecisionRequest.body.targetRef === target.artifact.artifactId;
+  }
+  return humanDecisionRequest.body[target.requestRefField] === target.artifact.artifactId;
 }
 
 function normalizePathForGit(filePath) {
@@ -152,6 +184,45 @@ export function requestHumanDecisionForConvergenceFailure({
   };
 }
 
+export function requestHumanDecisionForAutoMergeIssue({
+  taskContextPackage,
+  artifactType,
+  now = () => new Date().toISOString(),
+} = {}) {
+  if (!taskContextPackage?.packageId) {
+    throw new Error("taskContextPackage.packageId is required");
+  }
+  if (!["autoMergeRejection", "autoMergeFailure"].includes(artifactType)) {
+    throw new Error("artifactType must be autoMergeRejection or autoMergeFailure");
+  }
+
+  const targetArtifact = artifactByType(taskContextPackage, artifactType);
+  if (!targetArtifact) {
+    return {
+      appendRequest: null,
+      error: `任务上下文包缺少 ${artifactType}，不能请求人工处理自动合并问题。`,
+    };
+  }
+
+  return {
+    appendRequest: {
+      packageId: taskContextPackage.packageId,
+      artifactType: "humanDecisionRequest",
+      artifact: {
+        requestedAt: now(),
+        reason: "自动合并无法继续，需要人工提供收敛意见或取消任务。",
+        targetType: artifactType,
+        targetRef: targetArtifact.artifactId,
+        decisionOptions: [
+          "continue-convergence-with-guidance",
+          "cancel-task",
+        ],
+      },
+    },
+    error: null,
+  };
+}
+
 function normalizeList(value) {
   if (Array.isArray(value)) {
     return value.map((item) => String(item).trim()).filter(Boolean);
@@ -178,18 +249,18 @@ export function provideHumanConvergenceGuidance({
     };
   }
 
-  const convergenceResult = latestConvergenceResult(taskContextPackage);
-  if (!convergenceResult) {
+  const decisionTarget = latestHumanDecisionTarget(taskContextPackage);
+  if (!decisionTarget) {
     return {
       appendRequest: null,
-      error: "任务上下文包缺少 convergenceSuccess 或 convergenceFailure，不能追加人工收敛意见。",
+      error: "任务上下文包缺少人工决策请求指向的目标产物，不能追加人工收敛意见。",
     };
   }
   const humanDecisionRequest = taskContextPackage.artifacts?.humanDecisionRequest;
-  if (humanDecisionRequest?.body?.[convergenceResult.requestRefField] !== convergenceResult.artifact.artifactId) {
+  if (!humanDecisionRequestMatchesTarget(humanDecisionRequest, decisionTarget)) {
     return {
       appendRequest: null,
-      error: "人工决策请求没有指向当前收敛结果，不能追加人工收敛意见。",
+      error: "人工决策请求没有指向当前目标产物，不能追加人工收敛意见。",
     };
   }
   const normalizedGuidance = String(guidance ?? "").trim();
@@ -206,8 +277,8 @@ export function provideHumanConvergenceGuidance({
       artifactType: "humanConvergenceGuidance",
       artifact: {
         decision: "continue-convergence-with-guidance",
-        targetType: convergenceResult.kind,
-        targetRef: convergenceResult.artifact.artifactId,
+        targetType: decisionTarget.kind,
+        targetRef: decisionTarget.artifact.artifactId,
         decidedAt: now(),
         guidance: normalizedGuidance,
         focusAreas: normalizeList(focusAreas),
@@ -327,18 +398,18 @@ export function cancelTaskAfterHumanDecisionRequest({
     };
   }
 
-  const convergenceResult = latestConvergenceResult(taskContextPackage);
-  if (!convergenceResult) {
+  const decisionTarget = latestHumanDecisionTarget(taskContextPackage);
+  if (!decisionTarget) {
     return {
       appendRequest: null,
-      error: "任务上下文包缺少 convergenceSuccess 或 convergenceFailure，不能取消任务。",
+      error: "任务上下文包缺少人工决策请求指向的目标产物，不能取消任务。",
     };
   }
   const humanDecisionRequest = taskContextPackage.artifacts?.humanDecisionRequest;
-  if (humanDecisionRequest?.body?.[convergenceResult.requestRefField] !== convergenceResult.artifact.artifactId) {
+  if (!humanDecisionRequestMatchesTarget(humanDecisionRequest, decisionTarget)) {
     return {
       appendRequest: null,
-      error: "人工决策请求没有指向当前收敛结果，不能取消任务。",
+      error: "人工决策请求没有指向当前目标产物，不能取消任务。",
     };
   }
   return {
@@ -348,8 +419,8 @@ export function cancelTaskAfterHumanDecisionRequest({
       artifact: {
         decision: "cancel-task",
         decidedAt: now(),
-        targetType: convergenceResult.kind,
-        targetRef: convergenceResult.artifact.artifactId,
+        targetType: decisionTarget.kind,
+        targetRef: decisionTarget.artifact.artifactId,
         nextRequiredStage: "task-closeout",
       },
     },

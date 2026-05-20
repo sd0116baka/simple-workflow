@@ -8,6 +8,7 @@ import {
   acceptConvergenceSuccess,
   cancelTaskAfterHumanDecisionRequest,
   provideHumanConvergenceGuidance,
+  requestHumanDecisionForAutoMergeIssue,
   requestHumanDecisionForConvergenceFailure,
   requestHumanDecisionForConvergenceSuccess,
 } from "../src/workflow/human-decision-flow.js";
@@ -107,6 +108,36 @@ function convergenceFailedPackage() {
     body: {
       requestedAt: "2026-05-18T10:00:07.000Z",
       targetRef: "convergenceFailure:001",
+      decisionOptions: ["continue-convergence-with-guidance", "cancel-task"],
+    },
+    appendedAt: "2026-05-18T10:00:07.000Z",
+  };
+  return taskPackage;
+}
+
+function autoMergeIssuePackage(artifactType = "autoMergeRejection") {
+  const taskPackage = completedPackage();
+  delete taskPackage.artifacts.convergenceSuccess;
+  taskPackage.currentWorkStage = "human-decision";
+  taskPackage.artifacts[artifactType] = {
+    artifactId: artifactType,
+    body: {
+      [artifactType === "autoMergeRejection" ? "rejectedAt" : "failedAt"]: "2026-05-18T10:00:06.000Z",
+      reasons: [
+        {
+          code: artifactType === "autoMergeRejection" ? "NO_CHANGES" : "TARGET_MOVED",
+          message: "自动合并无法继续。",
+        },
+      ],
+    },
+    appendedAt: "2026-05-18T10:00:06.000Z",
+  };
+  taskPackage.artifacts.humanDecisionRequest = {
+    artifactId: "humanDecisionRequest",
+    body: {
+      requestedAt: "2026-05-18T10:00:07.000Z",
+      targetType: artifactType,
+      targetRef: artifactType,
       decisionOptions: ["continue-convergence-with-guidance", "cancel-task"],
     },
     appendedAt: "2026-05-18T10:00:07.000Z",
@@ -215,6 +246,23 @@ test("requests human decision after convergence failure", () => {
   ]);
 });
 
+test("requests human decision after auto-merge rejection", () => {
+  const result = requestHumanDecisionForAutoMergeIssue({
+    taskContextPackage: autoMergeIssuePackage("autoMergeRejection"),
+    artifactType: "autoMergeRejection",
+    now: () => "2026-05-18T10:00:07.000Z",
+  });
+
+  assert.equal(result.error, null);
+  assert.equal(result.appendRequest.artifactType, "humanDecisionRequest");
+  assert.equal(result.appendRequest.artifact.targetType, "autoMergeRejection");
+  assert.equal(result.appendRequest.artifact.targetRef, "autoMergeRejection");
+  assert.deepEqual(result.appendRequest.artifact.decisionOptions, [
+    "continue-convergence-with-guidance",
+    "cancel-task",
+  ]);
+});
+
 test("adds human convergence guidance against current failure", () => {
   const result = provideHumanConvergenceGuidance({
     taskContextPackage: convergenceFailedPackage(),
@@ -234,6 +282,20 @@ test("adds human convergence guidance against current failure", () => {
   assert.deepEqual(result.appendRequest.artifact.focusAreas, ["candidateTasks"]);
   assert.deepEqual(result.appendRequest.artifact.avoidRepeating, ["不要继续只改 UI 标签"]);
   assert.equal(result.appendRequest.artifact.expectedNextOutcome, "证明 human-decision 任务不再进入候选集。");
+});
+
+test("adds human convergence guidance against auto-merge failure", () => {
+  const result = provideHumanConvergenceGuidance({
+    taskContextPackage: autoMergeIssuePackage("autoMergeFailure"),
+    guidance: "目标分支已移动，先重新整理收敛结果再继续。",
+    now: () => "2026-05-18T10:00:08.000Z",
+  });
+
+  assert.equal(result.error, null);
+  assert.equal(result.appendRequest.artifactType, "humanConvergenceGuidance");
+  assert.equal(result.appendRequest.artifact.targetType, "autoMergeFailure");
+  assert.equal(result.appendRequest.artifact.targetRef, "autoMergeFailure");
+  assert.equal(result.appendRequest.artifact.nextRequiredStage, "convergence");
 });
 
 test("adds human convergence guidance against current success", () => {
@@ -290,4 +352,21 @@ test("records cancellation decision before closeout cleans resources", async (t)
   assert.equal(result.appendRequest.artifact.targetRef, "convergenceFailure:001");
   assert.equal(result.appendRequest.artifact.nextRequiredStage, "task-closeout");
   assert.equal("restoredExecutionState" in result.appendRequest.artifact, false);
+});
+
+test("records cancellation decision against auto-merge rejection", async (t) => {
+  const repositoryDir = await createGitRepositoryWithWorktree(t);
+
+  const result = cancelTaskAfterHumanDecisionRequest({
+    taskContextPackage: autoMergeIssuePackage("autoMergeRejection"),
+    repositoryDir,
+    now: () => "2026-05-18T10:00:09.000Z",
+  });
+
+  assert.equal(result.error, null);
+  assert.equal(result.appendRequest.artifactType, "humanDecision");
+  assert.equal(result.appendRequest.artifact.decision, "cancel-task");
+  assert.equal(result.appendRequest.artifact.targetType, "autoMergeRejection");
+  assert.equal(result.appendRequest.artifact.targetRef, "autoMergeRejection");
+  assert.equal(result.appendRequest.artifact.nextRequiredStage, "task-closeout");
 });

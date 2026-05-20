@@ -101,7 +101,27 @@ isolatedWorkspace
 }
 ```
 
-追加 `autoMergeRejection` 后，`currentWorkStage` 保持 `auto-merge-planning`。
+追加 `autoMergeRejection` 后，系统必须追加 `humanDecisionRequest`，并把 `currentWorkStage` 推进到 `human-decision`。
+
+该人工决策请求指向 `autoMergeRejection`：
+
+```json
+{
+  "artifactId": "humanDecisionRequest",
+  "body": {
+    "requestedAt": "2026-05-19T10:00:00.000Z",
+    "reason": "自动合并无法继续，需要人工提供收敛意见或取消任务。",
+    "targetType": "autoMergeRejection",
+    "targetRef": "autoMergeRejection",
+    "decisionOptions": [
+      "continue-convergence-with-guidance",
+      "cancel-task"
+    ]
+  }
+}
+```
+
+`autoMergeRejection.body.reasons` 只记录失败事实，不决定控制流。无论具体原因是什么，后续都进入同一个人工决策入口。
 
 ## 前置校验字段规则
 
@@ -239,7 +259,27 @@ rebase 只处理可自动套用的变更；发生冲突时产出 `autoMergeFailu
 }
 ```
 
-追加 `autoMergeFailure` 后，`currentWorkStage` 保持 `auto-merge-execution`。
+追加 `autoMergeFailure` 后，系统必须追加 `humanDecisionRequest`，并把 `currentWorkStage` 推进到 `human-decision`。
+
+该人工决策请求指向 `autoMergeFailure`：
+
+```json
+{
+  "artifactId": "humanDecisionRequest",
+  "body": {
+    "requestedAt": "2026-05-19T10:05:00.000Z",
+    "reason": "自动合并无法继续，需要人工提供收敛意见或取消任务。",
+    "targetType": "autoMergeFailure",
+    "targetRef": "autoMergeFailure",
+    "decisionOptions": [
+      "continue-convergence-with-guidance",
+      "cancel-task"
+    ]
+  }
+}
+```
+
+`autoMergeFailure.body.reasons` 只记录失败事实，不决定控制流。无论具体原因是什么，后续都进入同一个人工决策入口。
 
 ## 执行字段规则
 
@@ -251,7 +291,7 @@ rebase 只处理可自动套用的变更；发生冲突时产出 `autoMergeFailu
 
 `sourceRebasedOntoTarget` 表示执行时是否为了保持 fast-forward 合并而先把 source rebase 到目标 commit。
 
-`autoMergeFailure` 不包含恢复建议。失败原因只记录事实，后续恢复策略另行定义。
+`autoMergeFailure` 不包含恢复建议。失败原因只记录事实；恢复动作由后续 `humanDecisionRequest` 承接。
 
 ## 执行边界
 
