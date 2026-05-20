@@ -231,7 +231,7 @@ function createHumanDecisionPanel(taskContextPackage) {
   reason.className = "human-decision-reason";
   reason.textContent = decision?.body
     ? decision.body.decision === "cancel-task"
-      ? "任务已取消，执行侧资源已恢复到执行前状态。"
+      ? "人工已决定取消任务，执行侧资源由任务收尾环节清理。"
       : "收敛成功证据已由人工接受，等待自动合并环节处理。"
     : request.body.reason ?? "需要人工确认下一步。";
 
@@ -471,14 +471,16 @@ function createTaskCloseoutPanel(taskContextPackage) {
 
   const title = document.createElement("div");
   title.className = "auto-merge-title";
-  title.textContent = "任务已收尾";
+  title.textContent = closeout.body.finalStage === "cancelled"
+    ? "任务已取消并收尾"
+    : "任务已关闭并收尾";
 
   const meta = document.createElement("div");
   meta.className = "auto-merge-meta";
   meta.textContent = [
     `finalStage: ${closeout.body.finalStage ?? "unknown"}`,
     `reason: ${closeout.body.closeoutReason ?? "merged"}`,
-    `closedAt: ${closeout.body.closedAt ?? closeout.appendedAt ?? "unknown"}`,
+    `closeoutAt: ${closeout.body.closeoutAt ?? closeout.body.closedAt ?? closeout.appendedAt ?? "unknown"}`,
   ].join(" · ");
 
   panel.append(title, meta);
@@ -555,7 +557,9 @@ function createTaskContextPackagePanel(taskContextPackage) {
       ? "失败"
       : "未执行";
   values[8].textContent = taskContextPackage.artifacts?.taskCloseout
-    ? "已关闭"
+    ? taskContextPackage.artifacts.taskCloseout.body?.finalStage === "cancelled"
+      ? "已取消"
+      : "已关闭"
     : "未收尾";
   panel.append(artifacts);
 
@@ -757,7 +761,7 @@ function renderTaskCloseout(taskContextPackage) {
   ]);
 
   if (closeout) {
-    taskCloseoutStatus.textContent = "已关闭";
+    taskCloseoutStatus.textContent = closeout.body?.finalStage === "cancelled" ? "已取消" : "已关闭";
     const panel = createTaskCloseoutPanel(taskContextPackage);
     taskCloseoutPanel.append(panel);
     return;

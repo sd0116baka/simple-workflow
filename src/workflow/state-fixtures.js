@@ -518,7 +518,9 @@ function populateArtifacts(taskPackage, {
 
   if (currentWorkStage === "closed") {
     addArtifact(taskPackage, "taskCloseout", artifact("taskCloseout", {
+      closeoutAt: timestamp,
       closedAt: timestamp,
+      closeoutReason: "merged",
       resultRef: "autoMergeResult",
       cleanup: {
         worktree: {
@@ -556,9 +558,23 @@ function populateArtifacts(taskPackage, {
     addArtifact(taskPackage, "humanDecision", artifact("humanDecision", {
       decision: "cancel-task",
       decidedAt: timestamp,
+      targetType: "convergenceFailure",
       targetRef: "convergenceFailure:001",
-      restoredExecutionState: {
-        restored: true,
+      nextRequiredStage: "task-closeout",
+    }, timestamp));
+    addArtifact(taskPackage, "taskCloseout", artifact("taskCloseout", {
+      closeoutAt: timestamp,
+      closeoutReason: "cancelled",
+      decisionRef: "humanDecision",
+      cleanup: {
+        worktree: {
+          path: `.workflow/worktrees/tasks/${id}`,
+          removed: true,
+        },
+        branch: {
+          name: fixtureBranchName(id),
+          deleted: true,
+        },
       },
       finalStage: "cancelled",
     }, timestamp));

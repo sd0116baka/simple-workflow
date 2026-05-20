@@ -144,7 +144,9 @@ export function closeTask({
       packageId: taskContextPackage.packageId,
       artifactType: "taskCloseout",
       artifact: {
+        closeoutAt: now(),
         closedAt: now(),
+        closeoutReason: "merged",
         resultRef: "autoMergeResult",
         cleanup: {
           worktree: {
@@ -157,6 +159,73 @@ export function closeTask({
           },
         },
         finalStage: "closed",
+      },
+    },
+    error: null,
+  };
+}
+
+export function closeCancelledTask({
+  taskContextPackage,
+  repositoryDir = process.cwd(),
+  now = () => new Date().toISOString(),
+} = {}) {
+  if (!taskContextPackage?.packageId) {
+    throw new Error("taskContextPackage.packageId is required");
+  }
+  if (taskContextPackage.currentWorkStage !== "task-closeout") {
+    return {
+      appendRequest: null,
+      error: "任务不在 task-closeout 环节，不能执行取消收尾。",
+    };
+  }
+  const humanDecision = taskContextPackage.artifacts?.humanDecision;
+  if (humanDecision?.body?.decision !== "cancel-task") {
+    return {
+      appendRequest: null,
+      error: "任务缺少取消决策，不能执行取消收尾。",
+    };
+  }
+
+  const isolatedWorkspace = taskContextPackage.artifacts?.isolatedWorkspace;
+  if (!isolatedWorkspace?.body) {
+    return {
+      appendRequest: null,
+      error: "任务上下文包缺少 isolatedWorkspace，不能执行取消收尾。",
+    };
+  }
+
+  const worktreePath = isolatedWorkspace.body.worktreePath;
+  const branchName = isolatedWorkspace.body.branchName;
+  try {
+    const cleanup = removeWorkspaceAndBranch({ repositoryDir, worktreePath, branchName });
+    if (cleanup.error) return { appendRequest: null, error: cleanup.error };
+  } catch (error) {
+    return {
+      appendRequest: null,
+      error: error.message,
+    };
+  }
+
+  return {
+    appendRequest: {
+      packageId: taskContextPackage.packageId,
+      artifactType: "taskCloseout",
+      artifact: {
+        closeoutAt: now(),
+        closeoutReason: "cancelled",
+        decisionRef: "humanDecision",
+        cleanup: {
+          worktree: {
+            path: normalizePathForGit(worktreePath),
+            removed: true,
+          },
+          branch: {
+            name: branchName,
+            deleted: true,
+          },
+        },
+        finalStage: "cancelled",
       },
     },
     error: null,

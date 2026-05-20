@@ -1,6 +1,5 @@
 import { execFileSync } from "node:child_process";
 import { isAbsolute, relative, resolve } from "node:path";
-import { removeWorkspaceAndBranch } from "./task-closeout-flow.js";
 
 function latestConvergenceSuccess(taskContextPackage) {
   return taskContextPackage?.artifacts?.convergenceSuccess ?? null;
@@ -342,28 +341,6 @@ export function cancelTaskAfterHumanDecisionRequest({
       error: "人工决策请求没有指向当前收敛结果，不能取消任务。",
     };
   }
-  const isolatedWorkspace = taskContextPackage.artifacts?.isolatedWorkspace;
-  if (!isolatedWorkspace?.body) {
-    return {
-      appendRequest: null,
-      error: "任务上下文包缺少 isolatedWorkspace，不能确认执行侧资源已恢复。",
-    };
-  }
-
-  try {
-    const cleanup = removeWorkspaceAndBranch({
-      repositoryDir,
-      worktreePath: isolatedWorkspace.body.worktreePath,
-      branchName: isolatedWorkspace.body.branchName,
-    });
-    if (cleanup.error) return { appendRequest: null, error: cleanup.error };
-  } catch (error) {
-    return {
-      appendRequest: null,
-      error: error.message,
-    };
-  }
-
   return {
     appendRequest: {
       packageId: taskContextPackage.packageId,
@@ -373,13 +350,7 @@ export function cancelTaskAfterHumanDecisionRequest({
         decidedAt: now(),
         targetType: convergenceResult.kind,
         targetRef: convergenceResult.artifact.artifactId,
-        restoredExecutionState: {
-          isolatedWorkspaceRef: isolatedWorkspace.artifactId,
-          worktreePath: isolatedWorkspace.body.worktreePath,
-          branchName: isolatedWorkspace.body.branchName,
-          restored: true,
-        },
-        finalStage: "cancelled",
+        nextRequiredStage: "task-closeout",
       },
     },
     error: null,

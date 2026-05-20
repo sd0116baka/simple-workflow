@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadTaskContextPackages } from "../src/workflow/task-context-package-store.js";
 import { listRawTasks } from "../src/workflow/task-source.js";
+import { createWorkflowService } from "../src/workflow/workflow-service.js";
 import {
   cleanupTestStateFixtures,
   seedTestStateFixtures,
@@ -18,6 +19,15 @@ function runGit(args, cwd) {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
   }).trim();
+}
+
+function gitSucceeds(args, cwd) {
+  try {
+    runGit(args, cwd);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function initializeTestRepository(repositoryDir) {
@@ -141,6 +151,44 @@ test("convergence success fixture requests human decision and settles there", as
     "cancel-task",
   ]);
   assert.equal(runGit(["status", "--porcelain"], repositoryDir), "");
+});
+
+test("cancelling a convergence failure fixture closes out resources", async (t) => {
+  const rootDir = await mkdtemp(join(tmpdir(), "simple-workflow-fixtures-cancel-closeout-"));
+  t.after(() => rm(rootDir, { recursive: true, force: true }));
+  const repositoryDir = join(rootDir, ".workflow", "test-environment", "repository");
+  const tasksDir = join(repositoryDir, "tasks");
+  const storeDir = join(repositoryDir, ".workflow", "task-context-packages");
+  await mkdir(repositoryDir, { recursive: true });
+  await initializeTestRepository(repositoryDir);
+
+  const result = await seedTestStateFixtures({
+    repositoryDir,
+    tasksDir,
+    storeDir,
+    fixtureKey: "convergence-failure",
+  });
+  const service = createWorkflowService({
+    repositoryDir,
+    tasksDir,
+    taskContextPackageStoreDir: storeDir,
+    getRepositoryStatus: async () => ({ clean: true, entries: [] }),
+  });
+  const cancelled = await service.cancelTask({
+    packageId: result.tasks[0].packageId,
+  });
+  const [taskContextPackage] = await loadTaskContextPackages({ storeDir });
+
+  assert.equal(cancelled.cancelled, true);
+  assert.equal(taskContextPackage.currentWorkStage, "cancelled");
+  assert.equal(taskContextPackage.artifacts.humanDecision.body.decision, "cancel-task");
+  assert.equal(taskContextPackage.artifacts.taskCloseout.body.closeoutReason, "cancelled");
+  assert.equal(taskContextPackage.artifacts.taskCloseout.body.finalStage, "cancelled");
+  assert.equal(existsSync(join(repositoryDir, ".workflow", "worktrees", "tasks", "stub-convergence-failure")), false);
+  assert.equal(
+    gitSucceeds(["show-ref", "--verify", "--quiet", "refs/heads/workflow/tasks/stub-convergence-failure"], repositoryDir),
+    false,
+  );
 });
 
 test("cleanup resets test repository to the stub fixture base commit", async (t) => {

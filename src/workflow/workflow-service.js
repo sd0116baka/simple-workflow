@@ -23,7 +23,7 @@ import {
   requestHumanDecisionForConvergenceSuccess,
 } from "./human-decision-flow.js";
 import { runOpencodeRecommendation } from "./recommendation-runner.js";
-import { closeTask } from "./task-closeout-flow.js";
+import { closeCancelledTask, closeTask } from "./task-closeout-flow.js";
 import { runConvergence } from "./convergence-flow.js";
 import { runReviewAgent } from "./review-agent-flow.js";
 import {
@@ -833,11 +833,36 @@ export function createWorkflowService({
         };
       }
 
+      const previewPool = applyAppendRequest({
+        taskContextPackages: [taskContextPackage],
+      }, cancellation.appendRequest, {
+        currentWorkStage: "task-closeout",
+      });
+      const taskContextPackageWithDecision = previewPool.taskContextPackages[0];
+      const closeout = closeCancelledTask({
+        taskContextPackage: taskContextPackageWithDecision,
+        repositoryDir,
+      });
+      if (!closeout.appendRequest) {
+        latestRecommendationRun.taskCloseoutError = closeout.error;
+        emitRecommendationChanged(latestRecommendationRun);
+        return {
+          cancelled: false,
+          error: closeout.error,
+          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+        };
+      }
+
       await applyAndPersistAppendRequest(cancellation.appendRequest, {
+        currentWorkStage: "task-closeout",
+      });
+      await applyAndPersistAppendRequest(closeout.appendRequest, {
         currentWorkStage: "cancelled",
       });
       latestRecommendationRun.taskCancellation = cancellation;
       latestRecommendationRun.taskCancellationError = null;
+      latestRecommendationRun.taskCloseout = closeout;
+      latestRecommendationRun.taskCloseoutError = null;
       emitRecommendationChanged(latestRecommendationRun);
 
       return {

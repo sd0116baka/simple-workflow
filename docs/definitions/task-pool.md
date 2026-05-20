@@ -207,7 +207,9 @@ human-decision
 auto-merge-planning
 auto-merge-execution
 merged
+task-closeout
 closed
+cancelled
 ```
 
 `human-decision` 表示系统正在等待人工处理收敛结果。收敛成功时，人工接受、带意见继续收敛或取消任务；收敛失败时，人工带意见继续收敛或取消任务。
@@ -218,7 +220,11 @@ closed
 
 `merged` 表示自动合并执行已成功追加 `autoMergeResult`，任务成果已经合入目标分支。
 
-`closed` 表示任务收尾已成功追加 `taskCloseout`，隔离工作树和任务分支已经清理。
+`task-closeout` 表示任务已经决定退出，系统正在执行统一收尾。成功路径通常从 `merged` 立即完成收尾；取消路径从 `humanDecision(cancel-task)` 进入收尾。
+
+`closed` 表示成功路径的终态：任务收尾已追加 `taskCloseout(closeoutReason: merged)`，隔离工作树和任务分支已经清理。
+
+`cancelled` 表示取消路径的终态：任务收尾已追加 `taskCloseout(closeoutReason: cancelled)`，隔离工作树和任务分支已经清理，任务成果不会合入主线。
 
 ## isolatedWorkspace
 

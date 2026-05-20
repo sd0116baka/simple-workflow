@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { closeTask } from "../src/workflow/task-closeout-flow.js";
+import { closeCancelledTask, closeTask } from "../src/workflow/task-closeout-flow.js";
 
 function runGit(args, cwd) {
   return execFileSync("git", args, {
@@ -124,6 +124,41 @@ function mergedPackage({
   };
 }
 
+function cancelledPackage({
+  baseCommit,
+  worktreePath = ".workflow/worktrees/tasks/tasks-task-003",
+  branchName = "workflow/tasks/tasks-task-003",
+} = {}) {
+  return {
+    packageId: "task-context-package:tasks/task-003.yaml",
+    currentWorkStage: "task-closeout",
+    artifacts: {
+      isolatedWorkspace: {
+        artifactId: "isolatedWorkspace",
+        body: {
+          worktreePath,
+          branchName,
+          baseBranch: "main",
+          baseCommit,
+          status: "ready",
+        },
+        appendedAt: "2026-05-19T10:00:04.000Z",
+      },
+      humanDecision: {
+        artifactId: "humanDecision",
+        body: {
+          decision: "cancel-task",
+          decidedAt: "2026-05-19T10:09:00.000Z",
+          targetType: "convergenceFailure",
+          targetRef: "convergenceFailure:001",
+          nextRequiredStage: "task-closeout",
+        },
+        appendedAt: "2026-05-19T10:09:00.000Z",
+      },
+    },
+  };
+}
+
 test("closes a merged task and removes worktree plus branch", async (t) => {
   const repository = await createMergedTaskRepository(t);
 
@@ -136,7 +171,9 @@ test("closes a merged task and removes worktree plus branch", async (t) => {
   assert.equal(result.error, null);
   assert.equal(result.appendRequest.packageId, "task-context-package:tasks/task-003.yaml");
   assert.equal(result.appendRequest.artifactType, "taskCloseout");
+  assert.equal(result.appendRequest.artifact.closeoutAt, "2026-05-19T10:10:00.000Z");
   assert.equal(result.appendRequest.artifact.closedAt, "2026-05-19T10:10:00.000Z");
+  assert.equal(result.appendRequest.artifact.closeoutReason, "merged");
   assert.equal(result.appendRequest.artifact.resultRef, "autoMergeResult");
   assert.deepEqual(result.appendRequest.artifact.cleanup, {
     worktree: {
@@ -149,6 +186,28 @@ test("closes a merged task and removes worktree plus branch", async (t) => {
     },
   });
   assert.equal(result.appendRequest.artifact.finalStage, "closed");
+  assert.equal(existsSync(repository.worktreeDir), false);
+  assert.equal(
+    gitSucceeds(["show-ref", "--verify", "--quiet", "refs/heads/workflow/tasks/tasks-task-003"], repository.repositoryDir),
+    false,
+  );
+});
+
+test("closes a cancelled task and removes worktree plus branch", async (t) => {
+  const repository = await createMergedTaskRepository(t);
+
+  const result = closeCancelledTask({
+    taskContextPackage: cancelledPackage(repository),
+    repositoryDir: repository.repositoryDir,
+    now: () => "2026-05-19T10:10:00.000Z",
+  });
+
+  assert.equal(result.error, null);
+  assert.equal(result.appendRequest.artifactType, "taskCloseout");
+  assert.equal(result.appendRequest.artifact.closeoutAt, "2026-05-19T10:10:00.000Z");
+  assert.equal(result.appendRequest.artifact.closeoutReason, "cancelled");
+  assert.equal(result.appendRequest.artifact.decisionRef, "humanDecision");
+  assert.equal(result.appendRequest.artifact.finalStage, "cancelled");
   assert.equal(existsSync(repository.worktreeDir), false);
   assert.equal(
     gitSucceeds(["show-ref", "--verify", "--quiet", "refs/heads/workflow/tasks/tasks-task-003"], repository.repositoryDir),

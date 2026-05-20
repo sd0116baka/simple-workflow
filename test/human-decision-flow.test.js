@@ -1,7 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -19,15 +18,6 @@ function runGit(args, cwd) {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
   }).trim();
-}
-
-function gitSucceeds(args, cwd) {
-  try {
-    runGit(args, cwd);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 async function createGitRepositoryWithWorktree(t) {
@@ -284,10 +274,9 @@ test("uses the current human decision request when success and failure both exis
   assert.equal(result.appendRequest.artifact.targetRef, "convergenceSuccess");
 });
 
-test("cancels convergence-failed task only after execution resources are removed", async (t) => {
+test("records cancellation decision before closeout cleans resources", async (t) => {
   const repositoryDir = await createGitRepositoryWithWorktree(t);
   const taskPackage = convergenceFailedPackage();
-  const worktreeDir = join(repositoryDir, ".workflow", "worktrees", "tasks", "tasks-task-003");
 
   const result = cancelTaskAfterHumanDecisionRequest({
     taskContextPackage: taskPackage,
@@ -299,10 +288,6 @@ test("cancels convergence-failed task only after execution resources are removed
   assert.equal(result.appendRequest.artifactType, "humanDecision");
   assert.equal(result.appendRequest.artifact.decision, "cancel-task");
   assert.equal(result.appendRequest.artifact.targetRef, "convergenceFailure:001");
-  assert.equal(result.appendRequest.artifact.restoredExecutionState.restored, true);
-  assert.equal(existsSync(worktreeDir), false);
-  assert.equal(
-    gitSucceeds(["show-ref", "--verify", "--quiet", "refs/heads/workflow/tasks/tasks-task-003"], repositoryDir),
-    false,
-  );
+  assert.equal(result.appendRequest.artifact.nextRequiredStage, "task-closeout");
+  assert.equal("restoredExecutionState" in result.appendRequest.artifact, false);
 });

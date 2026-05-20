@@ -392,9 +392,9 @@ humanConvergenceGuidance
 
 追加 `humanConvergenceGuidance` 后，状态机可以进入下一轮修正：继续调用 `execution` Agent 和 `review` Agent，或在需要时先调用 `main` Agent 重新整理下一轮执行意见。下一轮 Agent 的 `inputArtifactRefs` 必须包含该人工意见。
 
-`cancel-task` 表示人工终止任务。系统必须取消仍在运行的 Agent，删除隔离工作树和任务分支等执行侧资源，把仓库恢复到该任务执行前的状态，然后追加取消决策。
+`cancel-task` 表示人工终止任务。系统必须先追加取消决策，再进入任务收尾，由 `taskCloseout(closeoutReason: cancelled)` 删除隔离工作树和任务分支等执行侧资源，把仓库恢复到该任务执行前的状态。
 
-取消成功后，任务推进到不再进入推荐、执行、收敛候选的终态。取消成功不允许保留执行侧残留；如果系统不能完成清理，取消流程必须失败并停留在人工处理状态，不能把任务标记为已取消。
+取消收尾成功后，任务推进到不再进入推荐、执行、收敛候选的 `cancelled` 终态。取消成功不允许保留执行侧残留；如果系统不能完成收尾，取消流程必须失败，不能把任务标记为已取消。
 
 ## inputArtifactRefs 业务规则
 
