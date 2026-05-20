@@ -182,8 +182,21 @@ export function createApp({
 
       if (request.method === "POST" && request.url?.startsWith("/api/test-fixtures/state-stubs")) {
         try {
-          const result = await workflowService.seedTestStateFixtures();
+          const body = await readJsonBody(request);
+          const result = await workflowService.seedTestStateFixtures({
+            currentWorkStage: body.currentWorkStage,
+          });
           sendJson(response, 201, result);
+        } catch (error) {
+          sendJson(response, 409, { error: error.message });
+        }
+        return;
+      }
+
+      if (request.method === "DELETE" && request.url?.startsWith("/api/test-fixtures/state-stubs")) {
+        try {
+          const result = await workflowService.cleanupTestStateFixtures();
+          sendJson(response, 200, result);
         } catch (error) {
           sendJson(response, 409, { error: error.message });
         }

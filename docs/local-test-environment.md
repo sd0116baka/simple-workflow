@@ -33,9 +33,11 @@ npm.cmd run testenv:reset
 
 ## 状态种子
 
-网页右上角的“生成测试状态”按钮会在测试仓库中生成一组 stub 任务和任务上下文包。
+网页右上角先选择目标状态，再点“生成状态桩”，会在测试仓库中生成一个 stub 任务和任务上下文包。
 
-这些任务分别停在 `task-pool`、`task-recommender`、`execution-admission`、`isolated-workspace`、`main-agent`、`execution-agent`、`review-agent`、`convergence`、`task-completion`、`human-decision`、`auto-merge`、`auto-merge-execution`、`merged`、`closed`、`cancelled` 等环节，方便检查各个面板展示。
+可选状态包括 `task-pool`、`task-recommender`、`execution-admission`、`isolated-workspace`、`main-agent`、`execution-agent`、`review-agent`、`convergence`、`task-completion`、`human-decision`、`auto-merge`、`auto-merge-execution`、`merged`、`closed`、`cancelled`。
+
+每次生成前会先清理旧的 `stub-*` 测试任务，所以一次只保留一个状态桩。测试完成后可以点击“清理状态桩”，删除所有 `stub-*` 任务文件和对应上下文包。
 
 该按钮只允许写入 `.workflow/test-environment/repository`，避免误写项目仓库。
 

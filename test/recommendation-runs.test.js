@@ -1241,15 +1241,17 @@ test("POST /api/server/restart returns unavailable without restart handler", asy
 });
 
 test("POST /api/test-fixtures/state-stubs seeds test state fixtures", async (t) => {
+  let observedStage = null;
   const workflowService = {
-    async seedTestStateFixtures() {
+    async seedTestStateFixtures({ currentWorkStage }) {
+      observedStage = currentWorkStage;
       return {
-        count: 15,
+        count: 1,
         tasks: [
           {
-            packageId: "task-context-package:tasks/stub-task-pool.yaml",
-            sourcePath: "tasks/stub-task-pool.yaml",
-            currentWorkStage: "task-pool",
+            packageId: "task-context-package:tasks/stub-human-decision.yaml",
+            sourcePath: "tasks/stub-human-decision.yaml",
+            currentWorkStage: "human-decision",
           },
         ],
       };
@@ -1265,13 +1267,48 @@ test("POST /api/test-fixtures/state-stubs seeds test state fixtures", async (t) 
 
   const response = await fetch(
     `http://localhost:${server.address().port}/api/test-fixtures/state-stubs`,
-    { method: "POST" },
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ currentWorkStage: "human-decision" }),
+    },
   );
   const payload = await response.json();
 
   assert.equal(response.status, 201);
-  assert.equal(payload.count, 15);
-  assert.equal(payload.tasks[0].currentWorkStage, "task-pool");
+  assert.equal(payload.count, 1);
+  assert.equal(payload.tasks[0].currentWorkStage, "human-decision");
+  assert.equal(observedStage, "human-decision");
+});
+
+test("DELETE /api/test-fixtures/state-stubs cleans test state fixtures", async (t) => {
+  const workflowService = {
+    async cleanupTestStateFixtures() {
+      return {
+        removedTaskFiles: 1,
+        removedPackages: 1,
+      };
+    },
+    onEvent() {
+      return () => {};
+    },
+  };
+  const server = createApp({ workflowService });
+  server.listen(0);
+  t.after(() => server.close());
+  await once(server, "listening");
+
+  const response = await fetch(
+    `http://localhost:${server.address().port}/api/test-fixtures/state-stubs`,
+    { method: "DELETE" },
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.removedTaskFiles, 1);
+  assert.equal(payload.removedPackages, 1);
 });
 
 test("static assets are not cached during workflow UI development", async (t) => {

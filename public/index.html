@@ -13,7 +13,25 @@
         <h1>任务真源</h1>
       </div>
       <div class="header-actions">
-        <button id="seedStateFixturesButton" class="secondary-button" type="button">生成测试状态</button>
+        <select id="seedStateFixtureSelect" class="header-select" aria-label="测试状态">
+          <option value="task-pool">task-pool</option>
+          <option value="task-recommender">task-recommender</option>
+          <option value="execution-admission">execution-admission</option>
+          <option value="isolated-workspace">isolated-workspace</option>
+          <option value="main-agent">main-agent</option>
+          <option value="execution-agent">execution-agent</option>
+          <option value="review-agent">review-agent</option>
+          <option value="convergence">convergence</option>
+          <option value="task-completion">task-completion</option>
+          <option value="human-decision">human-decision</option>
+          <option value="auto-merge">auto-merge</option>
+          <option value="auto-merge-execution">auto-merge-execution</option>
+          <option value="merged">merged</option>
+          <option value="closed">closed</option>
+          <option value="cancelled">cancelled</option>
+        </select>
+        <button id="seedStateFixturesButton" class="secondary-button" type="button">生成状态桩</button>
+        <button id="cleanupStateFixturesButton" class="secondary-button danger-button" type="button">清理状态桩</button>
         <button id="restartButton" class="secondary-button" type="button">重启</button>
         <button id="refreshButton" class="secondary-button" type="button">刷新</button>
       </div>

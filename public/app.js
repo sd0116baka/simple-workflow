@@ -11,7 +11,9 @@ const parsedText = document.querySelector("#parsedText");
 const parseStatus = document.querySelector("#parseStatus");
 const validationResult = document.querySelector("#validationResult");
 const validationStatus = document.querySelector("#validationStatus");
+const seedStateFixtureSelect = document.querySelector("#seedStateFixtureSelect");
 const seedStateFixturesButton = document.querySelector("#seedStateFixturesButton");
+const cleanupStateFixturesButton = document.querySelector("#cleanupStateFixturesButton");
 const restartButton = document.querySelector("#restartButton");
 const refreshButton = document.querySelector("#refreshButton");
 const recommendationStatus = document.querySelector("#recommendationStatus");
@@ -1379,20 +1381,48 @@ async function seedStateFixtures() {
   if (!seedStateFixturesButton) return;
   seedStateFixturesButton.disabled = true;
   seedStateFixturesButton.textContent = "生成中";
-  const response = await fetch("/api/test-fixtures/state-stubs", { method: "POST" });
+  const currentWorkStage = seedStateFixtureSelect?.value ?? "task-pool";
+  const response = await fetch("/api/test-fixtures/state-stubs", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ currentWorkStage }),
+  });
   const payload = await response.json();
   if (!response.ok) {
     seedStateFixturesButton.disabled = false;
-    seedStateFixturesButton.textContent = "生成测试状态";
+    seedStateFixturesButton.textContent = "生成状态桩";
     throw new Error(payload.error ?? `生成测试状态失败：${response.status}`);
   }
   selectedFileName = payload.tasks?.[0]?.sourcePath?.replace(/^tasks\//, "") ?? selectedFileName;
   recommendationRun = null;
   await Promise.all([loadTasks(), loadRecommendationRun()]);
-  seedStateFixturesButton.textContent = `已生成 ${payload.count ?? 0} 个状态`;
+  seedStateFixturesButton.textContent = `已生成 ${currentWorkStage}`;
   setTimeout(() => {
     seedStateFixturesButton.disabled = false;
-    seedStateFixturesButton.textContent = "生成测试状态";
+    seedStateFixturesButton.textContent = "生成状态桩";
+  }, 1500);
+}
+
+async function cleanupStateFixtures() {
+  if (!cleanupStateFixturesButton) return;
+  cleanupStateFixturesButton.disabled = true;
+  cleanupStateFixturesButton.textContent = "清理中";
+  const response = await fetch("/api/test-fixtures/state-stubs", { method: "DELETE" });
+  const payload = await response.json();
+  if (!response.ok) {
+    cleanupStateFixturesButton.disabled = false;
+    cleanupStateFixturesButton.textContent = "清理状态桩";
+    throw new Error(payload.error ?? `清理状态桩失败：${response.status}`);
+  }
+  recommendationRun = null;
+  selectedFileName = selectedFileName?.startsWith("stub-") ? null : selectedFileName;
+  await Promise.all([loadTasks(), loadRecommendationRun()]);
+  cleanupStateFixturesButton.textContent = `已清理 ${payload.removedTaskFiles ?? 0} 个`;
+  setTimeout(() => {
+    cleanupStateFixturesButton.disabled = false;
+    cleanupStateFixturesButton.textContent = "清理状态桩";
   }, 1500);
 }
 
@@ -1411,6 +1441,10 @@ refreshButton.addEventListener("click", () => {
 
 seedStateFixturesButton?.addEventListener("click", () => {
   seedStateFixtures().catch(showError);
+});
+
+cleanupStateFixturesButton?.addEventListener("click", () => {
+  cleanupStateFixtures().catch(showError);
 });
 
 runRecommendationButton.addEventListener("click", () => {
@@ -1473,7 +1507,11 @@ function showError(error) {
   runRecommendationButton.disabled = false;
   if (seedStateFixturesButton) {
     seedStateFixturesButton.disabled = false;
-    seedStateFixturesButton.textContent = "生成测试状态";
+    seedStateFixturesButton.textContent = "生成状态桩";
+  }
+  if (cleanupStateFixturesButton) {
+    cleanupStateFixturesButton.disabled = false;
+    cleanupStateFixturesButton.textContent = "清理状态桩";
   }
   if (cancelRecommendationButton) {
     cancelRecommendationButton.disabled = false;

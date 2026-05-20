@@ -5,9 +5,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadTaskContextPackages } from "../src/workflow/task-context-package-store.js";
 import { listRawTasks } from "../src/workflow/task-source.js";
-import { seedTestStateFixtures } from "../src/workflow/state-fixtures.js";
+import {
+  cleanupTestStateFixtures,
+  seedTestStateFixtures,
+} from "../src/workflow/state-fixtures.js";
 
-test("seeds stub tasks across workflow stages in the test environment", async (t) => {
+test("seeds one selected stub task and replaces previous fixtures", async (t) => {
   const rootDir = await mkdtemp(join(tmpdir(), "simple-workflow-fixtures-"));
   t.after(() => rm(rootDir, { recursive: true, force: true }));
   const repositoryDir = join(rootDir, ".workflow", "test-environment", "repository");
@@ -18,31 +21,64 @@ test("seeds stub tasks across workflow stages in the test environment", async (t
     repositoryDir,
     tasksDir,
     storeDir,
+    currentWorkStage: "human-decision",
     now: () => "2026-05-20T10:00:00.000Z",
   });
   const tasks = await listRawTasks(tasksDir);
   const packages = await loadTaskContextPackages({ storeDir });
-  const stages = new Set(packages.map((taskPackage) => taskPackage.currentWorkStage));
 
-  assert.equal(result.count, 15);
-  assert.equal(tasks.length, 15);
-  assert.equal(packages.length, 15);
-  assert.equal(stages.has("task-pool"), true);
-  assert.equal(stages.has("human-decision"), true);
-  assert.equal(stages.has("closed"), true);
-  assert.equal(stages.has("cancelled"), true);
+  assert.equal(result.count, 1);
+  assert.equal(tasks.length, 1);
+  assert.equal(packages.length, 1);
+  assert.equal(result.tasks[0].currentWorkStage, "human-decision");
+  assert.equal(packages[0].currentWorkStage, "human-decision");
 
-  const humanDecisionPackage = packages.find((taskPackage) =>
-    taskPackage.currentWorkStage === "human-decision"
-      && taskPackage.artifacts.convergenceFailure);
   assert.equal(
-    humanDecisionPackage.artifacts.humanDecisionRequest.body.targetRef,
+    packages[0].artifacts.humanDecisionRequest.body.targetRef,
     "convergenceFailure:001",
   );
-  assert.deepEqual(humanDecisionPackage.artifacts.humanDecisionRequest.body.decisionOptions, [
+  assert.deepEqual(packages[0].artifacts.humanDecisionRequest.body.decisionOptions, [
     "retry-with-guidance",
     "cancel-task",
   ]);
+
+  await seedTestStateFixtures({
+    repositoryDir,
+    tasksDir,
+    storeDir,
+    currentWorkStage: "closed",
+    now: () => "2026-05-20T10:01:00.000Z",
+  });
+  const replacedTasks = await listRawTasks(tasksDir);
+  const replacedPackages = await loadTaskContextPackages({ storeDir });
+
+  assert.equal(replacedTasks.length, 1);
+  assert.equal(replacedTasks[0].fileName, "stub-closed.yaml");
+  assert.equal(replacedPackages.length, 1);
+  assert.equal(replacedPackages[0].currentWorkStage, "closed");
+});
+
+test("cleans generated stub tasks and packages", async (t) => {
+  const rootDir = await mkdtemp(join(tmpdir(), "simple-workflow-fixtures-cleanup-"));
+  t.after(() => rm(rootDir, { recursive: true, force: true }));
+  const repositoryDir = join(rootDir, ".workflow", "test-environment", "repository");
+  const tasksDir = join(repositoryDir, "tasks");
+  const storeDir = join(repositoryDir, ".workflow", "task-context-packages");
+
+  await seedTestStateFixtures({
+    repositoryDir,
+    tasksDir,
+    storeDir,
+    currentWorkStage: "cancelled",
+  });
+  const result = await cleanupTestStateFixtures({ repositoryDir, tasksDir, storeDir });
+  const tasks = await listRawTasks(tasksDir);
+  const packages = await loadTaskContextPackages({ storeDir });
+
+  assert.equal(result.removedTaskFiles, 1);
+  assert.equal(result.removedPackages, 1);
+  assert.equal(tasks.length, 0);
+  assert.equal(packages.length, 0);
 });
 
 test("refuses to seed state fixtures outside the managed test environment", async (t) => {
@@ -54,6 +90,7 @@ test("refuses to seed state fixtures outside the managed test environment", asyn
       repositoryDir,
       tasksDir: join(repositoryDir, "tasks"),
       storeDir: join(repositoryDir, ".workflow", "task-context-packages"),
+      currentWorkStage: "task-pool",
     }),
     /测试状态种子只能写入/,
   );

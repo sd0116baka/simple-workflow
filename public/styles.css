@@ -51,6 +51,17 @@ h2 {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.header-select {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid #c8d2e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1b2333;
 }
 
 .secondary-button {

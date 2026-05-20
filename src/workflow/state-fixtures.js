@@ -1,6 +1,6 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { join, normalize, resolve } from "node:path";
-import { saveTaskContextPackage } from "./task-context-package-store.js";
+import { packageFileName, saveTaskContextPackage } from "./task-context-package-store.js";
 
 const STAGE_FIXTURES = [
   { id: "stub-task-pool", title: "Stub task-pool", currentWorkStage: "task-pool" },
@@ -398,6 +398,7 @@ export async function seedTestStateFixtures({
   repositoryDir,
   tasksDir,
   storeDir,
+  currentWorkStage,
   now = () => new Date().toISOString(),
 } = {}) {
   if (!repositoryDir || !tasksDir || !storeDir) {
@@ -405,28 +406,79 @@ export async function seedTestStateFixtures({
   }
   assertTestEnvironment(repositoryDir);
   await mkdir(tasksDir, { recursive: true });
+  await cleanupTestStateFixtures({ repositoryDir, tasksDir, storeDir });
 
   const timestamp = now();
-  const packages = [];
-  for (const fixture of STAGE_FIXTURES) {
-    const fileName = `${fixture.id}.yaml`;
-    await writeFile(join(tasksDir, fileName), yamlForFixture(fixture), "utf8");
-    const taskPackage = basePackage({ ...fixture, timestamp });
-    populateArtifacts(taskPackage, { ...fixture, timestamp });
-    packages.push(taskPackage);
-    await saveTaskContextPackage({
-      storeDir,
-      taskContextPackage: taskPackage,
-    });
-  }
+  const fixture = STAGE_FIXTURES.find((item) => item.currentWorkStage === currentWorkStage)
+    ?? STAGE_FIXTURES[0];
+  const fileName = `${fixture.id}.yaml`;
+  await writeFile(join(tasksDir, fileName), yamlForFixture(fixture), "utf8");
+  const taskPackage = basePackage({ ...fixture, timestamp });
+  populateArtifacts(taskPackage, { ...fixture, timestamp });
+  await saveTaskContextPackage({
+    storeDir,
+    taskContextPackage: taskPackage,
+  });
 
   return {
     generatedAt: timestamp,
-    count: packages.length,
-    tasks: packages.map((taskPackage) => ({
-      packageId: taskPackage.packageId,
-      sourcePath: taskPackage.source.path,
-      currentWorkStage: taskPackage.currentWorkStage,
-    })),
+    count: 1,
+    tasks: [
+      {
+        packageId: taskPackage.packageId,
+        sourcePath: taskPackage.source.path,
+        currentWorkStage: taskPackage.currentWorkStage,
+      },
+    ],
+  };
+}
+
+async function removeExistingStubTaskFiles(tasksDir) {
+  let entries = [];
+  try {
+    entries = await readdir(tasksDir, { withFileTypes: true });
+  } catch (error) {
+    if (error.code === "ENOENT") return 0;
+    throw error;
+  }
+
+  let removed = 0;
+  for (const entry of entries) {
+    if (!entry.isFile() || !/^stub-.*\.ya?ml$/i.test(entry.name)) continue;
+    await rm(join(tasksDir, entry.name), { force: true });
+    removed += 1;
+  }
+  return removed;
+}
+
+async function removeExistingStubPackages(storeDir) {
+  let removed = 0;
+  for (const fixture of STAGE_FIXTURES) {
+    const targetPath = join(storeDir, packageFileName(packageIdFor(`${fixture.id}.yaml`)));
+    try {
+      await rm(targetPath);
+      removed += 1;
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+  }
+  return removed;
+}
+
+export async function cleanupTestStateFixtures({
+  repositoryDir,
+  tasksDir,
+  storeDir,
+} = {}) {
+  if (!repositoryDir || !tasksDir || !storeDir) {
+    throw new Error("repositoryDir, tasksDir and storeDir are required");
+  }
+  assertTestEnvironment(repositoryDir);
+  const removedTaskFiles = await removeExistingStubTaskFiles(tasksDir);
+  const removedPackages = await removeExistingStubPackages(storeDir);
+
+  return {
+    removedTaskFiles,
+    removedPackages,
   };
 }
