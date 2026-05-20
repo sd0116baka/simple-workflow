@@ -136,6 +136,15 @@ export function createApp({
         return;
       }
 
+      if (request.method === "POST" && request.url?.startsWith("/api/auto-merge/replan")) {
+        const body = await readJsonBody(request);
+        const result = await workflowService.replanAutoMerge({
+          packageId: body.packageId,
+        });
+        sendJson(response, result.error ? 409 : 200, result);
+        return;
+      }
+
       if (request.method === "POST" && request.url?.startsWith("/api/task-closeout/accept-no-changes")) {
         const body = await readJsonBody(request);
         const result = await workflowService.acceptNoChangeCloseout({

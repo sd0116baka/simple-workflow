@@ -214,6 +214,17 @@ export function createWorkflowService({
     ) ?? null;
   }
 
+  async function findAutoMergePlannablePackage(packageId) {
+    const taskContextPackages = await loadExistingTaskContextPackages();
+    if (packageId) {
+      return taskContextPackages.find((candidate) => candidate.packageId === packageId) ?? null;
+    }
+    return taskContextPackages.find((candidate) =>
+      candidate.artifacts?.humanDecision?.body?.decision === "accept-completion"
+        && !candidate.artifacts?.taskCloseout?.body,
+    ) ?? null;
+  }
+
   async function findNoChangeCloseoutPackage(packageId) {
     const taskContextPackages = await loadExistingTaskContextPackages();
     if (packageId) {
@@ -522,6 +533,56 @@ export function createWorkflowService({
         planned: planning.appendRequest.artifactType === "autoMergePlan",
         executed: execution.appendRequest.artifactType === "autoMergeResult",
         closed: true,
+        error: null,
+        recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+      };
+    },
+
+    async replanAutoMerge({ packageId = null } = {}) {
+      const taskContextPackage = await findAutoMergePlannablePackage(packageId);
+      if (!taskContextPackage || taskContextPackage.artifacts?.taskCloseout?.body) {
+        return {
+          planned: false,
+          error: packageId
+            ? `没有找到可重新生成合并计划的任务上下文包：${packageId}`
+            : "没有可重新生成合并计划的任务上下文包。",
+          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+        };
+      }
+
+      ensureLatestRecommendationRun(taskContextPackage);
+      const planning = planAutoMerge({
+        taskContextPackage: {
+          ...latestRecommendationRun.taskContextPackage,
+          currentWorkStage: "auto-merge",
+        },
+        repositoryDir,
+      });
+      if (!planning.appendRequest) {
+        latestRecommendationRun.autoMergePlanningError = planning.error;
+        emitRecommendationChanged(latestRecommendationRun);
+        return {
+          planned: false,
+          error: planning.error,
+          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+        };
+      }
+
+      await applyAndPersistAppendRequest(
+        planning.appendRequest,
+        {
+          currentWorkStage: planning.appendRequest.artifactType === "autoMergePlan"
+            ? "auto-merge-execution"
+            : "auto-merge",
+        },
+      );
+      latestRecommendationRun.autoMergePlanning = planning;
+      latestRecommendationRun.autoMergePlanningError = null;
+      latestRecommendationRun.taskCloseoutError = null;
+      emitRecommendationChanged(latestRecommendationRun);
+
+      return {
+        planned: planning.appendRequest.artifactType === "autoMergePlan",
         error: null,
         recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
       };

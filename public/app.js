@@ -330,6 +330,17 @@ function createAutoMergePanel(taskContextPackage) {
   }
 
   if (rejection && reasons.some((itemReason) => itemReason.code === "NO_CHANGES")) {
+    const replanButton = document.createElement("button");
+    replanButton.type = "button";
+    replanButton.className = "primary-button human-decision-action";
+    replanButton.dataset.action = "replan-auto-merge";
+    replanButton.textContent = "重新生成合并计划";
+    replanButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (replanButton.dataset.pending === "true") return;
+      replanAutoMerge(replanButton).catch(showError);
+    });
+
     const closeoutButton = document.createElement("button");
     closeoutButton.type = "button";
     closeoutButton.className = "primary-button human-decision-action";
@@ -340,10 +351,13 @@ function createAutoMergePanel(taskContextPackage) {
       if (closeoutButton.dataset.pending === "true") return;
       acceptNoChangeCloseout(closeoutButton).catch(showError);
     });
+    const replanFeedback = document.createElement("div");
+    replanFeedback.className = "auto-merge-feedback";
+    replanFeedback.dataset.feedback = "replan-auto-merge";
     const closeoutFeedback = document.createElement("div");
     closeoutFeedback.className = "auto-merge-feedback";
     closeoutFeedback.dataset.feedback = "accept-no-change-closeout";
-    panel.append(closeoutButton, closeoutFeedback);
+    panel.append(replanButton, closeoutButton, replanFeedback, closeoutFeedback);
   }
 
   return panel;
@@ -668,8 +682,24 @@ function renderAutoMergeExecution(taskContextPackage) {
   }
 
   if (taskContextPackage?.currentWorkStage === "auto-merge-execution") {
-    autoMergeExecutionStatus.textContent = "执行中";
-    autoMergeExecutionPanel.textContent = "自动合并计划已生成，系统正在执行合并。";
+    autoMergeExecutionStatus.textContent = "等待执行";
+    const panel = document.createElement("div");
+    panel.className = "auto-merge-panel autoMergePlan";
+    const title = document.createElement("div");
+    title.className = "auto-merge-title";
+    title.textContent = "等待执行自动合并";
+    const meta = document.createElement("div");
+    meta.className = "auto-merge-meta";
+    meta.textContent = "自动合并计划已生成，尚未执行。";
+    const executeButton = document.createElement("button");
+    executeButton.type = "button";
+    executeButton.className = "primary-button human-decision-action";
+    executeButton.textContent = "执行自动合并";
+    executeButton.addEventListener("click", () => {
+      retryAutoMerge().catch(showError);
+    });
+    panel.append(title, meta, executeButton);
+    autoMergeExecutionPanel.append(panel);
     return;
   }
 
@@ -756,6 +786,52 @@ async function retryAutoMerge() {
   const payload = await response.json();
   if (!response.ok) {
     throw new Error(payload.error ?? `重试自动合并失败：${response.status}`);
+  }
+  recommendationRun = payload.recommendationRun ?? null;
+  if (recommendationRun?.taskContextPackage) {
+    const index = poolTaskContextPackages.findIndex((candidate) =>
+      candidate.packageId === recommendationRun.taskContextPackage.packageId,
+    );
+    if (index >= 0) {
+      poolTaskContextPackages[index] = recommendationRun.taskContextPackage;
+    }
+  }
+  renderRecommendationRun();
+  await loadTasks();
+}
+
+async function replanAutoMerge(actionButton = null) {
+  const taskContextPackage = activeTaskContextPackage();
+  const feedback = actionButton
+    ?.closest(".auto-merge-panel")
+    ?.querySelector("[data-feedback='replan-auto-merge']");
+  if (actionButton) {
+    actionButton.dataset.pending = "true";
+    actionButton.disabled = true;
+    actionButton.textContent = "规划中";
+  }
+  if (feedback) feedback.textContent = "正在重新扫描隔离工作树...";
+  autoMergeStatus.textContent = "规划中";
+  const response = await fetch("/api/auto-merge/replan", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      packageId: taskContextPackage?.packageId ?? null,
+    }),
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    const message = payload.error ?? `重新生成合并计划失败：${response.status}`;
+    autoMergeStatus.textContent = "规划失败";
+    if (feedback) feedback.textContent = message;
+    if (actionButton) {
+      delete actionButton.dataset.pending;
+      actionButton.disabled = false;
+      actionButton.textContent = "重新生成合并计划";
+    }
+    return;
   }
   recommendationRun = payload.recommendationRun ?? null;
   if (recommendationRun?.taskContextPackage) {
@@ -1315,12 +1391,17 @@ cancelRecommendationButton?.addEventListener("click", () => {
 });
 
 function handleDocumentAction(event) {
-  const actionButton = event.target.closest?.("[data-action='accept-no-change-closeout']");
+  const actionButton = event.target.closest?.("[data-action]");
   if (!actionButton) return;
   if (event.type === "keydown" && !["Enter", " "].includes(event.key)) return;
   event.preventDefault();
   if (actionButton.dataset.pending === "true") return;
-  acceptNoChangeCloseout(actionButton).catch(showError);
+  if (actionButton.dataset.action === "accept-no-change-closeout") {
+    acceptNoChangeCloseout(actionButton).catch(showError);
+  }
+  if (actionButton.dataset.action === "replan-auto-merge") {
+    replanAutoMerge(actionButton).catch(showError);
+  }
 }
 
 document.addEventListener("click", handleDocumentAction);
