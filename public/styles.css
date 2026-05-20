@@ -180,13 +180,15 @@ h2 {
 }
 
 .task-item:hover,
-.task-item.active {
+.task-item.active,
+.pool-item:hover,
+.pool-item.active {
   border-color: #9db0cc;
   background: #f3f6fb;
 }
 
 .pool-item {
-  cursor: default;
+  cursor: pointer;
 }
 
 .pool-item.ready {
@@ -197,6 +199,11 @@ h2 {
 .pool-item.blocked {
   border-color: #f2b8ae;
   background: #fff7f5;
+}
+
+.pool-item.active {
+  border-color: #9db0cc;
+  background: #f3f6fb;
 }
 
 .task-file {

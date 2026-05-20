@@ -190,16 +190,22 @@ function artifactRecords(artifactValue) {
 }
 
 function activeTaskContextPackage() {
-  if (recommendationRun?.taskContextPackage) return recommendationRun.taskContextPackage;
   const selectedPackage = poolTaskContextPackages.find((taskPackage) =>
     taskPackage.source?.path === `tasks/${selectedFileName}`,
   );
-  if (selectedPackage?.currentWorkStage === "human-decision") return selectedPackage;
+  if (selectedPackage) return selectedPackage;
+  if (recommendationRun?.taskContextPackage) return recommendationRun.taskContextPackage;
   return poolTaskContextPackages.find((taskPackage) =>
     taskPackage.currentWorkStage === "human-decision"
       && taskPackage.artifacts?.humanDecisionRequest?.body
       && !taskPackage.artifacts?.humanDecision?.body,
-  ) ?? selectedPackage ?? null;
+  ) ?? null;
+}
+
+function taskContextPackageLabel(taskContextPackage) {
+  if (!taskContextPackage) return "等待输入";
+  const sourceFile = taskContextPackage.source?.path?.split("/").pop() ?? taskContextPackage.packageId;
+  return `${sourceFile} · ${taskContextPackage.currentWorkStage}`;
 }
 
 function createHumanDecisionPanel(taskContextPackage) {
@@ -812,8 +818,9 @@ function renderTaskPool() {
   }
 
   for (const entry of poolEntries) {
-    const item = document.createElement("div");
-    item.className = `pool-item ${entry.status}`;
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = `pool-item ${entry.status}${entry.sourceFile === selectedFileName ? " active" : ""}`;
     item.innerHTML = `
       <span class="pool-title"></span>
       <span class="pool-meta"></span>
@@ -822,6 +829,7 @@ function renderTaskPool() {
     item.querySelector(".pool-title").textContent = entry.title || entry.id;
     item.querySelector(".pool-meta").textContent = `${entry.sourceFile} · ${entry.type || "unknown"}`;
     item.querySelector(".pool-status").textContent = entry.status;
+    item.addEventListener("click", () => selectTask(entry.sourceFile));
     taskPool.append(item);
   }
 }
@@ -950,7 +958,7 @@ function renderRecommendationRun() {
     recommendationIntentPanel.textContent = "尚未解析。";
     admissionPanel.textContent = "等待推荐器输出。";
     if (taskContextPackage) {
-      taskContextPackageStatus.textContent = taskContextPackage.currentWorkStage;
+      taskContextPackageStatus.textContent = taskContextPackageLabel(taskContextPackage);
       taskContextPackagePanel.append(createTaskContextPackagePanel(taskContextPackage));
     } else {
       taskContextPackageStatus.textContent = "等待输入";
@@ -1011,7 +1019,7 @@ function renderRecommendationRun() {
   }
 
   if (taskContextPackage) {
-    taskContextPackageStatus.textContent = taskContextPackage.currentWorkStage;
+    taskContextPackageStatus.textContent = taskContextPackageLabel(taskContextPackage);
     taskContextPackagePanel.append(createTaskContextPackagePanel(taskContextPackage));
   } else {
     taskContextPackageStatus.textContent = "未生成";
@@ -1042,6 +1050,8 @@ function selectTask(fileName) {
   if (validationResult) validationResult.textContent = "";
   if (validationStatus) validationStatus.textContent = "未展示";
   renderList();
+  renderTaskPool();
+  renderRecommendationRun();
 }
 
 function renderValidation(validation) {
