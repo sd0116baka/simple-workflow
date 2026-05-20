@@ -37,9 +37,9 @@ npm.cmd run testenv:reset
 
 可选状态/场景包括 `task-pool`、`task-recommender`、`execution-admission`、`isolated-workspace`、`main-agent`、`execution-agent`、`review-agent`、`convergence`、`convergence-success`、`convergence-failure`、`auto-merge-planning`、`auto-merge-execution`、`merged`、`closed`、`cancelled`。
 
-其中 `convergence-success` 选项表示收敛成功场景：生成 `convergenceSuccess` 后会立即追加 `humanDecisionRequest`，并停在 `human-decision` 等待人工接受或打回。
+其中 `convergence-success` 选项表示收敛成功场景：生成 `convergenceSuccess` 后会立即追加 `humanDecisionRequest`，并停在 `human-decision` 等待人工接受、带意见继续收敛或取消任务。
 
-`convergence-failure` 选项表示收敛失败场景：生成 `convergenceFailure` 后追加 `humanDecisionRequest`，并停在 `human-decision` 等待人工提供收敛意见重试或取消任务。
+`convergence-failure` 选项表示收敛失败场景：生成 `convergenceFailure` 后追加 `humanDecisionRequest`，并停在 `human-decision` 等待人工提供收敛意见继续或取消任务。
 
 每次生成前会先清理旧的 `stub-*` 测试任务，所以一次只保留一个状态桩。测试完成后可以点击“清理状态桩”，删除所有 `stub-*` 任务文件和对应上下文包。
 

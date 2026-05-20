@@ -131,7 +131,7 @@ export function planAutoMerge({
   const humanDecision = taskContextPackage.artifacts?.humanDecision;
   if (!humanDecision?.body) {
     reasons.push(reason("MISSING_HUMAN_DECISION", "任务上下文包缺少 humanDecision。"));
-  } else if (humanDecision.body.decision !== "accept-completion") {
+  } else if (humanDecision.body.decision !== "accept-convergence") {
     reasons.push(reason("HUMAN_DECISION_NOT_ACCEPTED", "人工决策没有接受收敛成功。"));
   }
 

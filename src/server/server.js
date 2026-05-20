@@ -130,7 +130,7 @@ export function createApp({
         return;
       }
 
-      if (request.method === "POST" && request.url?.startsWith("/api/human-decisions/accept-completion")) {
+      if (request.method === "POST" && request.url?.startsWith("/api/human-decisions/accept-convergence")) {
         const body = await readJsonBody(request);
         const result = await workflowService.acceptConvergenceSuccess({
           packageId: body.packageId,
@@ -139,16 +139,16 @@ export function createApp({
         return;
       }
 
-      if (request.method === "POST" && request.url?.startsWith("/api/human-decisions/retry-with-guidance")) {
+      if (request.method === "POST" && request.url?.startsWith("/api/human-decisions/continue-convergence-with-guidance")) {
         const body = await readJsonBody(request);
-        const result = await workflowService.retryWithConvergenceGuidance({
+        const result = await workflowService.continueConvergenceWithGuidance({
           packageId: body.packageId,
           guidance: body.guidance,
           focusAreas: body.focusAreas,
           avoidRepeating: body.avoidRepeating,
           expectedNextOutcome: body.expectedNextOutcome,
         });
-        sendJson(response, result.retried ? 200 : 409, result);
+        sendJson(response, result.continued ? 200 : 409, result);
         return;
       }
 

@@ -17,6 +17,51 @@ function latestConvergenceFailure(taskContextPackage) {
   return latestArtifact(taskContextPackage, "convergenceFailure");
 }
 
+function latestConvergenceResult(taskContextPackage) {
+  const humanDecisionRequest = taskContextPackage?.artifacts?.humanDecisionRequest;
+  const requestedSuccessRef = humanDecisionRequest?.body?.convergenceSuccessRef;
+  if (requestedSuccessRef) {
+    const convergenceSuccess = latestConvergenceSuccess(taskContextPackage);
+    if (convergenceSuccess?.artifactId === requestedSuccessRef) {
+      return {
+        kind: "convergenceSuccess",
+        artifact: convergenceSuccess,
+        requestRefField: "convergenceSuccessRef",
+      };
+    }
+  }
+
+  const requestedFailureRef = humanDecisionRequest?.body?.targetRef;
+  if (requestedFailureRef) {
+    const convergenceFailure = latestConvergenceFailure(taskContextPackage);
+    if (convergenceFailure?.artifactId === requestedFailureRef) {
+      return {
+        kind: "convergenceFailure",
+        artifact: convergenceFailure,
+        requestRefField: "targetRef",
+      };
+    }
+  }
+
+  const convergenceFailure = latestConvergenceFailure(taskContextPackage);
+  if (convergenceFailure) {
+    return {
+      kind: "convergenceFailure",
+      artifact: convergenceFailure,
+      requestRefField: "targetRef",
+    };
+  }
+  const convergenceSuccess = latestConvergenceSuccess(taskContextPackage);
+  if (convergenceSuccess) {
+    return {
+      kind: "convergenceSuccess",
+      artifact: convergenceSuccess,
+      requestRefField: "convergenceSuccessRef",
+    };
+  }
+  return null;
+}
+
 function normalizePathForGit(filePath) {
   return filePath.replace(/\\/g, "/");
 }
@@ -64,8 +109,9 @@ export function requestHumanDecisionForConvergenceSuccess({
         reason: "Agent 已产出 convergenceSuccess，需要人工决定是否接受收敛成功。",
         convergenceSuccessRef: convergenceSuccess.artifactId,
         decisionOptions: [
-          "accept-completion",
-          "request-changes",
+          "accept-convergence",
+          "continue-convergence-with-guidance",
+          "cancel-task",
         ],
       },
     },
@@ -98,7 +144,7 @@ export function requestHumanDecisionForConvergenceFailure({
         reason: "任务当前无法自动收敛，需要人工提供收敛意见或取消任务。",
         targetRef: convergenceFailure.artifactId,
         decisionOptions: [
-          "retry-with-guidance",
+          "continue-convergence-with-guidance",
           "cancel-task",
         ],
       },
@@ -133,18 +179,18 @@ export function provideHumanConvergenceGuidance({
     };
   }
 
-  const convergenceFailure = latestConvergenceFailure(taskContextPackage);
-  if (!convergenceFailure) {
+  const convergenceResult = latestConvergenceResult(taskContextPackage);
+  if (!convergenceResult) {
     return {
       appendRequest: null,
-      error: "任务上下文包缺少 convergenceFailure，不能追加人工收敛意见。",
+      error: "任务上下文包缺少 convergenceSuccess 或 convergenceFailure，不能追加人工收敛意见。",
     };
   }
   const humanDecisionRequest = taskContextPackage.artifacts?.humanDecisionRequest;
-  if (humanDecisionRequest?.body?.targetRef !== convergenceFailure.artifactId) {
+  if (humanDecisionRequest?.body?.[convergenceResult.requestRefField] !== convergenceResult.artifact.artifactId) {
     return {
       appendRequest: null,
-      error: "人工决策请求没有指向当前 convergenceFailure，不能追加人工收敛意见。",
+      error: "人工决策请求没有指向当前收敛结果，不能追加人工收敛意见。",
     };
   }
   const normalizedGuidance = String(guidance ?? "").trim();
@@ -160,12 +206,15 @@ export function provideHumanConvergenceGuidance({
       packageId: taskContextPackage.packageId,
       artifactType: "humanConvergenceGuidance",
       artifact: {
-        convergenceFailureRef: convergenceFailure.artifactId,
+        decision: "continue-convergence-with-guidance",
+        targetType: convergenceResult.kind,
+        targetRef: convergenceResult.artifact.artifactId,
         decidedAt: now(),
         guidance: normalizedGuidance,
         focusAreas: normalizeList(focusAreas),
         avoidRepeating: normalizeList(avoidRepeating),
         expectedNextOutcome: String(expectedNextOutcome ?? "").trim(),
+        nextRequiredStage: "convergence",
       },
     },
     error: null,
@@ -201,6 +250,18 @@ export function acceptConvergenceSuccess({
       error: "任务上下文包缺少 humanDecisionRequest，不能接受收敛成功。",
     };
   }
+  if (humanDecisionRequest.body.convergenceSuccessRef !== convergenceSuccess.artifactId) {
+    return {
+      appendRequest: null,
+      error: "人工决策请求没有指向当前 convergenceSuccess，不能接受收敛成功。",
+    };
+  }
+  if (!humanDecisionRequest.body.decisionOptions?.includes("accept-convergence")) {
+    return {
+      appendRequest: null,
+      error: "人工决策请求不允许接受收敛成功。",
+    };
+  }
   const isolatedWorkspace = taskContextPackage.artifacts?.isolatedWorkspace;
   if (!isolatedWorkspace?.body) {
     return {
@@ -232,7 +293,7 @@ export function acceptConvergenceSuccess({
       packageId: taskContextPackage.packageId,
       artifactType: "humanDecision",
       artifact: {
-        decision: "accept-completion",
+        decision: "accept-convergence",
         decidedAt: now(),
         convergenceSuccessRef: convergenceSuccess.artifactId,
         acceptedWork: {
@@ -252,7 +313,7 @@ export function acceptConvergenceSuccess({
   };
 }
 
-export function cancelTaskAfterConvergenceFailure({
+export function cancelTaskAfterHumanDecisionRequest({
   taskContextPackage,
   repositoryDir = process.cwd(),
   now = () => new Date().toISOString(),
@@ -267,18 +328,18 @@ export function cancelTaskAfterConvergenceFailure({
     };
   }
 
-  const convergenceFailure = latestConvergenceFailure(taskContextPackage);
-  if (!convergenceFailure) {
+  const convergenceResult = latestConvergenceResult(taskContextPackage);
+  if (!convergenceResult) {
     return {
       appendRequest: null,
-      error: "任务上下文包缺少 convergenceFailure，不能取消收敛失败任务。",
+      error: "任务上下文包缺少 convergenceSuccess 或 convergenceFailure，不能取消任务。",
     };
   }
   const humanDecisionRequest = taskContextPackage.artifacts?.humanDecisionRequest;
-  if (humanDecisionRequest?.body?.targetRef !== convergenceFailure.artifactId) {
+  if (humanDecisionRequest?.body?.[convergenceResult.requestRefField] !== convergenceResult.artifact.artifactId) {
     return {
       appendRequest: null,
-      error: "人工决策请求没有指向当前 convergenceFailure，不能取消任务。",
+      error: "人工决策请求没有指向当前收敛结果，不能取消任务。",
     };
   }
   const isolatedWorkspace = taskContextPackage.artifacts?.isolatedWorkspace;
@@ -310,7 +371,8 @@ export function cancelTaskAfterConvergenceFailure({
       artifact: {
         decision: "cancel-task",
         decidedAt: now(),
-        targetRef: convergenceFailure.artifactId,
+        targetType: convergenceResult.kind,
+        targetRef: convergenceResult.artifact.artifactId,
         restoredExecutionState: {
           isolatedWorkspaceRef: isolatedWorkspace.artifactId,
           worktreePath: isolatedWorkspace.body.worktreePath,

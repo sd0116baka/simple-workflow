@@ -18,7 +18,7 @@ humanDecision
 isolatedWorkspace
 ```
 
-`humanDecision.body.decision` 必须是 `accept-completion`。
+`humanDecision.body.decision` 必须是 `accept-convergence`。
 
 ## 前置校验通过产物
 

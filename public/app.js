@@ -215,7 +215,8 @@ function createHumanDecisionPanel(taskContextPackage) {
   const request = taskContextPackage?.artifacts?.humanDecisionRequest;
   const decision = taskContextPackage?.artifacts?.humanDecision;
   if (!request?.body && !decision?.body) return null;
-  const isConvergenceFailureRequest = request?.body?.decisionOptions?.includes("retry-with-guidance");
+  const isGuidanceRequest = request?.body?.decisionOptions?.includes("continue-convergence-with-guidance");
+  const isConvergenceSuccessRequest = request?.body?.decisionOptions?.includes("accept-convergence");
 
   const notice = document.createElement("div");
   notice.className = "human-decision-notice";
@@ -269,7 +270,7 @@ function createHumanDecisionPanel(taskContextPackage) {
     notice.append(options);
   }
 
-  if (request?.body && !decision?.body && isConvergenceFailureRequest) {
+  if (request?.body && !decision?.body && isGuidanceRequest) {
     const guidanceInput = document.createElement("textarea");
     guidanceInput.className = "human-guidance-input";
     guidanceInput.rows = 5;
@@ -285,16 +286,24 @@ function createHumanDecisionPanel(taskContextPackage) {
     const actions = document.createElement("div");
     actions.className = "human-decision-actions";
 
-    const retryButton = document.createElement("button");
-    retryButton.type = "button";
-    retryButton.className = "primary-button human-decision-action";
-    retryButton.textContent = "带意见重试";
-    retryButton.addEventListener("click", () => {
-      retryWithGuidance({
+    const continueButton = document.createElement("button");
+    continueButton.type = "button";
+    continueButton.className = "primary-button human-decision-action";
+    continueButton.textContent = "带意见继续收敛";
+    continueButton.addEventListener("click", () => {
+      continueConvergenceWithGuidance({
         guidance: guidanceInput.value,
         expectedNextOutcome: expectedInput.value,
-        actionButton: retryButton,
+        actionButton: continueButton,
       }).catch(showError);
+    });
+
+    const acceptButton = document.createElement("button");
+    acceptButton.type = "button";
+    acceptButton.className = "primary-button human-decision-action";
+    acceptButton.textContent = "接受收敛成功";
+    acceptButton.addEventListener("click", () => {
+      acceptConvergence(acceptButton).catch(showError);
     });
 
     const cancelButton = document.createElement("button");
@@ -305,7 +314,11 @@ function createHumanDecisionPanel(taskContextPackage) {
       cancelTask(cancelButton).catch(showError);
     });
 
-    actions.append(retryButton, cancelButton);
+    if (isConvergenceSuccessRequest) {
+      actions.append(acceptButton, continueButton, cancelButton);
+    } else {
+      actions.append(continueButton, cancelButton);
+    }
     notice.append(guidanceInput, expectedInput, actions);
   } else if (request?.body && !decision?.body) {
     const acceptButton = document.createElement("button");
@@ -313,7 +326,7 @@ function createHumanDecisionPanel(taskContextPackage) {
     acceptButton.className = "primary-button human-decision-action";
     acceptButton.textContent = "接受收敛成功";
     acceptButton.addEventListener("click", () => {
-      acceptCompletion().catch(showError);
+      acceptConvergence(acceptButton).catch(showError);
     });
     notice.append(acceptButton);
   }
@@ -762,10 +775,14 @@ function renderTaskCloseout(taskContextPackage) {
     : "等待自动合并结果。";
 }
 
-async function acceptCompletion() {
+async function acceptConvergence(actionButton = null) {
   const taskContextPackage = activeTaskContextPackage();
+  if (actionButton) {
+    actionButton.disabled = true;
+    actionButton.textContent = "提交中";
+  }
   humanDecisionStatus.textContent = "提交中";
-  const response = await fetch("/api/human-decisions/accept-completion", {
+  const response = await fetch("/api/human-decisions/accept-convergence", {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -802,14 +819,18 @@ function syncRunTaskPackageToPool() {
   }
 }
 
-async function retryWithGuidance({ guidance, expectedNextOutcome, actionButton = null } = {}) {
+async function continueConvergenceWithGuidance({
+  guidance,
+  expectedNextOutcome,
+  actionButton = null,
+} = {}) {
   const taskContextPackage = activeTaskContextPackage();
   if (actionButton) {
     actionButton.disabled = true;
-    actionButton.textContent = "重试中";
+    actionButton.textContent = "继续中";
   }
-  humanDecisionStatus.textContent = "重试中";
-  const response = await fetch("/api/human-decisions/retry-with-guidance", {
+  humanDecisionStatus.textContent = "继续中";
+  const response = await fetch("/api/human-decisions/continue-convergence-with-guidance", {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -822,7 +843,7 @@ async function retryWithGuidance({ guidance, expectedNextOutcome, actionButton =
   });
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload.error ?? `带意见重试失败：${response.status}`);
+    throw new Error(payload.error ?? `带意见继续收敛失败：${response.status}`);
   }
   recommendationRun = payload.recommendationRun ?? null;
   syncRunTaskPackageToPool();

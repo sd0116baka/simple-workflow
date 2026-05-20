@@ -65,7 +65,7 @@ test("seeds one selected stub task and replaces previous fixtures", async (t) =>
     "convergenceFailure:001",
   );
   assert.deepEqual(packages[0].artifacts.humanDecisionRequest.body.decisionOptions, [
-    "retry-with-guidance",
+    "continue-convergence-with-guidance",
     "cancel-task",
   ]);
 
@@ -136,8 +136,9 @@ test("convergence success fixture requests human decision and settles there", as
     "convergenceSuccess",
   );
   assert.deepEqual(packages[0].artifacts.humanDecisionRequest.body.decisionOptions, [
-    "accept-completion",
-    "request-changes",
+    "accept-convergence",
+    "continue-convergence-with-guidance",
+    "cancel-task",
   ]);
   assert.equal(runGit(["status", "--porcelain"], repositoryDir), "");
 });

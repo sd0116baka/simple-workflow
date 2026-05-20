@@ -210,7 +210,7 @@ merged
 closed
 ```
 
-`human-decision` 表示系统正在等待人工处理收敛结果。收敛成功时，人工接受或打回 `convergenceSuccess`；收敛失败时，人工提供收敛意见重试或取消任务。
+`human-decision` 表示系统正在等待人工处理收敛结果。收敛成功时，人工接受、带意见继续收敛或取消任务；收敛失败时，人工带意见继续收敛或取消任务。
 
 `auto-merge-planning` 表示人工已经接受收敛成功，系统等待自动合并规划环节消费 `humanDecision`。
 

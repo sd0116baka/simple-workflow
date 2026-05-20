@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   acceptConvergenceSuccess,
-  cancelTaskAfterConvergenceFailure,
+  cancelTaskAfterHumanDecisionRequest,
   provideHumanConvergenceGuidance,
   requestHumanDecisionForConvergenceFailure,
   requestHumanDecisionForConvergenceSuccess,
@@ -90,7 +90,7 @@ function completedPackage() {
         body: {
           requestedAt: "2026-05-18T10:00:07.000Z",
           convergenceSuccessRef: "convergenceSuccess",
-          decisionOptions: ["accept-completion", "request-changes"],
+          decisionOptions: ["accept-convergence", "continue-convergence-with-guidance", "cancel-task"],
         },
         appendedAt: "2026-05-18T10:00:07.000Z",
       },
@@ -117,7 +117,7 @@ function convergenceFailedPackage() {
     body: {
       requestedAt: "2026-05-18T10:00:07.000Z",
       targetRef: "convergenceFailure:001",
-      decisionOptions: ["retry-with-guidance", "cancel-task"],
+      decisionOptions: ["continue-convergence-with-guidance", "cancel-task"],
     },
     appendedAt: "2026-05-18T10:00:07.000Z",
   };
@@ -136,8 +136,9 @@ test("requests human decision after convergence success", () => {
   assert.equal(result.appendRequest.artifact.requestedAt, "2026-05-18T10:00:07.000Z");
   assert.equal(result.appendRequest.artifact.convergenceSuccessRef, "convergenceSuccess");
   assert.deepEqual(result.appendRequest.artifact.decisionOptions, [
-    "accept-completion",
-    "request-changes",
+    "accept-convergence",
+    "continue-convergence-with-guidance",
+    "cancel-task",
   ]);
 });
 
@@ -153,7 +154,7 @@ test("accepts convergence success and prepares auto-merge input", async (t) => {
   assert.equal(result.error, null);
   assert.equal(result.appendRequest.packageId, "task-context-package:tasks/task-003.yaml");
   assert.equal(result.appendRequest.artifactType, "humanDecision");
-  assert.equal(result.appendRequest.artifact.decision, "accept-completion");
+  assert.equal(result.appendRequest.artifact.decision, "accept-convergence");
   assert.equal(result.appendRequest.artifact.decidedAt, "2026-05-18T10:00:08.000Z");
   assert.equal(result.appendRequest.artifact.convergenceSuccessRef, "convergenceSuccess");
   assert.deepEqual(result.appendRequest.artifact.acceptedWork, {
@@ -219,7 +220,7 @@ test("requests human decision after convergence failure", () => {
   assert.equal(result.appendRequest.artifactType, "humanDecisionRequest");
   assert.equal(result.appendRequest.artifact.targetRef, "convergenceFailure:001");
   assert.deepEqual(result.appendRequest.artifact.decisionOptions, [
-    "retry-with-guidance",
+    "continue-convergence-with-guidance",
     "cancel-task",
   ]);
 });
@@ -236,11 +237,51 @@ test("adds human convergence guidance against current failure", () => {
 
   assert.equal(result.error, null);
   assert.equal(result.appendRequest.artifactType, "humanConvergenceGuidance");
-  assert.equal(result.appendRequest.artifact.convergenceFailureRef, "convergenceFailure:001");
+  assert.equal(result.appendRequest.artifact.decision, "continue-convergence-with-guidance");
+  assert.equal(result.appendRequest.artifact.targetType, "convergenceFailure");
+  assert.equal(result.appendRequest.artifact.targetRef, "convergenceFailure:001");
   assert.equal(result.appendRequest.artifact.guidance, "下一轮先收窄状态泄漏，再验证 candidateTasks。");
   assert.deepEqual(result.appendRequest.artifact.focusAreas, ["candidateTasks"]);
   assert.deepEqual(result.appendRequest.artifact.avoidRepeating, ["不要继续只改 UI 标签"]);
   assert.equal(result.appendRequest.artifact.expectedNextOutcome, "证明 human-decision 任务不再进入候选集。");
+});
+
+test("adds human convergence guidance against current success", () => {
+  const result = provideHumanConvergenceGuidance({
+    taskContextPackage: completedPackage(),
+    guidance: "Agent 认为收敛了，但还需要补充边界验证。",
+    expectedNextOutcome: "下一轮补齐取消路径证据。",
+    now: () => "2026-05-18T10:00:08.000Z",
+  });
+
+  assert.equal(result.error, null);
+  assert.equal(result.appendRequest.artifactType, "humanConvergenceGuidance");
+  assert.equal(result.appendRequest.artifact.decision, "continue-convergence-with-guidance");
+  assert.equal(result.appendRequest.artifact.targetType, "convergenceSuccess");
+  assert.equal(result.appendRequest.artifact.targetRef, "convergenceSuccess");
+  assert.equal(result.appendRequest.artifact.nextRequiredStage, "convergence");
+});
+
+test("uses the current human decision request when success and failure both exist", () => {
+  const taskPackage = completedPackage();
+  taskPackage.artifacts.convergenceFailure = [
+    {
+      artifactId: "convergenceFailure:001",
+      body: {
+        summary: "previous failure",
+      },
+      appendedAt: "2026-05-18T09:00:00.000Z",
+    },
+  ];
+
+  const result = provideHumanConvergenceGuidance({
+    taskContextPackage: taskPackage,
+    guidance: "这次是不同意 convergenceSuccess，而不是继续处理旧失败。",
+  });
+
+  assert.equal(result.error, null);
+  assert.equal(result.appendRequest.artifact.targetType, "convergenceSuccess");
+  assert.equal(result.appendRequest.artifact.targetRef, "convergenceSuccess");
 });
 
 test("cancels convergence-failed task only after execution resources are removed", async (t) => {
@@ -248,7 +289,7 @@ test("cancels convergence-failed task only after execution resources are removed
   const taskPackage = convergenceFailedPackage();
   const worktreeDir = join(repositoryDir, ".workflow", "worktrees", "tasks", "tasks-task-003");
 
-  const result = cancelTaskAfterConvergenceFailure({
+  const result = cancelTaskAfterHumanDecisionRequest({
     taskContextPackage: taskPackage,
     repositoryDir,
     now: () => "2026-05-18T10:00:09.000Z",

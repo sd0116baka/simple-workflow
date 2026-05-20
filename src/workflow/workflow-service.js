@@ -17,7 +17,7 @@ import {
 import { executeAutoMerge, planAutoMerge } from "./auto-merge-flow.js";
 import {
   acceptConvergenceSuccess,
-  cancelTaskAfterConvergenceFailure,
+  cancelTaskAfterHumanDecisionRequest,
   provideHumanConvergenceGuidance,
   requestHumanDecisionForConvergenceFailure,
   requestHumanDecisionForConvergenceSuccess,
@@ -236,38 +236,51 @@ export function createWorkflowService({
       return taskContextPackages.find((candidate) => candidate.packageId === packageId) ?? null;
     }
     return taskContextPackages.find((candidate) =>
-      candidate.artifacts?.humanDecision?.body?.decision === "accept-completion"
+      candidate.artifacts?.humanDecision?.body?.decision === "accept-convergence"
         && !candidate.artifacts?.taskCloseout?.body,
     ) ?? null;
   }
 
-  function latestMultiArtifact(taskContextPackage, artifactType) {
-    const artifacts = taskContextPackage?.artifacts?.[artifactType];
-    return Array.isArray(artifacts) && artifacts.length > 0
-      ? artifacts[artifacts.length - 1]
-      : null;
-  }
-
-  async function findConvergenceFailureDecisionPackage(packageId) {
+  async function findGuidableConvergenceDecisionPackage(packageId) {
     const taskContextPackages = await loadExistingTaskContextPackages();
-    const matchesConvergenceFailureDecision = (candidate) => {
-      const convergenceFailure = latestMultiArtifact(candidate, "convergenceFailure");
+    const matchesGuidableDecision = (candidate) => {
+      const request = candidate.artifacts?.humanDecisionRequest?.body;
       return candidate.currentWorkStage === "human-decision"
-        && convergenceFailure?.artifactId
-        && candidate.artifacts?.humanDecisionRequest?.body?.targetRef === convergenceFailure.artifactId
+        && request?.decisionOptions?.includes("continue-convergence-with-guidance")
         && !candidate.artifacts?.humanDecision?.body;
     };
     if (packageId) {
       const candidate = taskContextPackages.find((item) => item.packageId === packageId) ?? null;
-      return candidate && matchesConvergenceFailureDecision(candidate) ? candidate : null;
+      return candidate && matchesGuidableDecision(candidate) ? candidate : null;
     }
     if (
       latestRecommendationRun?.taskContextPackage
-      && matchesConvergenceFailureDecision(latestRecommendationRun.taskContextPackage)
+      && matchesGuidableDecision(latestRecommendationRun.taskContextPackage)
     ) {
       return latestRecommendationRun.taskContextPackage;
     }
-    return taskContextPackages.find(matchesConvergenceFailureDecision) ?? null;
+    return taskContextPackages.find(matchesGuidableDecision) ?? null;
+  }
+
+  async function findCancellableHumanDecisionPackage(packageId) {
+    const taskContextPackages = await loadExistingTaskContextPackages();
+    const matchesCancellableDecision = (candidate) => {
+      const request = candidate.artifacts?.humanDecisionRequest?.body;
+      return candidate.currentWorkStage === "human-decision"
+        && request?.decisionOptions?.includes("cancel-task")
+        && !candidate.artifacts?.humanDecision?.body;
+    };
+    if (packageId) {
+      const candidate = taskContextPackages.find((item) => item.packageId === packageId) ?? null;
+      return candidate && matchesCancellableDecision(candidate) ? candidate : null;
+    }
+    if (
+      latestRecommendationRun?.taskContextPackage
+      && matchesCancellableDecision(latestRecommendationRun.taskContextPackage)
+    ) {
+      return latestRecommendationRun.taskContextPackage;
+    }
+    return taskContextPackages.find(matchesCancellableDecision) ?? null;
   }
 
   function ensureLatestRecommendationRun(taskContextPackage) {
@@ -737,20 +750,20 @@ export function createWorkflowService({
       };
     },
 
-    async retryWithConvergenceGuidance({
+    async continueConvergenceWithGuidance({
       packageId = null,
       guidance = "",
       focusAreas = [],
       avoidRepeating = [],
       expectedNextOutcome = "",
     } = {}) {
-      const taskContextPackage = await findConvergenceFailureDecisionPackage(packageId);
+      const taskContextPackage = await findGuidableConvergenceDecisionPackage(packageId);
       if (!taskContextPackage) {
         return {
-          retried: false,
+          continued: false,
           error: packageId
-            ? `没有找到可带意见重试的任务上下文包：${packageId}`
-            : "没有可带意见重试的任务上下文包。",
+            ? `没有找到可带意见继续收敛的任务上下文包：${packageId}`
+            : "没有可带意见继续收敛的任务上下文包。",
           recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
         };
       }
@@ -767,7 +780,7 @@ export function createWorkflowService({
         latestRecommendationRun.humanConvergenceGuidanceError = guidanceResult.error;
         emitRecommendationChanged(latestRecommendationRun);
         return {
-          retried: false,
+          continued: false,
           error: guidanceResult.error,
           recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
         };
@@ -787,26 +800,26 @@ export function createWorkflowService({
       emitRecommendationChanged(latestRecommendationRun);
 
       return {
-        retried: !error,
+        continued: !error,
         error,
         recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
       };
     },
 
     async cancelTask({ packageId = null } = {}) {
-      const taskContextPackage = await findConvergenceFailureDecisionPackage(packageId);
+      const taskContextPackage = await findCancellableHumanDecisionPackage(packageId);
       if (!taskContextPackage) {
         return {
           cancelled: false,
           error: packageId
-            ? `没有找到可取消的收敛失败任务上下文包：${packageId}`
-            : "没有可取消的收敛失败任务上下文包。",
+            ? `没有找到可取消的任务上下文包：${packageId}`
+            : "没有可取消的任务上下文包。",
           recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
         };
       }
 
       ensureLatestRecommendationRun(taskContextPackage);
-      const cancellation = cancelTaskAfterConvergenceFailure({
+      const cancellation = cancelTaskAfterHumanDecisionRequest({
         taskContextPackage,
         repositoryDir,
       });

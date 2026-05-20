@@ -281,7 +281,7 @@ test("workflow service captures a successful recommendation run", async (t) => {
   assert.equal(accepted.recommendationRun.taskContextPackage.currentWorkStage, "closed");
   assert.equal(
     accepted.recommendationRun.taskContextPackage.artifacts.humanDecision.body.decision,
-    "accept-completion",
+    "accept-convergence",
   );
   assert.equal(
     accepted.recommendationRun.taskContextPackage.artifacts.humanDecision.body.nextRequiredStage,
@@ -853,7 +853,7 @@ test("POST /api/recommendation-runs/cancel cancels the latest run", async (t) =>
   assert.equal(payload.recommendationRun.status, "cancelled");
 });
 
-test("POST /api/human-decisions/accept-completion accepts convergence success", async (t) => {
+test("POST /api/human-decisions/accept-convergence accepts convergence success", async (t) => {
   const latestRun = {
     id: "recommendation-run-test",
     status: "succeeded",
@@ -884,7 +884,7 @@ test("POST /api/human-decisions/accept-completion accepts convergence success", 
   await once(server, "listening");
 
   const response = await fetch(
-    `http://localhost:${server.address().port}/api/human-decisions/accept-completion`,
+    `http://localhost:${server.address().port}/api/human-decisions/accept-convergence`,
     {
       method: "POST",
       headers: {
@@ -906,17 +906,17 @@ test("POST /api/human-decisions/accept-completion accepts convergence success", 
   assert.equal(observedPackageId, "task-context-package:tasks/task-001.yaml");
 });
 
-test("POST /api/human-decisions/retry-with-guidance retries convergence failure", async (t) => {
+test("POST /api/human-decisions/continue-convergence-with-guidance continues convergence", async (t) => {
   const latestRun = {
     id: "recommendation-run-test",
     status: "succeeded",
   };
   let observedBody = null;
   const workflowService = {
-    async retryWithConvergenceGuidance(body) {
+    async continueConvergenceWithGuidance(body) {
       observedBody = body;
       return {
-        retried: true,
+        continued: true,
         error: null,
         recommendationRun: latestRun,
       };
@@ -934,7 +934,7 @@ test("POST /api/human-decisions/retry-with-guidance retries convergence failure"
   await once(server, "listening");
 
   const response = await fetch(
-    `http://localhost:${server.address().port}/api/human-decisions/retry-with-guidance`,
+    `http://localhost:${server.address().port}/api/human-decisions/continue-convergence-with-guidance`,
     {
       method: "POST",
       headers: {
@@ -950,7 +950,7 @@ test("POST /api/human-decisions/retry-with-guidance retries convergence failure"
   const payload = await response.json();
 
   assert.equal(response.status, 200);
-  assert.equal(payload.retried, true);
+  assert.equal(payload.continued, true);
   assert.equal(observedBody.packageId, "task-context-package:tasks/task-001.yaml");
   assert.equal(observedBody.guidance, "先收窄候选任务状态。");
   assert.equal(observedBody.expectedNextOutcome, "下一轮证明候选集正确。");
@@ -1118,7 +1118,7 @@ test("workflow service replans accepted work when a no-change package later chan
       humanDecision: {
         artifactId: "humanDecision",
         body: {
-          decision: "accept-completion",
+          decision: "accept-convergence",
           decidedAt: "2026-05-19T10:02:00.000Z",
           convergenceSuccessRef: "convergenceSuccess",
           acceptedWork: {

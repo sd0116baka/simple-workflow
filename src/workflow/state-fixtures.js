@@ -406,7 +406,7 @@ function populateArtifacts(taskPackage, {
       reasonCode: "fixture-not-converged",
       basisRefs: ["executionReport:001", "reviewReport:001"],
       attemptedFixes: [],
-      unresolvedIssues: [{ code: "fixture-not-converged", message: "用于测试人工重试和取消按钮。" }],
+      unresolvedIssues: [{ code: "fixture-not-converged", message: "用于测试人工继续收敛和取消按钮。" }],
       humanDecisionQuestion: "提供人工收敛意见继续，或取消任务。",
       maxIterations: 1,
       completedIterations: 1,
@@ -425,7 +425,7 @@ function populateArtifacts(taskPackage, {
       requestedAt: timestamp,
       reason: "fixture 收敛失败，需要人工处理。",
       targetRef: "convergenceFailure:001",
-      decisionOptions: ["retry-with-guidance", "cancel-task"],
+      decisionOptions: ["continue-convergence-with-guidance", "cancel-task"],
     }, timestamp));
     return;
   }
@@ -458,13 +458,13 @@ function populateArtifacts(taskPackage, {
     requestedAt: timestamp,
     reason: "fixture 收敛成功，需要人工接受。",
     convergenceSuccessRef: "convergenceSuccess",
-    decisionOptions: ["accept-completion", "request-changes"],
+    decisionOptions: ["accept-convergence", "continue-convergence-with-guidance", "cancel-task"],
   }, timestamp));
 
   if (currentWorkStage === "human-decision") return;
 
   addArtifact(taskPackage, "humanDecision", artifact("humanDecision", {
-    decision: "accept-completion",
+    decision: "accept-convergence",
     decidedAt: timestamp,
     convergenceSuccessRef: "convergenceSuccess",
     acceptedWork: {
@@ -551,7 +551,7 @@ function populateArtifacts(taskPackage, {
       requestedAt: timestamp,
       reason: "fixture 取消请求。",
       targetRef: "convergenceFailure:001",
-      decisionOptions: ["retry-with-guidance", "cancel-task"],
+      decisionOptions: ["continue-convergence-with-guidance", "cancel-task"],
     }, timestamp));
     addArtifact(taskPackage, "humanDecision", artifact("humanDecision", {
       decision: "cancel-task",

@@ -79,7 +79,7 @@ function acceptedPackage(baseCommit) {
       humanDecision: {
         artifactId: "humanDecision",
         body: {
-          decision: "accept-completion",
+          decision: "accept-convergence",
           decidedAt: "2026-05-18T10:00:08.000Z",
           convergenceSuccessRef: "convergenceSuccess",
           acceptedWork: {
