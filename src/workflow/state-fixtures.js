@@ -2,7 +2,10 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { join, normalize, resolve } from "node:path";
-import { saveTaskContextPackage } from "./task-context-package-store.js";
+import {
+  loadTaskContextPackages,
+  saveTaskContextPackage,
+} from "./task-context-package-store.js";
 import { removeWorkspaceAndBranch } from "./task-closeout-flow.js";
 
 const TEST_ENV_GITIGNORE = [
@@ -112,6 +115,67 @@ async function ensureTestEnvironmentGitignore(repositoryDir) {
     "-m",
     "ignore generated test fixtures",
   ], repositoryDir);
+}
+
+function isStubPackage(taskContextPackage) {
+  return /^tasks\/stub-.*\.ya?ml$/i.test(taskContextPackage?.source?.path ?? "");
+}
+
+function isValidCommit(repositoryDir, commit) {
+  if (!commit || !/^[a-f0-9]{7,40}$/i.test(commit)) return false;
+  return gitSucceeds(["cat-file", "-e", `${commit}^{commit}`], repositoryDir);
+}
+
+function selectEarliestBaseCommit(repositoryDir, baseCommits) {
+  let selected = null;
+  for (const commit of baseCommits) {
+    if (!isValidCommit(repositoryDir, commit)) continue;
+    if (!selected || gitSucceeds(["merge-base", "--is-ancestor", commit, selected], repositoryDir)) {
+      selected = commit;
+    }
+  }
+  return selected;
+}
+
+function isStubAutoMergeSubject(subject) {
+  return /^chore\(auto-merge\): stub-/.test(subject ?? "");
+}
+
+function findBaseBeforeTopStubAutoMergeCommits(repositoryDir) {
+  if (!gitSucceeds(["rev-parse", "--git-dir"], repositoryDir)) return null;
+  const output = runGit(["log", "--first-parent", "--format=%H%x00%s", "-50"], repositoryDir);
+  let foundStubCommit = false;
+  for (const line of output.split(/\r?\n/)) {
+    if (!line) continue;
+    const [commit, subject] = line.split("\0");
+    if (isStubAutoMergeSubject(subject)) {
+      foundStubCommit = true;
+      continue;
+    }
+    return foundStubCommit && isValidCommit(repositoryDir, commit) ? commit : null;
+  }
+  return null;
+}
+
+async function findStubFixtureBaseCommit({ repositoryDir, storeDir }) {
+  const packages = await loadTaskContextPackages({ storeDir });
+  return selectEarliestBaseCommit(
+    repositoryDir,
+    packages
+      .filter(isStubPackage)
+      .map((taskContextPackage) => taskContextPackage.fixture?.baseCommit),
+  );
+}
+
+async function resetMainToStubFixtureBase({ repositoryDir, storeDir }) {
+  if (!gitSucceeds(["rev-parse", "--git-dir"], repositoryDir)) return null;
+  const baseCommit = await findStubFixtureBaseCommit({ repositoryDir, storeDir })
+    ?? findBaseBeforeTopStubAutoMergeCommits(repositoryDir);
+  if (!baseCommit) return null;
+
+  runGit(["checkout", "main"], repositoryDir);
+  runGit(["reset", "--hard", baseCommit], repositoryDir);
+  return baseCommit;
 }
 
 function fixtureWorktreePath(id) {
@@ -512,9 +576,9 @@ export async function seedTestStateFixtures({
     throw new Error("repositoryDir, tasksDir and storeDir are required");
   }
   assertTestEnvironment(repositoryDir);
-  await ensureTestEnvironmentGitignore(repositoryDir);
   await mkdir(tasksDir, { recursive: true });
   await cleanupTestStateFixtures({ repositoryDir, tasksDir, storeDir });
+  await ensureTestEnvironmentGitignore(repositoryDir);
 
   const timestamp = now();
   const fixture = STAGE_FIXTURES.find((item) => item.fixtureKey === fixtureKey)
@@ -611,13 +675,16 @@ export async function cleanupTestStateFixtures({
     throw new Error("repositoryDir, tasksDir and storeDir are required");
   }
   assertTestEnvironment(repositoryDir);
+  const resetCommit = await resetMainToStubFixtureBase({ repositoryDir, storeDir });
   const removedWorktrees = removeExistingStubWorktrees(repositoryDir);
   const removedTaskFiles = await removeExistingStubTaskFiles(tasksDir);
   const removedPackages = await removeExistingStubPackages(storeDir);
+  await ensureTestEnvironmentGitignore(repositoryDir);
 
   return {
     removedTaskFiles,
     removedPackages,
     removedWorktrees,
+    resetCommit,
   };
 }

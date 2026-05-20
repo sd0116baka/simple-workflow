@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -138,6 +139,75 @@ test("convergence success fixture requests human decision and settles there", as
     "accept-completion",
     "request-changes",
   ]);
+  assert.equal(runGit(["status", "--porcelain"], repositoryDir), "");
+});
+
+test("cleanup resets test repository to the stub fixture base commit", async (t) => {
+  const rootDir = await mkdtemp(join(tmpdir(), "simple-workflow-fixtures-reset-"));
+  t.after(() => rm(rootDir, { recursive: true, force: true }));
+  const repositoryDir = join(rootDir, ".workflow", "test-environment", "repository");
+  const tasksDir = join(repositoryDir, "tasks");
+  const storeDir = join(repositoryDir, ".workflow", "task-context-packages");
+  await mkdir(repositoryDir, { recursive: true });
+  await initializeTestRepository(repositoryDir);
+
+  await seedTestStateFixtures({
+    repositoryDir,
+    tasksDir,
+    storeDir,
+    fixtureKey: "convergence-success",
+  });
+  const [taskContextPackage] = await loadTaskContextPackages({ storeDir });
+  const baseCommit = taskContextPackage.fixture.baseCommit;
+  await writeFile(join(repositoryDir, "stub-merge-result.txt"), "merged fixture output\n", "utf8");
+  runGit(["add", "stub-merge-result.txt"], repositoryDir);
+  runGit([
+    "-c",
+    "user.name=Simple Workflow Test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-m",
+    "fake fixture merge",
+  ], repositoryDir);
+
+  const result = await cleanupTestStateFixtures({ repositoryDir, tasksDir, storeDir });
+
+  assert.equal(result.resetCommit, baseCommit);
+  assert.equal(runGit(["rev-parse", "HEAD"], repositoryDir), baseCommit);
+  assert.equal(existsSync(join(repositoryDir, "stub-merge-result.txt")), false);
+  assert.equal(runGit(["status", "--porcelain"], repositoryDir), "");
+});
+
+test("cleanup removes legacy top-level stub auto-merge commits without packages", async (t) => {
+  const rootDir = await mkdtemp(join(tmpdir(), "simple-workflow-fixtures-legacy-reset-"));
+  t.after(() => rm(rootDir, { recursive: true, force: true }));
+  const repositoryDir = join(rootDir, ".workflow", "test-environment", "repository");
+  const tasksDir = join(repositoryDir, "tasks");
+  const storeDir = join(repositoryDir, ".workflow", "task-context-packages");
+  await mkdir(repositoryDir, { recursive: true });
+  await initializeTestRepository(repositoryDir);
+
+  await seedTestStateFixtures({ repositoryDir, tasksDir, storeDir, fixtureKey: "cancelled" });
+  await cleanupTestStateFixtures({ repositoryDir, tasksDir, storeDir });
+  const baseCommit = runGit(["rev-parse", "HEAD"], repositoryDir);
+  await writeFile(join(repositoryDir, "legacy-stub-merge.txt"), "legacy fixture output\n", "utf8");
+  runGit(["add", "legacy-stub-merge.txt"], repositoryDir);
+  runGit([
+    "-c",
+    "user.name=Simple Workflow Test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-m",
+    "chore(auto-merge): stub-legacy Legacy",
+  ], repositoryDir);
+
+  const result = await cleanupTestStateFixtures({ repositoryDir, tasksDir, storeDir });
+
+  assert.equal(result.resetCommit, baseCommit);
+  assert.equal(runGit(["rev-parse", "HEAD"], repositoryDir), baseCommit);
+  assert.equal(existsSync(join(repositoryDir, "legacy-stub-merge.txt")), false);
   assert.equal(runGit(["status", "--porcelain"], repositoryDir), "");
 });
 
