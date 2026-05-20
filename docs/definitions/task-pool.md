@@ -54,6 +54,7 @@
     {
       "packageId": "task-context-package:tasks/task-003.yaml",
       "currentWorkStage": "task-pool",
+      "taskPoolState": "ready",
       "source": {
         "path": "tasks/task-003.yaml",
         "format": "yaml",
@@ -79,7 +80,17 @@
       },
       "artifacts": {},
       "agentRuns": [],
-      "timeline": []
+      "timeline": [
+        {
+          "eventType": "taskPoolStateChanged",
+          "from": "parsed",
+          "to": "ready",
+          "reason": "qualityGate.pass",
+          "sourceContentHash": "abc123",
+          "findings": [],
+          "appendedAt": "2026-05-18T10:00:00.000Z"
+        }
+      ]
     }
   ],
   "views": {
@@ -112,6 +123,67 @@ task-context-package:tasks/task-003.yaml
 即使内容从 `content-broken` 修复为 `recognized`，只要 `source.path` 不变，`packageId` 就不变。
 
 第一版不考虑文件改名。`source.path` 改变时，视为旧任务上下文包移除、新任务上下文包创建。
+
+## taskPoolState
+
+`taskPoolState` 表示任务进入任务池后的早期可消费状态。它只描述任务定义在任务池中的健康度和可推荐性，不表达当前工作环节；当前工作环节仍由 `currentWorkStage` 表达。
+
+第一版最小状态集合：
+
+```text
+raw
+parsed
+blocked
+ready
+```
+
+`raw` 表示任务池已收到某个 `source.path` 的解析器报告，但尚未把报告归并成可稳定读取的任务上下文包。进入条件：收到新的 `taskRecognitionReport`，并完成 `packageId` 计算之前。`raw` 是任务池内部归并过程中的短暂状态，正常输出的任务上下文包不应长期停留在 `raw`。
+
+`parsed` 表示任务池已经基于解析器报告创建或更新任务上下文包，且 `source`、`recognition`、`taskDraft`、`qualityGate` 已写入包内。进入条件：`packageId` 已确定，报告已归并，但尚未根据 `recognition.outcome` 和 `qualityGate.outcome` 做可推荐性判定。
+
+`blocked` 表示任务上下文包存在，但不能进入候选任务视图。进入条件满足任一项即可：`recognition.outcome` 不是 `recognized`；`qualityGate.outcome` 不是 `pass`；`taskDraft` 为 `null`；或 `recognition.findings` 中存在 `severity: "blocking"`。`blocked` 的原因必须从对应 `findings` 或状态变化记录中可追溯。
+
+`ready` 表示任务定义层面可被推荐器消费。进入条件必须同时满足：`recognition.outcome` 为 `recognized`；`qualityGate.outcome` 为 `pass`；`taskDraft` 不为 `null`；`recognition.findings` 中没有 `severity: "blocking"`。`ready` 不代表当前运行环境允许启动工作，也不代表已经获得执行授权。
+
+状态判定顺序固定为：
+
+```text
+raw -> parsed -> blocked | ready
+```
+
+当同一路径的任务源内容变化时，任务池基于新的 `contentHash` 重新归并解析器报告，并按同一顺序重新判定 `taskPoolState`。内容从坏到好时可以从 `blocked` 变为 `ready`；内容从好到坏时可以从 `ready` 变为 `blocked`。
+
+## 状态变化记录
+
+任务池每次改变 `taskPoolState` 时，都必须向对应任务上下文包的 `timeline` 追加一条记录。状态未变化但源内容 `contentHash` 改变时，也应追加记录，便于追溯“重新解析但状态不变”。
+
+记录格式：
+
+```json
+{
+  "eventType": "taskPoolStateChanged",
+  "from": "parsed",
+  "to": "ready",
+  "reason": "qualityGate.pass",
+  "sourceContentHash": "abc123",
+  "findings": [],
+  "appendedAt": "2026-05-18T10:00:00.000Z"
+}
+```
+
+字段规则：
+
+```text
+eventType 固定为 taskPoolStateChanged。
+from 是变化前状态；首次创建任务上下文包时为 null。
+to 是变化后状态。
+reason 是本次判定的直接触发原因，使用稳定代码，例如 recognition.content-broken、qualityGate.fail、qualityGate.pass、source.content-changed。
+sourceContentHash 记录触发本次判定的 source.contentHash。
+findings 保存导致 blocked 或需要诊断的相关 findings；ready 时通常为空数组。
+appendedAt 是任务池执行本次状态记录追加的时间。
+```
+
+`timeline` 只记录状态变化事实和必要诊断信息，不重复保存完整 `taskDraft`，也不保存原始任务源内容。
 
 ## currentWorkStage
 
@@ -288,11 +360,11 @@ needsAttention
 brokenContent
 ```
 
-`candidateTasks` 表示任务定义层面可以进入后续流程的候选任务。
+`candidateTasks` 表示任务定义层面可以进入后续流程的候选任务，只包含 `taskPoolState: "ready"` 的任务上下文包。
 
-`needsAttention` 表示能形成任务草稿，但当前质量门槛未通过，需要维护者处理。
+`needsAttention` 表示能形成任务草稿，但当前质量门槛未通过，需要维护者处理。它来自 `taskPoolState: "blocked"` 且 `recognition.outcome: "incomplete"` 或 `qualityGate.outcome: "fail"` 的任务上下文包。
 
-`brokenContent` 表示源内容已经成功读取，但内容格式坏了，无法形成任务草稿。
+`brokenContent` 表示源内容已经成功读取，但内容格式坏了，无法形成任务草稿。它来自 `taskPoolState: "blocked"` 且 `recognition.outcome: "content-broken"` 的任务上下文包。
 
 ## 边界规则
 
