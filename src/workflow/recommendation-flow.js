@@ -2,7 +2,10 @@ import { readFile } from "node:fs/promises";
 import { runConvergence } from "./convergence-flow.js";
 import { evaluateExecutionAdmission } from "./execution-admission.js";
 import { runExecutionAgent } from "./execution-agent-flow.js";
-import { requestHumanDecisionForTaskCompletion } from "./human-decision-flow.js";
+import {
+  requestHumanDecisionForConvergenceFailure,
+  requestHumanDecisionForTaskCompletion,
+} from "./human-decision-flow.js";
 import { allocateIsolatedWorkspace } from "./isolated-workspace-flow.js";
 import { initializeMainAgent } from "./main-agent-flow.js";
 import { parseRecommendationIntent } from "./recommendation-intent.js";
@@ -38,6 +41,8 @@ export function createBlockedRecommendationRun({ id, startupCheck, now = () => n
     convergenceErrors: [],
     completionHumanDecisionRequest: null,
     completionHumanDecisionError: null,
+    failureHumanDecisionRequest: null,
+    failureHumanDecisionError: null,
     taskContextPackage: null,
     stdout: "",
     stderr: "",
@@ -78,6 +83,8 @@ export function createRunningRecommendationRun({
     convergenceErrors: [],
     completionHumanDecisionRequest: null,
     completionHumanDecisionError: null,
+    failureHumanDecisionRequest: null,
+    failureHumanDecisionError: null,
     taskContextPackage: null,
     stdout: "",
     stderr: "",
@@ -159,6 +166,7 @@ export async function completeRecommendationFlow({
   onProgress,
   signal,
 }) {
+  const maxIterations = projectProfile?.defaults?.maxIterations ?? null;
   const failed = commandResult.error || commandResult.exitCode !== 0;
   const parsed = failed
     ? { appendRequest: null, intent: null, error: null }
@@ -260,6 +268,7 @@ export async function completeRecommendationFlow({
     : runConvergence({
         taskContextPackage: reviewedPackage,
         runAgentSession: runConvergenceSession,
+        maxIterations,
         now,
       });
   taskPool = !convergenceRun?.appendRequest
@@ -270,7 +279,8 @@ export async function completeRecommendationFlow({
   const convergedPackage = failed || !parsed.appendRequest
     ? null
     : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
-  const nextExecutionAgentRun = !convergedPackage || !convergenceRun?.appendRequest
+  const nextExecutionAgentRun = !convergedPackage
+    || convergenceRun?.appendRequest?.artifactType !== "convergenceAdvice"
     ? null
     : await runExecutionAgent({
         taskContextPackage: convergedPackage,
@@ -308,6 +318,7 @@ export async function completeRecommendationFlow({
     : runConvergence({
         taskContextPackage: secondReviewedPackage,
         runAgentSession: runConvergenceSession,
+        maxIterations,
         now,
       });
   taskPool = !nextConvergenceRun?.appendRequest
@@ -320,16 +331,29 @@ export async function completeRecommendationFlow({
   const completedPackage = failed || !parsed.appendRequest
     ? null
     : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
+  const terminalConvergenceRun = nextConvergenceRun ?? convergenceRun;
   const completionHumanDecisionRequest =
-    !completedPackage || nextConvergenceRun?.appendRequest?.artifactType !== "taskCompletion"
+    !completedPackage || terminalConvergenceRun?.appendRequest?.artifactType !== "taskCompletion"
       ? null
       : requestHumanDecisionForTaskCompletion({
+          taskContextPackage: completedPackage,
+          now,
+        });
+  const failureHumanDecisionRequest =
+    !completedPackage || terminalConvergenceRun?.appendRequest?.artifactType !== "convergenceFailure"
+      ? null
+      : requestHumanDecisionForConvergenceFailure({
           taskContextPackage: completedPackage,
           now,
         });
   taskPool = !completionHumanDecisionRequest?.appendRequest
     ? taskPool
     : applyAppendRequest(taskPool, completionHumanDecisionRequest.appendRequest, {
+        currentWorkStage: "human-decision",
+      });
+  taskPool = !failureHumanDecisionRequest?.appendRequest
+    ? taskPool
+    : applyAppendRequest(taskPool, failureHumanDecisionRequest.appendRequest, {
         currentWorkStage: "human-decision",
       });
   const taskContextPackage = failed || !parsed.appendRequest
@@ -378,6 +402,8 @@ export async function completeRecommendationFlow({
       .filter(Boolean),
     completionHumanDecisionRequest,
     completionHumanDecisionError: completionHumanDecisionRequest?.error ?? null,
+    failureHumanDecisionRequest,
+    failureHumanDecisionError: failureHumanDecisionRequest?.error ?? null,
     taskContextPackage,
   };
 }

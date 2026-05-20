@@ -618,6 +618,25 @@ h2 {
   margin-top: 14px;
 }
 
+.human-decision-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.human-guidance-input {
+  width: 100%;
+  min-height: 80px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #172033;
+  font: inherit;
+  resize: vertical;
+}
+
 .recommendation-output {
   max-height: 220px;
   margin: 10px 0 0;

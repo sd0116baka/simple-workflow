@@ -135,6 +135,80 @@ test("completes task after a reviewed execution that used convergence advice", (
   ]);
 });
 
+test("returns convergence failure when automatic iteration budget is exhausted", () => {
+  const taskPackage = convergenceReadyPackage();
+  taskPackage.artifacts.convergenceAdvice = [
+    {
+      artifactId: "convergenceAdvice:001",
+      body: {
+        summary: "first fix",
+      },
+      appendedAt: "2026-05-18T10:00:03.000Z",
+    },
+  ];
+  taskPackage.artifacts.executionReport.push({
+    artifactId: "executionReport:002",
+    body: {},
+    appendedAt: "2026-05-18T10:00:04.000Z",
+  });
+  taskPackage.artifacts.reviewReport.push({
+    artifactId: "reviewReport:002",
+    body: {
+      outcome: "failed",
+      findings: [{ code: "still-broken" }],
+    },
+    appendedAt: "2026-05-18T10:00:05.000Z",
+  });
+
+  const result = runConvergence({
+    taskContextPackage: taskPackage,
+    maxIterations: 1,
+  });
+
+  assert.equal(result.appendRequest.artifactType, "convergenceFailure");
+  assert.equal(result.appendRequest.artifact.reasonCode, "max-iterations-reached");
+  assert.deepEqual(result.appendRequest.artifact.basisRefs, [
+    "executionReport:002",
+    "reviewReport:002",
+  ]);
+  assert.deepEqual(result.appendRequest.artifact.attemptedFixes, ["convergenceAdvice:001"]);
+  assert.deepEqual(result.appendRequest.agentRun.outputArtifactRefs, []);
+});
+
+test("includes human convergence guidance in the next convergence input", () => {
+  const taskPackage = convergenceReadyPackage();
+  taskPackage.artifacts.convergenceFailure = [
+    {
+      artifactId: "convergenceFailure:001",
+      body: {},
+      appendedAt: "2026-05-18T10:00:03.000Z",
+    },
+  ];
+  taskPackage.artifacts.humanConvergenceGuidance = [
+    {
+      artifactId: "humanConvergenceGuidance:001",
+      body: {
+        guidance: "先修正状态泄漏。",
+      },
+      appendedAt: "2026-05-18T10:00:04.000Z",
+    },
+  ];
+
+  const result = runConvergence({
+    taskContextPackage: taskPackage,
+  });
+
+  assert.deepEqual(result.appendRequest.agentRun.inputArtifactRefs, [
+    "taskDraft",
+    "executionIntent",
+    "executionAuthorization",
+    "convergenceFailure:001",
+    "humanConvergenceGuidance:001",
+    "executionReport:001",
+    "reviewReport:001",
+  ]);
+});
+
 test("does not run convergence before review report exists", () => {
   const taskPackage = convergenceReadyPackage();
   delete taskPackage.artifacts.reviewReport;

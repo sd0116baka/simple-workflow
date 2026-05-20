@@ -42,7 +42,7 @@ function listedWorktreePaths(repositoryDir) {
     .map((line) => resolve(line.slice("worktree ".length)));
 }
 
-function removeWorkspaceAndBranch({ repositoryDir, worktreePath, branchName }) {
+export function removeWorkspaceAndBranch({ repositoryDir, worktreePath, branchName }) {
   const absoluteWorktreePath = resolveWorktreePath(worktreePath, repositoryDir);
   if (!absoluteWorktreePath) {
     return {
@@ -72,6 +72,16 @@ function removeWorkspaceAndBranch({ repositoryDir, worktreePath, branchName }) {
     cwd: repositoryDir,
   })) {
     runGit(["branch", "-D", branchName], { cwd: repositoryDir });
+  }
+  const branchStillExists = branchName
+    ? gitSucceeds(["show-ref", "--verify", "--quiet", `refs/heads/${branchName}`], {
+        cwd: repositoryDir,
+      })
+    : false;
+  if (existsSync(absoluteWorktreePath) || branchStillExists) {
+    return {
+      error: "执行侧资源未清理干净，不能完成取消或收尾。",
+    };
   }
 
   return { error: null };

@@ -6,6 +6,8 @@ const MULTI_ARTIFACT_TYPES = new Set([
   "executionReport",
   "reviewReport",
   "convergenceAdvice",
+  "convergenceFailure",
+  "humanConvergenceGuidance",
 ]);
 
 function toTaskDraft(entry) {

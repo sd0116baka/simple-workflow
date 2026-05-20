@@ -19,6 +19,8 @@ function nextConvergenceRunId(taskContextPackage) {
 }
 
 function inputArtifactRefsForConvergence(taskContextPackage, executionReport, reviewReport) {
+  const failure = latestArtifact(taskContextPackage, "convergenceFailure");
+  const guidance = latestArtifact(taskContextPackage, "humanConvergenceGuidance");
   const refs = [
     "taskDraft",
     "executionIntent",
@@ -27,7 +29,7 @@ function inputArtifactRefsForConvergence(taskContextPackage, executionReport, re
     reviewReport.artifactId,
   ];
   const convergenceAdvice = latestArtifact(taskContextPackage, "convergenceAdvice");
-  return convergenceAdvice
+  const inputRefs = convergenceAdvice
     ? [
         "taskDraft",
         "executionIntent",
@@ -37,6 +39,17 @@ function inputArtifactRefsForConvergence(taskContextPackage, executionReport, re
         reviewReport.artifactId,
       ]
     : refs;
+  const humanCorrectionRefs = [
+    failure?.artifactId,
+    guidance?.artifactId,
+  ].filter(Boolean);
+  return humanCorrectionRefs.length > 0
+    ? [
+        ...inputRefs.slice(0, -2),
+        ...humanCorrectionRefs,
+        ...inputRefs.slice(-2),
+      ]
+    : inputRefs;
 }
 
 function shouldCompleteTask(taskContextPackage, reviewReport) {
@@ -46,7 +59,36 @@ function shouldCompleteTask(taskContextPackage, reviewReport) {
   );
 }
 
-function convergenceArtifact(taskContextPackage, executionReport, reviewReport) {
+function convergenceFailureArtifact(taskContextPackage, executionReport, reviewReport, maxIterations) {
+  const convergenceAdvice = taskContextPackage?.artifacts?.convergenceAdvice ?? [];
+  const adviceCount = Array.isArray(convergenceAdvice) ? convergenceAdvice.length : 0;
+  return {
+    artifactType: "convergenceFailure",
+    artifact: {
+      summary: "当前轮次无法自动收敛。",
+      reasonCode: "max-iterations-reached",
+      basisRefs: [
+        executionReport.artifactId,
+        reviewReport.artifactId,
+      ],
+      attemptedFixes: convergenceAdvice.map((advice) => advice.artifactId),
+      unresolvedIssues: reviewReport.body?.findings ?? [],
+      humanDecisionQuestion: "请提供人工收敛意见继续下一轮，或取消任务并恢复执行前状态。",
+      maxIterations,
+      completedIterations: Math.max(adviceCount, 1),
+    },
+  };
+}
+
+function shouldFailConvergence(taskContextPackage, reviewReport, maxIterations) {
+  if (shouldCompleteTask(taskContextPackage, reviewReport)) return false;
+  if (!Number.isInteger(maxIterations)) return false;
+  const convergenceAdvice = taskContextPackage?.artifacts?.convergenceAdvice ?? [];
+  const adviceCount = Array.isArray(convergenceAdvice) ? convergenceAdvice.length : 0;
+  return adviceCount >= maxIterations;
+}
+
+function convergenceArtifact(taskContextPackage, executionReport, reviewReport, maxIterations) {
   if (shouldCompleteTask(taskContextPackage, reviewReport)) {
     return {
       artifactType: "taskCompletion",
@@ -58,6 +100,10 @@ function convergenceArtifact(taskContextPackage, executionReport, reviewReport) 
         ],
       },
     };
+  }
+
+  if (shouldFailConvergence(taskContextPackage, reviewReport, maxIterations)) {
+    return convergenceFailureArtifact(taskContextPackage, executionReport, reviewReport, maxIterations);
   }
 
   return {
@@ -76,6 +122,7 @@ function convergenceArtifact(taskContextPackage, executionReport, reviewReport) 
 export function runConvergence({
   taskContextPackage,
   runAgentSession = createStubAgentSession,
+  maxIterations = null,
   now = () => new Date().toISOString(),
 } = {}) {
   if (!taskContextPackage?.packageId) {
@@ -118,6 +165,7 @@ export function runConvergence({
     taskContextPackage,
     executionReport,
     reviewReport,
+    maxIterations,
   );
 
   return {

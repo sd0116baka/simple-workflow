@@ -212,6 +212,7 @@ function createHumanDecisionPanel(taskContextPackage) {
   const request = taskContextPackage?.artifacts?.humanDecisionRequest;
   const decision = taskContextPackage?.artifacts?.humanDecision;
   if (!request?.body && !decision?.body) return null;
+  const isConvergenceFailureRequest = request?.body?.decisionOptions?.includes("retry-with-guidance");
 
   const notice = document.createElement("div");
   notice.className = "human-decision-notice";
@@ -219,13 +220,15 @@ function createHumanDecisionPanel(taskContextPackage) {
   const title = document.createElement("div");
   title.className = "human-decision-title";
   title.textContent = decision?.body
-    ? "已接受完成"
+    ? decision.body.decision === "cancel-task" ? "已取消任务" : "已接受完成"
     : "等待人工决策";
 
   const reason = document.createElement("div");
   reason.className = "human-decision-reason";
   reason.textContent = decision?.body
-    ? "任务完成结论已由人工接受，等待自动合并环节处理。"
+    ? decision.body.decision === "cancel-task"
+      ? "任务已取消，执行侧资源已恢复到执行前状态。"
+      : "任务完成结论已由人工接受，等待自动合并环节处理。"
     : request.body.reason ?? "需要人工确认下一步。";
 
   const meta = document.createElement("div");
@@ -237,7 +240,7 @@ function createHumanDecisionPanel(taskContextPackage) {
         `decidedAt: ${decision.body.decidedAt ?? decision.appendedAt ?? "unknown"}`,
       ].join(" · ")
     : [
-        `target: ${request.body.taskCompletionRef ?? "unknown"}`,
+        `target: ${request.body.taskCompletionRef ?? request.body.targetRef ?? "unknown"}`,
         `requestedAt: ${request.body.requestedAt ?? request.appendedAt ?? "unknown"}`,
       ].join(" · ");
 
@@ -263,7 +266,45 @@ function createHumanDecisionPanel(taskContextPackage) {
     notice.append(options);
   }
 
-  if (request?.body && !decision?.body) {
+  if (request?.body && !decision?.body && isConvergenceFailureRequest) {
+    const guidanceInput = document.createElement("textarea");
+    guidanceInput.className = "human-guidance-input";
+    guidanceInput.rows = 5;
+    guidanceInput.placeholder = "输入人工收敛意见...";
+    guidanceInput.dataset.field = "guidance";
+
+    const expectedInput = document.createElement("textarea");
+    expectedInput.className = "human-guidance-input";
+    expectedInput.rows = 3;
+    expectedInput.placeholder = "下一轮期望看到的变化...";
+    expectedInput.dataset.field = "expectedNextOutcome";
+
+    const actions = document.createElement("div");
+    actions.className = "human-decision-actions";
+
+    const retryButton = document.createElement("button");
+    retryButton.type = "button";
+    retryButton.className = "primary-button human-decision-action";
+    retryButton.textContent = "带意见重试";
+    retryButton.addEventListener("click", () => {
+      retryWithGuidance({
+        guidance: guidanceInput.value,
+        expectedNextOutcome: expectedInput.value,
+        actionButton: retryButton,
+      }).catch(showError);
+    });
+
+    const cancelButton = document.createElement("button");
+    cancelButton.type = "button";
+    cancelButton.className = "secondary-button danger-button human-decision-action";
+    cancelButton.textContent = "取消任务";
+    cancelButton.addEventListener("click", () => {
+      cancelTask(cancelButton).catch(showError);
+    });
+
+    actions.append(retryButton, cancelButton);
+    notice.append(guidanceInput, expectedInput, actions);
+  } else if (request?.body && !decision?.body) {
     const acceptButton = document.createElement("button");
     acceptButton.type = "button";
     acceptButton.className = "primary-button human-decision-action";
@@ -551,20 +592,27 @@ function renderHumanDecision(taskContextPackage) {
   const request = taskContextPackage?.artifacts?.humanDecisionRequest ?? null;
   const decision = taskContextPackage?.artifacts?.humanDecision ?? null;
   const taskCompletion = taskContextPackage?.artifacts?.taskCompletion ?? null;
+  const convergenceFailures = taskContextPackage?.artifacts?.convergenceFailure ?? [];
+  const humanConvergenceGuidance = taskContextPackage?.artifacts?.humanConvergenceGuidance ?? [];
   humanDecisionRaw.textContent = formatJsonBlock({
     taskCompletion,
+    convergenceFailure: convergenceFailures.at?.(-1) ?? null,
+    humanConvergenceGuidance: humanConvergenceGuidance.at?.(-1) ?? null,
     humanDecisionRequest: request,
     humanDecision: decision,
   });
   renderInputs(humanDecisionInputs, [
     { label: "任务完成结论", value: taskCompletion?.artifactId ?? "未生成" },
+    { label: "收敛失败", value: convergenceFailures.at?.(-1)?.artifactId ?? "未生成" },
     { label: "人工决策请求", value: request?.artifactId ?? "未请求" },
     { label: "人工决策", value: decision?.body?.decision ?? "未决策" },
     { label: "当前环节", value: taskContextPackage?.currentWorkStage ?? "未生成" },
   ]);
 
   if (decision) {
-    humanDecisionStatus.textContent = "已接受完成";
+    humanDecisionStatus.textContent = decision.body?.decision === "cancel-task"
+      ? "已取消"
+      : "已接受完成";
     const panel = createHumanDecisionPanel(taskContextPackage);
     humanDecisionPanel.append(panel);
     return;
@@ -736,6 +784,70 @@ async function acceptCompletion() {
       poolTaskContextPackages[index] = recommendationRun.taskContextPackage;
     }
   }
+  renderRecommendationRun();
+  await loadTasks();
+}
+
+function syncRunTaskPackageToPool() {
+  if (!recommendationRun?.taskContextPackage) return;
+  const index = poolTaskContextPackages.findIndex((candidate) =>
+    candidate.packageId === recommendationRun.taskContextPackage.packageId,
+  );
+  if (index >= 0) {
+    poolTaskContextPackages[index] = recommendationRun.taskContextPackage;
+  }
+}
+
+async function retryWithGuidance({ guidance, expectedNextOutcome, actionButton = null } = {}) {
+  const taskContextPackage = activeTaskContextPackage();
+  if (actionButton) {
+    actionButton.disabled = true;
+    actionButton.textContent = "重试中";
+  }
+  humanDecisionStatus.textContent = "重试中";
+  const response = await fetch("/api/human-decisions/retry-with-guidance", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      packageId: taskContextPackage?.packageId ?? null,
+      guidance,
+      expectedNextOutcome,
+    }),
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error ?? `带意见重试失败：${response.status}`);
+  }
+  recommendationRun = payload.recommendationRun ?? null;
+  syncRunTaskPackageToPool();
+  renderRecommendationRun();
+  await loadTasks();
+}
+
+async function cancelTask(actionButton = null) {
+  const taskContextPackage = activeTaskContextPackage();
+  if (actionButton) {
+    actionButton.disabled = true;
+    actionButton.textContent = "取消中";
+  }
+  humanDecisionStatus.textContent = "取消中";
+  const response = await fetch("/api/human-decisions/cancel-task", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      packageId: taskContextPackage?.packageId ?? null,
+    }),
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error ?? `取消任务失败：${response.status}`);
+  }
+  recommendationRun = payload.recommendationRun ?? null;
+  syncRunTaskPackageToPool();
   renderRecommendationRun();
   await loadTasks();
 }

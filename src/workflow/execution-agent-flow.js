@@ -47,8 +47,15 @@ function inputArtifactRefsForExecution(taskContextPackage) {
     "executionAuthorization",
   ];
   const convergenceAdvice = latestArtifact(taskContextPackage, "convergenceAdvice");
-  return convergenceAdvice
-    ? [...baseRefs, convergenceAdvice.artifactId, "isolatedWorkspace"]
+  const convergenceFailure = latestArtifact(taskContextPackage, "convergenceFailure");
+  const humanConvergenceGuidance = latestArtifact(taskContextPackage, "humanConvergenceGuidance");
+  const correctionRefs = [
+    convergenceAdvice?.artifactId,
+    convergenceFailure?.artifactId,
+    humanConvergenceGuidance?.artifactId,
+  ].filter(Boolean);
+  return correctionRefs.length > 0
+    ? [...baseRefs, ...correctionRefs, "isolatedWorkspace"]
     : [...baseRefs, "isolatedWorkspace"];
 }
 
@@ -158,12 +165,14 @@ export function buildExecutionAgentPrompt({
     executionAuthorization: taskContextPackage.artifacts.executionAuthorization?.body ?? null,
     isolatedWorkspace: taskContextPackage.artifacts.isolatedWorkspace?.body ?? null,
     convergenceAdvice: latestExecutionArtifact(taskContextPackage, "convergenceAdvice"),
+    convergenceFailure: latestExecutionArtifact(taskContextPackage, "convergenceFailure"),
+    humanConvergenceGuidance: latestExecutionArtifact(taskContextPackage, "humanConvergenceGuidance"),
   };
 
   return [
     "你是 simple-workflow 的 execution agent。",
     "你只能在当前工作树中实现任务，不要修改主工作树，也不要提交或合并。",
-    "根据输入 JSON 完成任务；如果有 convergenceAdvice，优先按它修正上一轮问题。",
+    "根据输入 JSON 完成任务；如果有 humanConvergenceGuidance，优先按人工收敛意见修正上一轮问题。",
     "完成后只输出 fenced JSON，不要输出额外说明。",
     "JSON 字段：summary 字符串；tests 数组；notes 数组。",
     "",

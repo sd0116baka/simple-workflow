@@ -906,6 +906,102 @@ test("POST /api/human-decisions/accept-completion accepts completion", async (t)
   assert.equal(observedPackageId, "task-context-package:tasks/task-001.yaml");
 });
 
+test("POST /api/human-decisions/retry-with-guidance retries convergence failure", async (t) => {
+  const latestRun = {
+    id: "recommendation-run-test",
+    status: "succeeded",
+  };
+  let observedBody = null;
+  const workflowService = {
+    async retryWithConvergenceGuidance(body) {
+      observedBody = body;
+      return {
+        retried: true,
+        error: null,
+        recommendationRun: latestRun,
+      };
+    },
+    getLatestRecommendationRun() {
+      return latestRun;
+    },
+    onEvent() {
+      return () => {};
+    },
+  };
+  const server = createApp({ workflowService });
+  server.listen(0);
+  t.after(() => server.close());
+  await once(server, "listening");
+
+  const response = await fetch(
+    `http://localhost:${server.address().port}/api/human-decisions/retry-with-guidance`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        packageId: "task-context-package:tasks/task-001.yaml",
+        guidance: "先收窄候选任务状态。",
+        expectedNextOutcome: "下一轮证明候选集正确。",
+      }),
+    },
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.retried, true);
+  assert.equal(observedBody.packageId, "task-context-package:tasks/task-001.yaml");
+  assert.equal(observedBody.guidance, "先收窄候选任务状态。");
+  assert.equal(observedBody.expectedNextOutcome, "下一轮证明候选集正确。");
+});
+
+test("POST /api/human-decisions/cancel-task cancels convergence-failed task", async (t) => {
+  const latestRun = {
+    id: "recommendation-run-test",
+    status: "succeeded",
+  };
+  let observedPackageId = null;
+  const workflowService = {
+    async cancelTask({ packageId }) {
+      observedPackageId = packageId;
+      return {
+        cancelled: true,
+        error: null,
+        recommendationRun: latestRun,
+      };
+    },
+    getLatestRecommendationRun() {
+      return latestRun;
+    },
+    onEvent() {
+      return () => {};
+    },
+  };
+  const server = createApp({ workflowService });
+  server.listen(0);
+  t.after(() => server.close());
+  await once(server, "listening");
+
+  const response = await fetch(
+    `http://localhost:${server.address().port}/api/human-decisions/cancel-task`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        packageId: "task-context-package:tasks/task-001.yaml",
+      }),
+    },
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.cancelled, true);
+  assert.equal(observedPackageId, "task-context-package:tasks/task-001.yaml");
+});
+
 test("POST /api/auto-merge/replan regenerates auto-merge plan only", async (t) => {
   const latestRun = {
     id: "recommendation-run-test",

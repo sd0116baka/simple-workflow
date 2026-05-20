@@ -14,6 +14,13 @@ function latestConvergenceAdvice(taskContextPackage) {
     : null;
 }
 
+function latestArtifact(taskContextPackage, artifactType) {
+  const artifacts = taskContextPackage?.artifacts?.[artifactType];
+  return Array.isArray(artifacts) && artifacts.length > 0
+    ? artifacts[artifacts.length - 1]
+    : null;
+}
+
 function hasIsolatedWorkspace(taskContextPackage) {
   return Boolean(taskContextPackage?.artifacts?.isolatedWorkspace?.body);
 }
@@ -32,11 +39,18 @@ function inputArtifactRefsForReview(taskContextPackage, executionReport) {
     executionReport.artifactId,
   ];
   const convergenceAdvice = latestConvergenceAdvice(taskContextPackage);
-  return convergenceAdvice
+  const convergenceFailure = latestArtifact(taskContextPackage, "convergenceFailure");
+  const humanConvergenceGuidance = latestArtifact(taskContextPackage, "humanConvergenceGuidance");
+  const correctionRefs = [
+    convergenceAdvice?.artifactId,
+    convergenceFailure?.artifactId,
+    humanConvergenceGuidance?.artifactId,
+  ].filter(Boolean);
+  return correctionRefs.length > 0
     ? [
         "taskDraft",
         "executionAuthorization",
-        convergenceAdvice.artifactId,
+        ...correctionRefs,
         "isolatedWorkspace",
         executionReport.artifactId,
       ]

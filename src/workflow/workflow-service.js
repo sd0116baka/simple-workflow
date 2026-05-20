@@ -10,11 +10,22 @@ import {
   completeRecommendationFlow,
   startRecommendationFlow,
 } from "./recommendation-flow.js";
-import { runOpencodeExecutionAgentSession } from "./execution-agent-flow.js";
+import {
+  runExecutionAgent,
+  runOpencodeExecutionAgentSession,
+} from "./execution-agent-flow.js";
 import { executeAutoMerge, planAutoMerge } from "./auto-merge-flow.js";
-import { acceptTaskCompletion } from "./human-decision-flow.js";
+import {
+  acceptTaskCompletion,
+  cancelTaskAfterConvergenceFailure,
+  provideHumanConvergenceGuidance,
+  requestHumanDecisionForConvergenceFailure,
+  requestHumanDecisionForTaskCompletion,
+} from "./human-decision-flow.js";
 import { runOpencodeRecommendation } from "./recommendation-runner.js";
 import { closeTask } from "./task-closeout-flow.js";
+import { runConvergence } from "./convergence-flow.js";
+import { runReviewAgent } from "./review-agent-flow.js";
 import {
   loadTaskContextPackages,
   saveTaskContextPackage,
@@ -99,6 +110,18 @@ export function createWorkflowService({
             ? JSON.parse(JSON.stringify(run.completionHumanDecisionRequest))
             : null,
           completionHumanDecisionError: run.completionHumanDecisionError ?? null,
+          failureHumanDecisionRequest: run.failureHumanDecisionRequest
+            ? JSON.parse(JSON.stringify(run.failureHumanDecisionRequest))
+            : null,
+          failureHumanDecisionError: run.failureHumanDecisionError ?? null,
+          humanConvergenceGuidance: run.humanConvergenceGuidance
+            ? JSON.parse(JSON.stringify(run.humanConvergenceGuidance))
+            : null,
+          humanConvergenceGuidanceError: run.humanConvergenceGuidanceError ?? null,
+          taskCancellation: run.taskCancellation
+            ? JSON.parse(JSON.stringify(run.taskCancellation))
+            : null,
+          taskCancellationError: run.taskCancellationError ?? null,
           autoMergePlanning: run.autoMergePlanning
             ? JSON.parse(JSON.stringify(run.autoMergePlanning))
             : null,
@@ -162,7 +185,8 @@ export function createWorkflowService({
   function findActiveWork(taskContextPackages) {
     const activePackage = taskContextPackages.find((taskContextPackage) =>
       taskContextPackage.currentWorkStage !== "task-pool"
-        && taskContextPackage.currentWorkStage !== "closed",
+        && taskContextPackage.currentWorkStage !== "closed"
+        && taskContextPackage.currentWorkStage !== "cancelled",
     );
     if (!activePackage) return null;
     return {
@@ -213,6 +237,35 @@ export function createWorkflowService({
     ) ?? null;
   }
 
+  function latestMultiArtifact(taskContextPackage, artifactType) {
+    const artifacts = taskContextPackage?.artifacts?.[artifactType];
+    return Array.isArray(artifacts) && artifacts.length > 0
+      ? artifacts[artifacts.length - 1]
+      : null;
+  }
+
+  async function findConvergenceFailureDecisionPackage(packageId) {
+    const taskContextPackages = await loadExistingTaskContextPackages();
+    const matchesConvergenceFailureDecision = (candidate) => {
+      const convergenceFailure = latestMultiArtifact(candidate, "convergenceFailure");
+      return candidate.currentWorkStage === "human-decision"
+        && convergenceFailure?.artifactId
+        && candidate.artifacts?.humanDecisionRequest?.body?.targetRef === convergenceFailure.artifactId
+        && !candidate.artifacts?.humanDecision?.body;
+    };
+    if (packageId) {
+      const candidate = taskContextPackages.find((item) => item.packageId === packageId) ?? null;
+      return candidate && matchesConvergenceFailureDecision(candidate) ? candidate : null;
+    }
+    if (
+      latestRecommendationRun?.taskContextPackage
+      && matchesConvergenceFailureDecision(latestRecommendationRun.taskContextPackage)
+    ) {
+      return latestRecommendationRun.taskContextPackage;
+    }
+    return taskContextPackages.find(matchesConvergenceFailureDecision) ?? null;
+  }
+
   function ensureLatestRecommendationRun(taskContextPackage) {
     if (!latestRecommendationRun || latestRecommendationRun.status === "running") {
       latestRecommendationRun = {
@@ -224,8 +277,20 @@ export function createWorkflowService({
         args: [],
         startupCheck: null,
         progress: [],
+        executionAgentRuns: [],
+        executionAgentErrors: [],
+        reviewAgentRuns: [],
+        reviewAgentErrors: [],
+        convergenceRuns: [],
+        convergenceErrors: [],
       };
     }
+    latestRecommendationRun.executionAgentRuns ??= [];
+    latestRecommendationRun.executionAgentErrors ??= [];
+    latestRecommendationRun.reviewAgentRuns ??= [];
+    latestRecommendationRun.reviewAgentErrors ??= [];
+    latestRecommendationRun.convergenceRuns ??= [];
+    latestRecommendationRun.convergenceErrors ??= [];
     latestRecommendationRun.taskContextPackage = taskContextPackage;
   }
 
@@ -281,6 +346,80 @@ export function createWorkflowService({
       recommendationRunControllers.delete(run.id);
     }
     emitRecommendationChanged(run);
+  }
+
+  async function runGuidedCorrectionRound({ maxIterations = 3 } = {}) {
+    const execution = await runExecutionAgent({
+      taskContextPackage: latestRecommendationRun.taskContextPackage,
+      runAgentSession: runExecutionAgentSession,
+      repositoryDir,
+    });
+    if (!execution.appendRequest) return { execution, review: null, convergence: null };
+    await applyAndPersistAppendRequest(execution.appendRequest, {
+      currentWorkStage: "execution-agent",
+    });
+    latestRecommendationRun.executionAgentRuns.push(execution);
+    latestRecommendationRun.executionAgentErrors = [
+      ...latestRecommendationRun.executionAgentErrors,
+      execution.error,
+    ].filter(Boolean);
+    if (execution.error) return { execution, review: null, convergence: null };
+
+    const review = runReviewAgent({
+      taskContextPackage: latestRecommendationRun.taskContextPackage,
+    });
+    if (!review.appendRequest) return { execution, review, convergence: null };
+    await applyAndPersistAppendRequest(review.appendRequest, {
+      currentWorkStage: "review-agent",
+    });
+    latestRecommendationRun.reviewAgentRuns.push(review);
+    latestRecommendationRun.reviewAgentErrors = [
+      ...latestRecommendationRun.reviewAgentErrors,
+      review.error,
+    ].filter(Boolean);
+
+    const convergence = runConvergence({
+      taskContextPackage: latestRecommendationRun.taskContextPackage,
+      maxIterations,
+    });
+    if (!convergence.appendRequest) return { execution, review, convergence };
+    await applyAndPersistAppendRequest(convergence.appendRequest, {
+      currentWorkStage: convergence.appendRequest.artifactType === "taskCompletion"
+        ? "task-completion"
+        : "convergence",
+    });
+    latestRecommendationRun.convergenceRuns.push(convergence);
+    latestRecommendationRun.convergenceErrors = [
+      ...latestRecommendationRun.convergenceErrors,
+      convergence.error,
+    ].filter(Boolean);
+
+    if (convergence.appendRequest.artifactType === "taskCompletion") {
+      const request = requestHumanDecisionForTaskCompletion({
+        taskContextPackage: latestRecommendationRun.taskContextPackage,
+      });
+      latestRecommendationRun.completionHumanDecisionRequest = request;
+      latestRecommendationRun.completionHumanDecisionError = request.error ?? null;
+      if (request.appendRequest) {
+        await applyAndPersistAppendRequest(request.appendRequest, {
+          currentWorkStage: "human-decision",
+        });
+      }
+    }
+    if (convergence.appendRequest.artifactType === "convergenceFailure") {
+      const request = requestHumanDecisionForConvergenceFailure({
+        taskContextPackage: latestRecommendationRun.taskContextPackage,
+      });
+      latestRecommendationRun.failureHumanDecisionRequest = request;
+      latestRecommendationRun.failureHumanDecisionError = request.error ?? null;
+      if (request.appendRequest) {
+        await applyAndPersistAppendRequest(request.appendRequest, {
+          currentWorkStage: "human-decision",
+        });
+      }
+    }
+
+    return { execution, review, convergence };
   }
 
   return {
@@ -558,6 +697,103 @@ export function createWorkflowService({
 
       return {
         planned: planning.appendRequest.artifactType === "autoMergePlan",
+        error: null,
+        recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+      };
+    },
+
+    async retryWithConvergenceGuidance({
+      packageId = null,
+      guidance = "",
+      focusAreas = [],
+      avoidRepeating = [],
+      expectedNextOutcome = "",
+    } = {}) {
+      const taskContextPackage = await findConvergenceFailureDecisionPackage(packageId);
+      if (!taskContextPackage) {
+        return {
+          retried: false,
+          error: packageId
+            ? `没有找到可带意见重试的任务上下文包：${packageId}`
+            : "没有可带意见重试的任务上下文包。",
+          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+        };
+      }
+
+      ensureLatestRecommendationRun(taskContextPackage);
+      const guidanceResult = provideHumanConvergenceGuidance({
+        taskContextPackage,
+        guidance,
+        focusAreas,
+        avoidRepeating,
+        expectedNextOutcome,
+      });
+      if (!guidanceResult.appendRequest) {
+        latestRecommendationRun.humanConvergenceGuidanceError = guidanceResult.error;
+        emitRecommendationChanged(latestRecommendationRun);
+        return {
+          retried: false,
+          error: guidanceResult.error,
+          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+        };
+      }
+
+      await applyAndPersistAppendRequest(guidanceResult.appendRequest, {
+        currentWorkStage: "human-guidance",
+      });
+      latestRecommendationRun.humanConvergenceGuidance = guidanceResult;
+      latestRecommendationRun.humanConvergenceGuidanceError = null;
+
+      const round = await runGuidedCorrectionRound();
+      const error = round.execution?.error
+        ?? round.review?.error
+        ?? round.convergence?.error
+        ?? null;
+      emitRecommendationChanged(latestRecommendationRun);
+
+      return {
+        retried: !error,
+        error,
+        recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+      };
+    },
+
+    async cancelTask({ packageId = null } = {}) {
+      const taskContextPackage = await findConvergenceFailureDecisionPackage(packageId);
+      if (!taskContextPackage) {
+        return {
+          cancelled: false,
+          error: packageId
+            ? `没有找到可取消的收敛失败任务上下文包：${packageId}`
+            : "没有可取消的收敛失败任务上下文包。",
+          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+        };
+      }
+
+      ensureLatestRecommendationRun(taskContextPackage);
+      const cancellation = cancelTaskAfterConvergenceFailure({
+        taskContextPackage,
+        repositoryDir,
+      });
+      if (!cancellation.appendRequest) {
+        latestRecommendationRun.taskCancellationError = cancellation.error;
+        emitRecommendationChanged(latestRecommendationRun);
+        return {
+          cancelled: false,
+          error: cancellation.error,
+          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+        };
+      }
+
+      await applyAndPersistAppendRequest(cancellation.appendRequest, {
+        currentWorkStage: "cancelled",
+      });
+      latestRecommendationRun.taskCancellation = cancellation;
+      latestRecommendationRun.taskCancellationError = null;
+      emitRecommendationChanged(latestRecommendationRun);
+
+      return {
+        cancelled: true,
         error: null,
         recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
       };

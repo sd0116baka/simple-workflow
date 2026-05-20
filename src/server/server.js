@@ -127,6 +127,28 @@ export function createApp({
         return;
       }
 
+      if (request.method === "POST" && request.url?.startsWith("/api/human-decisions/retry-with-guidance")) {
+        const body = await readJsonBody(request);
+        const result = await workflowService.retryWithConvergenceGuidance({
+          packageId: body.packageId,
+          guidance: body.guidance,
+          focusAreas: body.focusAreas,
+          avoidRepeating: body.avoidRepeating,
+          expectedNextOutcome: body.expectedNextOutcome,
+        });
+        sendJson(response, result.retried ? 200 : 409, result);
+        return;
+      }
+
+      if (request.method === "POST" && request.url?.startsWith("/api/human-decisions/cancel-task")) {
+        const body = await readJsonBody(request);
+        const result = await workflowService.cancelTask({
+          packageId: body.packageId,
+        });
+        sendJson(response, result.cancelled ? 200 : 409, result);
+        return;
+      }
+
       if (request.method === "POST" && request.url?.startsWith("/api/auto-merge/replan")) {
         const body = await readJsonBody(request);
         const result = await workflowService.replanAutoMerge({
