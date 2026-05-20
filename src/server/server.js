@@ -1,14 +1,26 @@
 import { createServer } from "node:http";
 import { spawn, spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { extname, join, normalize } from "node:path";
+import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createWorkflowService } from "../workflow/workflow-service.js";
 
 const rootDir = fileURLToPath(new URL("../..", import.meta.url));
 const publicDir = join(rootDir, "public");
-const tasksDir = join(rootDir, "tasks");
 const port = Number(process.env.PORT ?? 5173);
+
+export function runtimeConfigFromEnv(env = process.env, cwd = rootDir) {
+  const repositoryDir = resolve(env.SIMPLE_WORKFLOW_REPOSITORY_DIR ?? cwd);
+  const tasksDir = resolve(env.SIMPLE_WORKFLOW_TASKS_DIR ?? join(repositoryDir, "tasks"));
+  const taskContextPackageStoreDir = resolve(
+    env.SIMPLE_WORKFLOW_CONTEXT_STORE_DIR ?? join(repositoryDir, ".workflow", "task-context-packages"),
+  );
+  return {
+    repositoryDir,
+    tasksDir,
+    taskContextPackageStoreDir,
+  };
+}
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -89,7 +101,7 @@ async function serveStatic(request, response) {
 }
 
 export function createApp({
-  workflowService = createWorkflowService({ tasksDir, repositoryDir: rootDir }),
+  workflowService = createWorkflowService(runtimeConfigFromEnv()),
   restartServer = null,
 } = {}) {
   return createServer(async (request, response) => {
@@ -261,7 +273,8 @@ function spawnRestartProcess(options) {
 }
 
 if (isDirectRun(import.meta.url, process.argv[1])) {
-  const workflowService = createWorkflowService({ tasksDir, repositoryDir: rootDir });
+  const runtimeConfig = runtimeConfigFromEnv();
+  const workflowService = createWorkflowService(runtimeConfig);
   await workflowService.startWatching();
   let server = null;
   const restartServer = () => {
@@ -282,5 +295,7 @@ if (isDirectRun(import.meta.url, process.argv[1])) {
   };
   server = createApp({ workflowService, restartServer }).listen(port, () => {
     console.log(`simple-workflow running at http://localhost:${port}`);
+    console.log(`workflow repository: ${runtimeConfig.repositoryDir}`);
+    console.log(`workflow tasks: ${runtimeConfig.tasksDir}`);
   });
 }

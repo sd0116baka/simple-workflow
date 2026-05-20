@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "node --watch src/server/server.js",
     "start": "node src/server/server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "testenv:reset": "node scripts/create-test-environment.js",
+    "testenv:start": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-test-environment.ps1"
   },
   "dependencies": {
     "yaml": "^2.9.0"
