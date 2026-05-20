@@ -6,6 +6,8 @@
 
 本环节不修改主线，不执行合并。
 
+本文只描述自动合并相关的推进规则，不定义 `currentWorkStage` 枚举语义。`currentWorkStage` 的正式枚举和含义以 `docs/definitions/task-pool.md` 为准。
+
 ## 前置校验输入
 
 输入是处于 `auto-merge-planning` 环节的任务上下文包。

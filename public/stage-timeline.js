@@ -1,24 +1,52 @@
-const STAGE_DEFINITIONS = [
-  { stage: "task-pool", label: "任务池", transition: "任务入池" },
-  { stage: "task-recommender", label: "任务推荐器", transition: "选中候选任务" },
-  { stage: "execution-admission", label: "执行准入器", transition: "授权或拒绝" },
-  { stage: "isolated-workspace", label: "隔离工作树", transition: "分配执行环境" },
-  { stage: "main-agent", label: "Main Agent", transition: "初始化会话" },
-  { stage: "execution-agent", label: "Execution Agent", transition: "执行任务" },
-  { stage: "review-agent", label: "Review Agent", transition: "审查执行结果" },
-  { stage: "convergence", label: "收敛判断", transition: "判断下一步" },
-  { stage: "human-decision", label: "人工决策", transition: "人工选择" },
-  { stage: "auto-merge-planning", label: "合并前置校验", transition: "生成合并计划" },
-  { stage: "auto-merge-execution", label: "自动合并执行", transition: "执行合并" },
-  { stage: "merged", label: "已合入", transition: "进入收尾" },
-  { stage: "task-closeout", label: "任务收尾", transition: "清理执行资源" },
-  { stage: "closed", label: "已关闭", transition: null },
-  { stage: "cancelled", label: "已取消", transition: null },
-];
+const STAGE_DEFINITIONS = {
+  "task-pool": { label: "任务池", transition: "任务入池" },
+  "task-recommender": { label: "任务推荐器", transition: "选中候选任务" },
+  "execution-admission": { label: "执行准入器", transition: "授权或拒绝" },
+  "isolated-workspace": { label: "隔离工作树", transition: "分配执行环境" },
+  "main-agent": { label: "Main Agent", transition: "初始化会话" },
+  "execution-agent": { label: "Execution Agent", transition: "执行任务" },
+  "review-agent": { label: "Review Agent", transition: "审查执行结果" },
+  convergence: { label: "收敛判断", transition: "判断下一步" },
+  "human-decision": { label: "人工决策", transition: "人工选择" },
+  "auto-merge-planning": { label: "合并前置校验", transition: "生成合并计划" },
+  "auto-merge-execution": { label: "自动合并执行", transition: "执行合并" },
+  merged: { label: "已合入", transition: "进入收尾" },
+  "task-closeout": { label: "任务收尾", transition: "清理执行资源" },
+  closed: { label: "已关闭", transition: null },
+  cancelled: { label: "已取消", transition: null },
+};
+
+const ARTIFACT_STAGE = {
+  executionIntent: "task-recommender",
+  executionAuthorization: "execution-admission",
+  admissionRejection: "execution-admission",
+  isolatedWorkspace: "isolated-workspace",
+  convergenceAdvice: "convergence",
+  convergenceSuccess: "convergence",
+  convergenceFailure: "convergence",
+  humanDecisionRequest: "human-decision",
+  humanConvergenceGuidance: "human-decision",
+  humanDecision: "human-decision",
+  autoMergePlan: "auto-merge-planning",
+  autoMergeRejection: "auto-merge-planning",
+  autoMergeResult: "auto-merge-execution",
+  autoMergeFailure: "auto-merge-execution",
+  taskCloseout: "task-closeout",
+};
 
 function artifactRecords(artifactValue) {
   if (Array.isArray(artifactValue)) return artifactValue;
   return artifactValue ? [artifactValue] : [];
+}
+
+function allArtifacts(taskContextPackage) {
+  return Object.entries(taskContextPackage?.artifacts ?? {}).flatMap(([artifactType, value]) =>
+    artifactRecords(value).map((artifact) => ({ artifactType, artifact })),
+  );
+}
+
+function artifactById(taskContextPackage, artifactId) {
+  return allArtifacts(taskContextPackage).find((item) => item.artifact?.artifactId === artifactId) ?? null;
 }
 
 function latestArtifact(taskContextPackage, artifactType) {
@@ -26,26 +54,16 @@ function latestArtifact(taskContextPackage, artifactType) {
   return records.length > 0 ? records[records.length - 1] : null;
 }
 
-function hasArtifact(taskContextPackage, artifactType) {
-  return artifactRecords(taskContextPackage?.artifacts?.[artifactType]).length > 0;
+function agentRunById(taskContextPackage, runId) {
+  return (taskContextPackage?.agentRuns ?? []).find((agentRun) => agentRun.runId === runId) ?? null;
 }
 
-function agentRun(taskContextPackage, predicate) {
-  return (taskContextPackage?.agentRuns ?? []).find(predicate) ?? null;
+function stageDefinition(stage) {
+  return STAGE_DEFINITIONS[stage] ?? { label: stage, transition: null };
 }
 
-function latestAgentRun(taskContextPackage, predicate) {
-  return [...(taskContextPackage?.agentRuns ?? [])].reverse().find(predicate) ?? null;
-}
-
-function latestArtifactId(taskContextPackage, artifactType) {
-  return latestArtifact(taskContextPackage, artifactType)?.artifactId ?? null;
-}
-
-function latestArtifactTimestamp(taskContextPackage, artifactType) {
-  const artifact = latestArtifact(taskContextPackage, artifactType);
+function timestampFromArtifact(artifact) {
   return artifact?.appendedAt
-    ?? artifact?.body?.appendedAt
     ?? artifact?.body?.requestedAt
     ?? artifact?.body?.decidedAt
     ?? artifact?.body?.plannedAt
@@ -55,152 +73,158 @@ function latestArtifactTimestamp(taskContextPackage, artifactType) {
     ?? null;
 }
 
-function agentRunTimestamp(run) {
-  return run?.finishedAt ?? run?.startedAt ?? null;
+function timestampFromAgentRun(agentRun) {
+  return agentRun?.finishedAt ?? agentRun?.startedAt ?? null;
 }
 
-function latestTimelineTimestamp(taskContextPackage, predicate) {
-  const entry = [...(taskContextPackage?.timeline ?? [])].reverse().find(predicate);
-  return entry?.appendedAt ?? null;
+function stageFromAgentRun(agentRun) {
+  if (agentRun?.role === "execution") return "execution-agent";
+  if (agentRun?.role === "review") return "review-agent";
+  if (agentRun?.role === "main" && agentRun.runId === "main-agent:initialization") return "main-agent";
+  if (agentRun?.role === "main") return "convergence";
+  return null;
 }
 
-function humanDecisionLabel(taskContextPackage) {
-  const guidance = latestArtifact(taskContextPackage, "humanConvergenceGuidance");
-  if (guidance) return guidance.artifactId ?? "humanConvergenceGuidance";
-  const decision = latestArtifact(taskContextPackage, "humanDecision");
-  if (decision) return decision.body?.decision ?? decision.artifactId ?? "humanDecision";
-  const request = latestArtifact(taskContextPackage, "humanDecisionRequest");
-  return request?.artifactId ?? null;
+function stageFromTimelineEntry(taskContextPackage, entry) {
+  if (entry.agentRunId) {
+    return stageFromAgentRun(agentRunById(taskContextPackage, entry.agentRunId));
+  }
+  return ARTIFACT_STAGE[entry.artifactType] ?? null;
 }
 
-function stageEvidence(taskContextPackage, stage) {
-  const artifacts = taskContextPackage?.artifacts ?? {};
-  switch (stage) {
-    case "task-pool":
-      return taskContextPackage ? taskContextPackage.packageId ?? "taskContextPackage" : null;
-    case "task-recommender":
-      return latestArtifactId(taskContextPackage, "executionIntent");
-    case "execution-admission":
-      return latestArtifactId(taskContextPackage, "executionAuthorization")
-        ?? latestArtifactId(taskContextPackage, "admissionRejection");
-    case "isolated-workspace":
-      return latestArtifactId(taskContextPackage, "isolatedWorkspace");
-    case "main-agent": {
-      const run = agentRun(taskContextPackage, (item) =>
-        item.role === "main" && item.runId === "main-agent:initialization",
-      );
-      return run?.runId ?? null;
+function evidenceFromTimelineEntry(taskContextPackage, entry) {
+  if (entry.agentRunId) return entry.agentRunId;
+  if (entry.artifactId) return entry.artifactId;
+  return entry.artifactType ?? taskContextPackage?.packageId ?? "taskContextPackage";
+}
+
+function timestampFromTimelineEntry(taskContextPackage, entry) {
+  if (entry.agentRunId) {
+    return timestampFromAgentRun(agentRunById(taskContextPackage, entry.agentRunId))
+      ?? entry.appendedAt
+      ?? null;
+  }
+  if (entry.artifactId) {
+    return timestampFromArtifact(artifactById(taskContextPackage, entry.artifactId)?.artifact)
+      ?? entry.appendedAt
+      ?? null;
+  }
+  return entry.appendedAt ?? null;
+}
+
+function initialNode(taskContextPackage) {
+  const { label, transition } = stageDefinition("task-pool");
+  return {
+    stage: "task-pool",
+    label,
+    transition,
+    evidence: taskContextPackage?.packageId ?? "taskContextPackage",
+    timestamp: taskContextPackage?.fixture?.generatedAt
+      ?? taskContextPackage?.timeline?.[0]?.appendedAt
+      ?? null,
+    status: "completed",
+    detail: taskContextPackage?.packageId ?? "taskContextPackage",
+  };
+}
+
+function nodeFromTimelineEntry(taskContextPackage, entry, index) {
+  const stage = stageFromTimelineEntry(taskContextPackage, entry);
+  if (!stage) return null;
+  const { label, transition } = stageDefinition(stage);
+  const evidence = evidenceFromTimelineEntry(taskContextPackage, entry);
+  return {
+    stage,
+    label,
+    transition,
+    evidence,
+    timestamp: timestampFromTimelineEntry(taskContextPackage, entry),
+    status: "completed",
+    detail: evidence,
+    timelineIndex: index,
+  };
+}
+
+function coalesceAdjacentImplementationDetails(nodes) {
+  const result = [];
+  for (let index = 0; index < nodes.length; index += 1) {
+    const node = nodes[index];
+    const nextNode = nodes[index + 1];
+    if (node.stage === "human-decision" && nextNode?.stage === "human-decision") {
+      result.push({
+        ...nextNode,
+        evidence: `${node.evidence} -> ${nextNode.evidence}`,
+        detail: `${node.evidence} -> ${nextNode.evidence}`,
+        timestamp: nextNode.timestamp ?? node.timestamp,
+      });
+      index += 1;
+      continue;
     }
-    case "execution-agent":
-      return latestArtifactId(taskContextPackage, "executionReport")
-        ?? latestAgentRun(taskContextPackage, (item) => item.role === "execution")?.runId
-        ?? null;
-    case "review-agent":
-      return latestArtifactId(taskContextPackage, "reviewReport")
-        ?? latestAgentRun(taskContextPackage, (item) => item.role === "review")?.runId
-        ?? null;
-    case "convergence":
-      return latestArtifactId(taskContextPackage, "convergenceAdvice")
-        ?? latestArtifactId(taskContextPackage, "convergenceSuccess")
-        ?? latestArtifactId(taskContextPackage, "convergenceFailure")
-        ?? latestAgentRun(taskContextPackage, (item) => item.runId?.startsWith("main-agent:convergence"))?.runId
-        ?? null;
-    case "human-decision":
-      return humanDecisionLabel(taskContextPackage);
-    case "auto-merge-planning":
-      return latestArtifactId(taskContextPackage, "autoMergePlan")
-        ?? latestArtifactId(taskContextPackage, "autoMergeRejection")
-        ?? (artifacts.humanDecision?.body?.nextRequiredStage === "auto-merge-planning" ? "humanDecision" : null);
-    case "auto-merge-execution":
-      return latestArtifactId(taskContextPackage, "autoMergeResult")
-        ?? latestArtifactId(taskContextPackage, "autoMergeFailure");
-    case "merged":
-      return latestArtifactId(taskContextPackage, "autoMergeResult");
-    case "task-closeout":
-      return latestArtifactId(taskContextPackage, "taskCloseout");
-    case "closed":
-      return artifacts.taskCloseout?.body?.finalStage === "closed" ? "taskCloseout" : null;
-    case "cancelled":
-      return artifacts.taskCloseout?.body?.finalStage === "cancelled" ? "taskCloseout" : null;
-    default:
-      return null;
+    if (
+      ["execution-agent", "review-agent"].includes(node.stage)
+      && nextNode?.stage === node.stage
+      && nextNode.evidence?.includes("-agent:")
+    ) {
+      result.push(nextNode);
+      index += 1;
+      continue;
+    }
+    if (
+      node.stage === "convergence"
+      && nextNode?.stage === "convergence"
+      && nextNode.evidence?.startsWith("main-agent:convergence")
+    ) {
+      result.push(node);
+      index += 1;
+      continue;
+    }
+    result.push(node);
   }
+  return result;
 }
 
-function stageTimestamp(taskContextPackage, stage) {
-  switch (stage) {
-    case "task-pool":
-      return taskContextPackage?.fixture?.generatedAt
-        ?? latestTimelineTimestamp(taskContextPackage, () => true);
-    case "task-recommender":
-      return latestArtifactTimestamp(taskContextPackage, "executionIntent");
-    case "execution-admission":
-      return latestArtifactTimestamp(taskContextPackage, "executionAuthorization")
-        ?? latestArtifactTimestamp(taskContextPackage, "admissionRejection");
-    case "isolated-workspace":
-      return latestArtifactTimestamp(taskContextPackage, "isolatedWorkspace");
-    case "main-agent":
-      return agentRunTimestamp(agentRun(taskContextPackage, (item) =>
-        item.role === "main" && item.runId === "main-agent:initialization",
-      ));
-    case "execution-agent":
-      return agentRunTimestamp(latestAgentRun(taskContextPackage, (item) => item.role === "execution"))
-        ?? latestArtifactTimestamp(taskContextPackage, "executionReport")
-        ?? latestArtifactTimestamp(taskContextPackage, "humanConvergenceGuidance");
-    case "review-agent":
-      return agentRunTimestamp(latestAgentRun(taskContextPackage, (item) => item.role === "review"))
-        ?? latestArtifactTimestamp(taskContextPackage, "reviewReport");
-    case "convergence":
-      return agentRunTimestamp(latestAgentRun(taskContextPackage, (item) =>
-        item.runId?.startsWith("main-agent:convergence"),
-      ))
-        ?? latestArtifactTimestamp(taskContextPackage, "convergenceAdvice")
-        ?? latestArtifactTimestamp(taskContextPackage, "convergenceSuccess")
-        ?? latestArtifactTimestamp(taskContextPackage, "convergenceFailure");
-    case "human-decision":
-      return latestArtifactTimestamp(taskContextPackage, "humanConvergenceGuidance")
-        ?? latestArtifactTimestamp(taskContextPackage, "humanDecision")
-        ?? latestArtifactTimestamp(taskContextPackage, "humanDecisionRequest");
-    case "auto-merge-planning":
-      return latestArtifactTimestamp(taskContextPackage, "autoMergePlan")
-        ?? latestArtifactTimestamp(taskContextPackage, "autoMergeRejection")
-        ?? latestArtifactTimestamp(taskContextPackage, "humanDecision");
-    case "auto-merge-execution":
-      return latestArtifactTimestamp(taskContextPackage, "autoMergeResult")
-        ?? latestArtifactTimestamp(taskContextPackage, "autoMergeFailure");
-    case "merged":
-      return latestArtifactTimestamp(taskContextPackage, "autoMergeResult");
-    case "task-closeout":
-    case "closed":
-    case "cancelled":
-      return latestArtifactTimestamp(taskContextPackage, "taskCloseout");
-    default:
-      return null;
-  }
-}
-
-function skippedStage(taskContextPackage, stage) {
-  const decision = taskContextPackage?.artifacts?.humanDecision?.body?.decision;
+function terminalNode(taskContextPackage) {
   const finalStage = taskContextPackage?.artifacts?.taskCloseout?.body?.finalStage;
-  if (finalStage === "closed" && stage === "cancelled") return true;
-  if (finalStage === "cancelled" && stage === "closed") return true;
-  if (decision === "cancel-task") {
-    return [
-      "auto-merge-planning",
-      "auto-merge-execution",
-      "merged",
-      "closed",
-    ].includes(stage);
-  }
-  return false;
+  if (!["closed", "cancelled"].includes(finalStage)) return null;
+  const { label, transition } = stageDefinition(finalStage);
+  return {
+    stage: finalStage,
+    label,
+    transition,
+    evidence: "taskCloseout",
+    timestamp: timestampFromArtifact(taskContextPackage.artifacts.taskCloseout),
+    status: "completed",
+    detail: "taskCloseout",
+  };
 }
 
-function stageDetail({ taskContextPackage, stage, status, evidence }) {
-  if (status === "current") return evidence ? `当前 · ${evidence}` : "当前环节";
-  if (status === "skipped") return "未进入此分支";
-  if (evidence) return evidence;
-  if (!taskContextPackage) return "等待任务包";
-  return "等待";
+function fallbackCurrentNode(taskContextPackage, nodes) {
+  const currentStage = taskContextPackage?.currentWorkStage;
+  if (!currentStage || nodes.some((node) => node.stage === currentStage)) return null;
+  const { label, transition } = stageDefinition(currentStage);
+  return {
+    stage: currentStage,
+    label,
+    transition,
+    evidence: currentStage,
+    timestamp: null,
+    status: "current",
+    detail: "当前环节",
+  };
+}
+
+function markCurrentNode(nodes, currentStage) {
+  const nextNodes = nodes.map((node) => ({ ...node, status: "completed", detail: node.evidence }));
+  const currentIndex = currentStage
+    ? nextNodes.findLastIndex((node) => node.stage === currentStage)
+    : nextNodes.length - 1;
+  if (currentIndex >= 0) {
+    nextNodes[currentIndex] = {
+      ...nextNodes[currentIndex],
+      status: "current",
+      detail: `当前 · ${nextNodes[currentIndex].evidence}`,
+    };
+  }
+  return nextNodes;
 }
 
 function correctionNotes(taskContextPackage) {
@@ -215,44 +239,42 @@ function correctionNotes(taskContextPackage) {
 }
 
 export function buildStageTimeline(taskContextPackage) {
-  const currentStage = taskContextPackage?.currentWorkStage ?? null;
-  const nodes = STAGE_DEFINITIONS.map((definition) => {
-    const evidence = stageEvidence(taskContextPackage, definition.stage);
-    const status = currentStage === definition.stage
-      ? "current"
-      : evidence
-        ? "completed"
-      : skippedStage(taskContextPackage, definition.stage)
-        ? "skipped"
-      : "pending";
+  if (!taskContextPackage) {
     return {
-      ...definition,
-      evidence,
-      timestamp: stageTimestamp(taskContextPackage, definition.stage),
-      status,
-      detail: stageDetail({
-        taskContextPackage,
-        stage: definition.stage,
-        status,
-        evidence,
-      }),
+      currentStage: null,
+      nodes: [],
+      transitions: [],
+      notes: [],
     };
-  });
+  }
+
+  const timelineNodes = coalesceAdjacentImplementationDetails((taskContextPackage.timeline ?? [])
+    .map((entry, index) => nodeFromTimelineEntry(taskContextPackage, entry, index))
+    .filter(Boolean));
+  const terminal = terminalNode(taskContextPackage);
+  const baseNodes = [
+    initialNode(taskContextPackage),
+    ...timelineNodes,
+    ...(terminal ? [terminal] : []),
+  ];
+  const fallback = fallbackCurrentNode(taskContextPackage, baseNodes);
+  const nodes = markCurrentNode(
+    fallback ? [...baseNodes, fallback] : baseNodes,
+    taskContextPackage.currentWorkStage,
+  );
 
   const transitions = nodes.slice(0, -1).map((node, index) => {
     const nextNode = nodes[index + 1];
-    const completed = ["completed", "current"].includes(node.status)
-      && ["completed", "current"].includes(nextNode.status);
     return {
       from: node.stage,
       to: nextNode.stage,
       label: node.transition,
-      status: completed ? "completed" : "pending",
+      status: "completed",
     };
   });
 
   return {
-    currentStage,
+    currentStage: taskContextPackage.currentWorkStage,
     nodes,
     transitions,
     notes: correctionNotes(taskContextPackage),

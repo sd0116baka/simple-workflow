@@ -37,6 +37,13 @@ const STAGE_FIXTURES = [
     currentWorkStage: "human-decision",
     humanDecisionScenario: "convergence-failure",
   },
+  {
+    id: "stub-human-guided-execution",
+    title: "Stub human-guided-execution",
+    fixtureKey: "human-guided-execution",
+    currentWorkStage: "execution-agent",
+    humanDecisionScenario: "human-guided-execution",
+  },
   { id: "stub-auto-merge-planning", title: "Stub auto-merge-planning", fixtureKey: "auto-merge-planning", currentWorkStage: "auto-merge-planning" },
   { id: "stub-auto-merge-execution", title: "Stub auto-merge-execution", fixtureKey: "auto-merge-execution", currentWorkStage: "auto-merge-execution" },
   { id: "stub-merged", title: "Stub merged", fixtureKey: "merged", currentWorkStage: "merged" },
@@ -180,6 +187,10 @@ async function resetMainToStubFixtureBase({ repositoryDir, storeDir }) {
 
 function fixtureWorktreePath(id) {
   return `.workflow/worktrees/tasks/${id}`;
+}
+
+function isConvergenceFailureScenario(scenario) {
+  return ["convergence-failure", "human-guided-execution"].includes(scenario);
 }
 
 function fixtureBranchName(id) {
@@ -377,12 +388,12 @@ function populateArtifacts(taskPackage, {
     finishedAt: timestamp,
   });
 
-  if (currentWorkStage === "execution-agent") return;
+  if (currentWorkStage === "execution-agent" && humanDecisionScenario !== "human-guided-execution") return;
 
   addMultiArtifact(taskPackage, "reviewReport", artifact("reviewReport:001", {
-    outcome: humanDecisionScenario === "convergence-failure" ? "failed" : "passed",
+    outcome: isConvergenceFailureScenario(humanDecisionScenario) ? "failed" : "passed",
     summary: "fixture review report",
-    findings: humanDecisionScenario === "convergence-failure"
+    findings: isConvergenceFailureScenario(humanDecisionScenario)
       ? [{ code: "fixture-not-converged", message: "用于测试收敛失败人工处理。" }]
       : [],
   }, timestamp));
@@ -400,7 +411,7 @@ function populateArtifacts(taskPackage, {
 
   if (currentWorkStage === "review-agent") return;
 
-  if (humanDecisionScenario === "convergence-failure") {
+  if (isConvergenceFailureScenario(humanDecisionScenario)) {
     addMultiArtifact(taskPackage, "convergenceFailure", artifact("convergenceFailure:001", {
       summary: "fixture convergence failure",
       reasonCode: "fixture-not-converged",
@@ -427,6 +438,35 @@ function populateArtifacts(taskPackage, {
       targetRef: "convergenceFailure:001",
       decisionOptions: ["continue-convergence-with-guidance", "cancel-task"],
     }, timestamp));
+    if (humanDecisionScenario === "human-guided-execution") {
+      addMultiArtifact(taskPackage, "humanConvergenceGuidance", artifact("humanConvergenceGuidance:001", {
+        decision: "continue-convergence-with-guidance",
+        targetType: "convergenceFailure",
+        targetRef: "convergenceFailure:001",
+        guidance: "fixture 人工要求下一轮执行修正收敛失败点。",
+        focusAreas: ["fixture 收敛失败点"],
+        avoidRepeating: ["不要重复上一轮无效修正。"],
+        expectedNextOutcome: "下一轮 execution-agent 使用人工意见继续修正。",
+        nextRequiredStage: "convergence",
+      }, timestamp));
+      addAgentRun(taskPackage, {
+        runId: "execution-agent:002",
+        role: "execution",
+        sessionId: `fixture-execution-guided:${id}`,
+        inputArtifactRefs: [
+          "taskDraft",
+          "executionIntent",
+          "executionAuthorization",
+          "convergenceFailure:001",
+          "humanConvergenceGuidance:001",
+          "isolatedWorkspace",
+        ],
+        outputArtifactRefs: [],
+        status: "running",
+        startedAt: timestamp,
+        finishedAt: null,
+      });
+    }
     return;
   }
 

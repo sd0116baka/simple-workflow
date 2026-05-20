@@ -20,6 +20,8 @@ review
 
 系统状态机负责决定什么时候调用哪个 Agent。Agent 不负责推进工作流状态。
 
+本文只描述 Agent 调用和工作流推进规则，不定义 `currentWorkStage` 枚举语义。`currentWorkStage` 的正式枚举和含义以 `docs/definitions/task-pool.md` 为准。
+
 ## 生命周期规则
 
 `main` Agent 是任务级会话。

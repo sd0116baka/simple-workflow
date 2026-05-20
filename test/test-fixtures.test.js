@@ -153,6 +153,51 @@ test("convergence success fixture requests human decision and settles there", as
   assert.equal(runGit(["status", "--porcelain"], repositoryDir), "");
 });
 
+test("human guided execution fixture loops from human decision to execution agent", async (t) => {
+  const rootDir = await mkdtemp(join(tmpdir(), "simple-workflow-fixtures-human-guided-"));
+  t.after(() => rm(rootDir, { recursive: true, force: true }));
+  const repositoryDir = join(rootDir, ".workflow", "test-environment", "repository");
+  const tasksDir = join(repositoryDir, "tasks");
+  const storeDir = join(repositoryDir, ".workflow", "task-context-packages");
+  await mkdir(repositoryDir, { recursive: true });
+  await initializeTestRepository(repositoryDir);
+
+  const result = await seedTestStateFixtures({
+    repositoryDir,
+    tasksDir,
+    storeDir,
+    fixtureKey: "human-guided-execution",
+    now: () => "2026-05-20T10:00:00.000Z",
+  });
+  const packages = await loadTaskContextPackages({ storeDir });
+  const taskContextPackage = packages[0];
+
+  assert.equal(result.tasks[0].sourcePath, "tasks/stub-human-guided-execution.yaml");
+  assert.equal(result.tasks[0].currentWorkStage, "execution-agent");
+  assert.equal(taskContextPackage.currentWorkStage, "execution-agent");
+  assert.equal(
+    taskContextPackage.artifacts.humanDecisionRequest.body.targetRef,
+    "convergenceFailure:001",
+  );
+  assert.equal(
+    taskContextPackage.artifacts.humanConvergenceGuidance[0].body.targetRef,
+    "convergenceFailure:001",
+  );
+  assert.deepEqual(
+    taskContextPackage.agentRuns.at(-1).inputArtifactRefs,
+    [
+      "taskDraft",
+      "executionIntent",
+      "executionAuthorization",
+      "convergenceFailure:001",
+      "humanConvergenceGuidance:001",
+      "isolatedWorkspace",
+    ],
+  );
+  assert.equal(taskContextPackage.agentRuns.at(-1).runId, "execution-agent:002");
+  assert.equal(taskContextPackage.agentRuns.at(-1).status, "running");
+});
+
 test("cancelling a convergence failure fixture closes out resources", async (t) => {
   const rootDir = await mkdtemp(join(tmpdir(), "simple-workflow-fixtures-cancel-closeout-"));
   t.after(() => rm(rootDir, { recursive: true, force: true }));

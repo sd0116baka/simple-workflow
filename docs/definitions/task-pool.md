@@ -187,44 +187,34 @@ appendedAt 是任务池执行本次状态记录追加的时间。
 
 ## currentWorkStage
 
-`currentWorkStage` 表示围绕该任务正在进行或停留的工作环节。
+`currentWorkStage` 表示围绕该任务正在进行或停留的工作环节。本节是 `currentWorkStage` 枚举和语义的文档权威来源；其他文档可以描述某条流程如何推进到这些环节，但不重新定义枚举含义。
 
 它不表达阻塞原因，不表达整体健康度，也不表达是否可执行。
 
-第一版枚举值：
+正式枚举：
 
-```text
-task-parser
-task-pool
-task-recommender
-execution-admission
-isolated-workspace
-main-agent
-execution-agent
-review-agent
-convergence
-human-decision
-auto-merge-planning
-auto-merge-execution
-merged
-task-closeout
-closed
-cancelled
-```
+| currentWorkStage | 含义 | 进入依据 |
+| --- | --- | --- |
+| `task-parser` | 系统正在读取并解析任务真源。 | 原始任务文件刚进入解析流程，尚未形成可消费任务池条目。 |
+| `task-pool` | 任务已进入任务池，等待推荐或继续观察。 | 任务真源可解析，且尚未被推荐器选中执行。 |
+| `task-recommender` | 推荐器正在选择本轮要执行的任务。 | 系统开始消费任务池候选任务，并准备生成 `executionIntent`。 |
+| `execution-admission` | 执行准入器正在判断推荐任务是否允许进入执行。 | 已生成 `executionIntent`，等待追加 `executionAuthorization` 或 `admissionRejection`。 |
+| `isolated-workspace` | 系统正在为任务分配隔离执行工作树。 | 已追加 `executionAuthorization`，等待追加任务级 `isolatedWorkspace`。 |
+| `main-agent` | Main Agent 正在初始化该任务的执行上下文。 | 已分配 `isolatedWorkspace`，等待记录 `main-agent:initialization`。 |
+| `execution-agent` | Execution Agent 正在执行或修正任务。 | 已完成 main 初始化；首轮执行或带收敛意见的新一轮执行都会进入该环节。 |
+| `review-agent` | Review Agent 正在审查本轮执行结果。 | 已追加本轮 `executionReport`，等待追加 `reviewReport`。 |
+| `convergence` | Main Agent 正在判断本轮执行和审查结果是否收敛。 | 已追加本轮 `reviewReport`，等待追加 `convergenceAdvice`、`convergenceSuccess` 或 `convergenceFailure`。 |
+| `human-decision` | 系统正在等待人工处理需要判断的工作流结果。 | 已追加 `humanDecisionRequest`；请求目标可以是 `convergenceSuccess`、`convergenceFailure`、`autoMergeRejection` 或 `autoMergeFailure`。 |
+| `auto-merge-planning` | 系统正在为人工接受的收敛结果生成自动合并计划。 | 已追加 `humanDecision(decision: accept-convergence)`，等待追加 `autoMergePlan` 或 `autoMergeRejection`。 |
+| `auto-merge-execution` | 系统正在执行自动合并。 | 已追加 `autoMergePlan`，等待追加 `autoMergeResult` 或 `autoMergeFailure`。 |
+| `merged` | 任务成果已经合入目标分支，等待统一收尾。 | 已追加 `autoMergeResult`。 |
+| `task-closeout` | 任务已经决定退出，系统正在清理执行侧资源。 | 成功路径通常从 `merged` 进入；取消路径从 `humanDecision(decision: cancel-task)` 进入。 |
+| `closed` | 成功路径终态。 | 已追加 `taskCloseout(closeoutReason: merged)`，隔离工作树和任务分支已经清理。 |
+| `cancelled` | 取消路径终态。 | 已追加 `taskCloseout(closeoutReason: cancelled)`，隔离工作树和任务分支已经清理，任务成果不会合入主线。 |
 
-`human-decision` 表示系统正在等待人工处理需要判断的工作流结果。收敛成功时，人工接受、带意见继续收敛或取消任务；收敛失败或自动合并失败时，人工带意见继续收敛或取消任务。
+`human-decision` 内部可以包含一次请求和一次人工响应，例如 `humanDecisionRequest -> humanConvergenceGuidance`。这仍然是同一次人工决策环节，不表示状态机进入了两次 `human-decision`。
 
-`auto-merge-planning` 表示人工已经接受收敛成功，系统等待自动合并规划环节消费 `humanDecision`。
-
-`auto-merge-execution` 表示自动合并前置校验已通过，系统等待自动合并执行环节消费 `autoMergePlan`。
-
-`merged` 表示自动合并执行已成功追加 `autoMergeResult`，任务成果已经合入目标分支。
-
-`task-closeout` 表示任务已经决定退出，系统正在执行统一收尾。成功路径通常从 `merged` 立即完成收尾；取消路径从 `humanDecision(cancel-task)` 进入收尾。
-
-`closed` 表示成功路径的终态：任务收尾已追加 `taskCloseout(closeoutReason: merged)`，隔离工作树和任务分支已经清理。
-
-`cancelled` 表示取消路径的终态：任务收尾已追加 `taskCloseout(closeoutReason: cancelled)`，隔离工作树和任务分支已经清理，任务成果不会合入主线。
+`human-guided-execution` 不是 `currentWorkStage`。它只是本地测试状态桩场景名，用来生成已经追加 `humanConvergenceGuidance` 且当前停在下一轮 `execution-agent` 的任务包。
 
 ## isolatedWorkspace
 

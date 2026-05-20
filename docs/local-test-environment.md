@@ -35,11 +35,15 @@ npm.cmd run testenv:reset
 
 网页右上角先选择目标状态，再点“生成状态桩”，会在测试仓库中生成一个 stub 任务和任务上下文包。
 
-可选状态/场景包括 `task-pool`、`task-recommender`、`execution-admission`、`isolated-workspace`、`main-agent`、`execution-agent`、`review-agent`、`convergence`、`convergence-success`、`convergence-failure`、`auto-merge-planning`、`auto-merge-execution`、`merged`、`closed`、`cancelled`。
+可选状态桩包括 `task-pool`、`task-recommender`、`execution-admission`、`isolated-workspace`、`main-agent`、`execution-agent`、`review-agent`、`convergence`、`auto-merge-planning`、`auto-merge-execution`、`merged`、`closed`、`cancelled`。`currentWorkStage` 的正式枚举和含义以 `docs/definitions/task-pool.md` 为准。
+
+可选测试场景包括 `convergence-success`、`convergence-failure`、`human-guided-execution`。测试场景用于生成特定上下文包，不等同于 `currentWorkStage` 枚举。
 
 其中 `convergence-success` 选项表示收敛成功场景：生成 `convergenceSuccess` 后会立即追加 `humanDecisionRequest`，并停在 `human-decision` 等待人工接受、带意见继续收敛或取消任务。
 
 `convergence-failure` 选项表示收敛失败场景：生成 `convergenceFailure` 后追加 `humanDecisionRequest`，并停在 `human-decision` 等待人工提供收敛意见继续或取消任务。
+
+`human-guided-execution` 选项表示人工带意见继续收敛后的回环场景：先生成 `convergenceFailure` 和 `humanDecisionRequest`，再追加 `humanConvergenceGuidance`，并直接停在下一轮 `execution-agent`。
 
 每次生成前会先清理旧的 `stub-*` 测试任务，所以一次只保留一个状态桩。测试完成后可以点击“清理状态桩”，删除所有 `stub-*` 任务文件和对应上下文包。
 
