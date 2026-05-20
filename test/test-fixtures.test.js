@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadTaskContextPackages } from "../src/workflow/task-context-package-store.js";
@@ -10,12 +11,37 @@ import {
   seedTestStateFixtures,
 } from "../src/workflow/state-fixtures.js";
 
+function runGit(args, cwd) {
+  return execFileSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
+}
+
+async function initializeTestRepository(repositoryDir) {
+  await writeFile(join(repositoryDir, "README.md"), "fixture repository\n", "utf8");
+  runGit(["init", "-b", "main"], repositoryDir);
+  runGit(["add", "README.md"], repositoryDir);
+  runGit([
+    "-c",
+    "user.name=Simple Workflow Test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-m",
+    "initial commit",
+  ], repositoryDir);
+}
+
 test("seeds one selected stub task and replaces previous fixtures", async (t) => {
   const rootDir = await mkdtemp(join(tmpdir(), "simple-workflow-fixtures-"));
   t.after(() => rm(rootDir, { recursive: true, force: true }));
   const repositoryDir = join(rootDir, ".workflow", "test-environment", "repository");
   const tasksDir = join(repositoryDir, "tasks");
   const storeDir = join(repositoryDir, ".workflow", "task-context-packages");
+  await mkdir(repositoryDir, { recursive: true });
+  await initializeTestRepository(repositoryDir);
 
   const result = await seedTestStateFixtures({
     repositoryDir,
@@ -64,6 +90,8 @@ test("cleans generated stub tasks and packages", async (t) => {
   const repositoryDir = join(rootDir, ".workflow", "test-environment", "repository");
   const tasksDir = join(repositoryDir, "tasks");
   const storeDir = join(repositoryDir, ".workflow", "task-context-packages");
+  await mkdir(repositoryDir, { recursive: true });
+  await initializeTestRepository(repositoryDir);
 
   await seedTestStateFixtures({
     repositoryDir,
@@ -87,6 +115,8 @@ test("convergence success fixture requests human decision and settles there", as
   const repositoryDir = join(rootDir, ".workflow", "test-environment", "repository");
   const tasksDir = join(repositoryDir, "tasks");
   const storeDir = join(repositoryDir, ".workflow", "task-context-packages");
+  await mkdir(repositoryDir, { recursive: true });
+  await initializeTestRepository(repositoryDir);
 
   const result = await seedTestStateFixtures({
     repositoryDir,

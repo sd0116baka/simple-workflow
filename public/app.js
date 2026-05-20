@@ -776,6 +776,7 @@ async function acceptCompletion() {
   });
   const payload = await response.json();
   if (!response.ok) {
+    humanDecisionStatus.textContent = "失败";
     throw new Error(payload.error ?? `接受收敛成功失败：${response.status}`);
   }
   recommendationRun = payload.recommendationRun ?? null;
@@ -1506,6 +1507,7 @@ function showError(error) {
   if (validationStatus) validationStatus.textContent = "失败";
   startupCheckStatus.textContent = "失败";
   recommendationStatus.textContent = "失败";
+  if (humanDecisionStatus) humanDecisionStatus.textContent = "失败";
   if (recommendationResult) recommendationResult.textContent = error.message;
   runRecommendationButton.disabled = false;
   if (seedStateFixturesButton) {

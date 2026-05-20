@@ -183,6 +183,20 @@ test("does not accept convergence success outside human-decision stage", async (
   assert.match(result.error, /human-decision/);
 });
 
+test("does not throw when accepting convergence success without a worktree", async (t) => {
+  const repositoryDir = await mkdtemp(join(tmpdir(), "simple-workflow-missing-worktree-"));
+  t.after(() => rm(repositoryDir, { recursive: true, force: true }));
+  const taskPackage = completedPackage();
+
+  const result = acceptConvergenceSuccess({
+    taskContextPackage: taskPackage,
+    repositoryDir,
+  });
+
+  assert.equal(result.appendRequest, null);
+  assert.match(result.error, /无法读取隔离工作树变更/);
+});
+
 test("does not request human decision before convergence success exists", () => {
   const taskPackage = completedPackage();
   delete taskPackage.artifacts.convergenceSuccess;

@@ -210,7 +210,22 @@ export function acceptConvergenceSuccess({
   }
 
   const cwd = worktreeCwd(taskContextPackage, repositoryDir);
-  const changedFiles = changedFilesInWorktree(cwd);
+  if (!cwd) {
+    return {
+      appendRequest: null,
+      error: "任务上下文包缺少隔离工作树路径，不能接受收敛成功。",
+    };
+  }
+
+  let changedFiles;
+  try {
+    changedFiles = changedFilesInWorktree(cwd);
+  } catch (error) {
+    return {
+      appendRequest: null,
+      error: `无法读取隔离工作树变更，不能接受收敛成功：${error.message}`,
+    };
+  }
 
   return {
     appendRequest: {

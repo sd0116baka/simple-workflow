@@ -1,6 +1,9 @@
+import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { join, normalize, resolve } from "node:path";
 import { saveTaskContextPackage } from "./task-context-package-store.js";
+import { removeWorkspaceAndBranch } from "./task-closeout-flow.js";
 
 const STAGE_FIXTURES = [
   { id: "stub-task-pool", title: "Stub task-pool", fixtureKey: "task-pool", currentWorkStage: "task-pool" },
@@ -68,7 +71,69 @@ function sourcePathFor(id) {
   return `tasks/${id}.yaml`;
 }
 
-function basePackage({ id, title, currentWorkStage, timestamp }) {
+function runGit(args, cwd) {
+  return execFileSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
+}
+
+function gitSucceeds(args, cwd) {
+  try {
+    runGit(args, cwd);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function fixtureWorktreePath(id) {
+  return `.workflow/worktrees/tasks/${id}`;
+}
+
+function fixtureBranchName(id) {
+  return `workflow/tasks/${id}`;
+}
+
+function needsFixtureWorktree({ currentWorkStage }) {
+  return ![
+    "task-pool",
+    "task-recommender",
+    "execution-admission",
+    "closed",
+    "cancelled",
+  ].includes(currentWorkStage);
+}
+
+async function createFixtureWorktree({ repositoryDir, id }) {
+  const branchName = fixtureBranchName(id);
+  const worktreePath = fixtureWorktreePath(id);
+  const baseCommit = runGit(["rev-parse", "main"], repositoryDir);
+  removeWorkspaceAndBranch({ repositoryDir, worktreePath, branchName });
+  runGit([
+    "worktree",
+    "add",
+    "-b",
+    branchName,
+    worktreePath,
+    baseCommit,
+  ], repositoryDir);
+  const absoluteWorktreePath = resolve(repositoryDir, worktreePath);
+  await mkdir(join(absoluteWorktreePath, "fixtures"), { recursive: true });
+  await writeFile(
+    join(absoluteWorktreePath, "fixtures", `${id}.txt`),
+    `fixture worktree for ${id}\n`,
+    "utf8",
+  );
+  return {
+    baseCommit,
+    branchName,
+    worktreePath,
+  };
+}
+
+function basePackage({ id, title, currentWorkStage, timestamp, baseCommit }) {
   const sourcePath = sourcePathFor(id);
   return {
     packageId: packageIdFor(`${id}.yaml`),
@@ -100,6 +165,7 @@ function basePackage({ id, title, currentWorkStage, timestamp }) {
     fixture: {
       generatedBy: "test-state-seed",
       generatedAt: timestamp,
+      baseCommit,
     },
   };
 }
@@ -178,10 +244,10 @@ function populateArtifacts(taskPackage, {
   if (currentWorkStage === "execution-admission") return;
 
   addArtifact(taskPackage, "isolatedWorkspace", artifact("isolatedWorkspace", {
-    worktreePath: `.workflow/worktrees/tasks/${id}`,
-    branchName: `workflow/tasks/${id}`,
+    worktreePath: fixtureWorktreePath(id),
+    branchName: fixtureBranchName(id),
     baseBranch: "main",
-    baseCommit: "fixture-base",
+    baseCommit: taskPackage.fixture.baseCommit ?? "fixture-base",
     status: "ready",
   }, timestamp));
 
@@ -314,8 +380,8 @@ function populateArtifacts(taskPackage, {
     acceptedWork: {
       isolatedWorkspaceRef: "isolatedWorkspace",
       worktreePath: `.workflow/worktrees/tasks/${id}`,
-      branchName: `workflow/tasks/${id}`,
-      baseCommit: "fixture-base",
+      branchName: fixtureBranchName(id),
+      baseCommit: taskPackage.fixture.baseCommit ?? "fixture-base",
     },
     worktreeSnapshot: {
       cwd: `.workflow/worktrees/tasks/${id}`,
@@ -331,7 +397,7 @@ function populateArtifacts(taskPackage, {
     decisionRef: "humanDecision",
     source: {
       worktreePath: `.workflow/worktrees/tasks/${id}`,
-      branchName: `workflow/tasks/${id}`,
+      branchName: fixtureBranchName(id),
     },
     target: {
       branchName: "main",
@@ -348,7 +414,7 @@ function populateArtifacts(taskPackage, {
     mergedAt: timestamp,
     decisionRef: "humanDecision",
     source: {
-      branchName: `workflow/tasks/${id}`,
+      branchName: fixtureBranchName(id),
       commit: "fixture-commit",
     },
     target: {
@@ -370,7 +436,7 @@ function populateArtifacts(taskPackage, {
           removed: true,
         },
         branch: {
-          name: `workflow/tasks/${id}`,
+          name: fixtureBranchName(id),
           deleted: true,
         },
       },
@@ -426,10 +492,17 @@ export async function seedTestStateFixtures({
   const timestamp = now();
   const fixture = STAGE_FIXTURES.find((item) => item.fixtureKey === fixtureKey)
     ?? STAGE_FIXTURES[0];
+  const fixtureResources = needsFixtureWorktree(fixture)
+    ? await createFixtureWorktree({ repositoryDir, id: fixture.id })
+    : {};
+  const runtimeFixture = {
+    ...fixture,
+    baseCommit: fixtureResources.baseCommit,
+  };
   const fileName = `${fixture.id}.yaml`;
-  await writeFile(join(tasksDir, fileName), yamlForFixture(fixture), "utf8");
-  const taskPackage = basePackage({ ...fixture, timestamp });
-  populateArtifacts(taskPackage, { ...fixture, timestamp });
+  await writeFile(join(tasksDir, fileName), yamlForFixture(runtimeFixture), "utf8");
+  const taskPackage = basePackage({ ...runtimeFixture, timestamp });
+  populateArtifacts(taskPackage, { ...runtimeFixture, timestamp });
   await saveTaskContextPackage({
     storeDir,
     taskContextPackage: taskPackage,
@@ -484,6 +557,24 @@ async function removeExistingStubPackages(storeDir) {
   return removed;
 }
 
+function removeExistingStubWorktrees(repositoryDir) {
+  if (!gitSucceeds(["rev-parse", "--git-dir"], repositoryDir)) return 0;
+  let removed = 0;
+  for (const fixture of STAGE_FIXTURES) {
+    const absoluteWorktreePath = resolve(repositoryDir, fixtureWorktreePath(fixture.id));
+    const branchName = fixtureBranchName(fixture.id);
+    const existed = existsSync(absoluteWorktreePath)
+      || gitSucceeds(["show-ref", "--verify", "--quiet", `refs/heads/${branchName}`], repositoryDir);
+    const result = removeWorkspaceAndBranch({
+      repositoryDir,
+      worktreePath: fixtureWorktreePath(fixture.id),
+      branchName,
+    });
+    if (existed && !result.error) removed += 1;
+  }
+  return removed;
+}
+
 export async function cleanupTestStateFixtures({
   repositoryDir,
   tasksDir,
@@ -493,11 +584,13 @@ export async function cleanupTestStateFixtures({
     throw new Error("repositoryDir, tasksDir and storeDir are required");
   }
   assertTestEnvironment(repositoryDir);
+  const removedWorktrees = removeExistingStubWorktrees(repositoryDir);
   const removedTaskFiles = await removeExistingStubTaskFiles(tasksDir);
   const removedPackages = await removeExistingStubPackages(storeDir);
 
   return {
     removedTaskFiles,
     removedPackages,
+    removedWorktrees,
   };
 }
