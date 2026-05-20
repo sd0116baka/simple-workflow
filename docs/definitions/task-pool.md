@@ -307,6 +307,8 @@ qualityGate
 
 Agent 调用也通过同一个追加请求接口进入任务池。
 
+收敛失败后的人工处理也通过追加请求进入任务池。`convergenceFailure`、`humanConvergenceGuidance` 和取消决策都是任务上下文包 artifact，由对应工作流环节构造追加请求，任务池只负责原子追加、生成 `artifactId`、补全 `agentRun.outputArtifactRefs`，不解释人工意见，也不执行清理。
+
 ```json
 {
   "appendRequest": {

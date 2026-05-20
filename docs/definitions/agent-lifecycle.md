@@ -365,7 +365,36 @@ taskCompletion
 
 追加 `humanDecision` 后，`currentWorkStage` 推进到 `auto-merge`。自动合并环节另行消费该产物，本环节不合并主线。
 
-第一版只处理成功收敛后的人工确认；任务无法收敛、超过循环次数、审查冲突等分支另行定义。
+如果 `main` Agent 在收敛环节判断当前结果不能继续自动收敛，或状态机判断已经达到终止条件，它不产出下一轮 `convergenceAdvice`，而是产出：
+
+```text
+convergenceFailure
+```
+
+`convergenceFailure` 表示当前轮次无法自动收敛。它必须说明失败原因、依据的 `executionReport` / `reviewReport`、已经尝试过的修正方向，以及下一步需要人工判断的问题。
+
+系统收到 `convergenceFailure` 后，必须追加 `humanDecisionRequest`，把后续处理交给人工决定，并把 `currentWorkStage` 推进到 `human-decision`。
+
+人工可以选择：
+
+```text
+retry-with-guidance
+cancel-task
+```
+
+`retry-with-guidance` 表示人工不取消任务，而是在现有收敛失败结果上追加人工收敛意见：
+
+```text
+humanConvergenceGuidance
+```
+
+`humanConvergenceGuidance` 是下一轮收敛 / 修正的正式输入。它应引用当前 `convergenceFailure`，说明人工判断、修正方向、禁止重复的问题和下一轮关注点。它不是临时运行参数，也不是重新执行上一轮命令。
+
+追加 `humanConvergenceGuidance` 后，状态机可以进入下一轮修正：继续调用 `execution` Agent 和 `review` Agent，或在需要时先调用 `main` Agent 重新整理下一轮执行意见。下一轮 Agent 的 `inputArtifactRefs` 必须包含该人工意见。
+
+`cancel-task` 表示人工终止任务。系统必须取消仍在运行的 Agent，删除隔离工作树和任务分支等执行侧资源，把仓库恢复到该任务执行前的状态，然后追加取消决策。
+
+取消成功后，任务推进到不再进入推荐、执行、收敛候选的终态。取消成功不允许保留执行侧残留；如果系统不能完成清理，取消流程必须失败并停留在人工处理状态，不能把任务标记为已取消。
 
 ## inputArtifactRefs 业务规则
 
