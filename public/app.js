@@ -341,23 +341,10 @@ function createAutoMergePanel(taskContextPackage) {
       replanAutoMerge(replanButton).catch(showError);
     });
 
-    const closeoutButton = document.createElement("button");
-    closeoutButton.type = "button";
-    closeoutButton.className = "primary-button human-decision-action";
-    closeoutButton.dataset.action = "accept-no-change-closeout";
-    closeoutButton.textContent = "接受无变更完成";
-    closeoutButton.addEventListener("click", (event) => {
-      event.preventDefault();
-      if (closeoutButton.dataset.pending === "true") return;
-      acceptNoChangeCloseout(closeoutButton).catch(showError);
-    });
     const replanFeedback = document.createElement("div");
     replanFeedback.className = "auto-merge-feedback";
     replanFeedback.dataset.feedback = "replan-auto-merge";
-    const closeoutFeedback = document.createElement("div");
-    closeoutFeedback.className = "auto-merge-feedback";
-    closeoutFeedback.dataset.feedback = "accept-no-change-closeout";
-    panel.append(replanButton, closeoutButton, replanFeedback, closeoutFeedback);
+    panel.append(replanButton, replanFeedback);
   }
 
   return panel;
@@ -413,17 +400,6 @@ function createAutoMergeExecutionPanel(taskContextPackage) {
       list.append(item);
     }
     panel.append(list);
-  }
-
-  if (failure && taskContextPackage?.currentWorkStage === "auto-merge-execution" && !result) {
-    const retryButton = document.createElement("button");
-    retryButton.type = "button";
-    retryButton.className = "primary-button human-decision-action";
-    retryButton.textContent = "重试自动合并";
-    retryButton.addEventListener("click", () => {
-      retryAutoMerge().catch(showError);
-    });
-    panel.append(retryButton);
   }
 
   return panel;
@@ -687,18 +663,11 @@ function renderAutoMergeExecution(taskContextPackage) {
     panel.className = "auto-merge-panel autoMergePlan";
     const title = document.createElement("div");
     title.className = "auto-merge-title";
-    title.textContent = "等待执行自动合并";
+    title.textContent = "合并计划已生成";
     const meta = document.createElement("div");
     meta.className = "auto-merge-meta";
-    meta.textContent = "自动合并计划已生成，尚未执行。";
-    const executeButton = document.createElement("button");
-    executeButton.type = "button";
-    executeButton.className = "primary-button human-decision-action";
-    executeButton.textContent = "执行自动合并";
-    executeButton.addEventListener("click", () => {
-      retryAutoMerge().catch(showError);
-    });
-    panel.append(title, meta, executeButton);
+    meta.textContent = "自动合并计划已生成。";
+    panel.append(title, meta);
     autoMergeExecutionPanel.append(panel);
     return;
   }
@@ -771,35 +740,6 @@ async function acceptCompletion() {
   await loadTasks();
 }
 
-async function retryAutoMerge() {
-  const taskContextPackage = activeTaskContextPackage();
-  autoMergeExecutionStatus.textContent = "重试中";
-  const response = await fetch("/api/auto-merge/retry", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      packageId: taskContextPackage?.packageId ?? null,
-    }),
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload.error ?? `重试自动合并失败：${response.status}`);
-  }
-  recommendationRun = payload.recommendationRun ?? null;
-  if (recommendationRun?.taskContextPackage) {
-    const index = poolTaskContextPackages.findIndex((candidate) =>
-      candidate.packageId === recommendationRun.taskContextPackage.packageId,
-    );
-    if (index >= 0) {
-      poolTaskContextPackages[index] = recommendationRun.taskContextPackage;
-    }
-  }
-  renderRecommendationRun();
-  await loadTasks();
-}
-
 async function replanAutoMerge(actionButton = null) {
   const taskContextPackage = activeTaskContextPackage();
   const feedback = actionButton
@@ -830,53 +770,6 @@ async function replanAutoMerge(actionButton = null) {
       delete actionButton.dataset.pending;
       actionButton.disabled = false;
       actionButton.textContent = "重新生成合并计划";
-    }
-    return;
-  }
-  recommendationRun = payload.recommendationRun ?? null;
-  if (recommendationRun?.taskContextPackage) {
-    const index = poolTaskContextPackages.findIndex((candidate) =>
-      candidate.packageId === recommendationRun.taskContextPackage.packageId,
-    );
-    if (index >= 0) {
-      poolTaskContextPackages[index] = recommendationRun.taskContextPackage;
-    }
-  }
-  renderRecommendationRun();
-  await loadTasks();
-}
-
-async function acceptNoChangeCloseout(actionButton = null) {
-  const taskContextPackage = activeTaskContextPackage();
-  const feedback = actionButton
-    ?.closest(".auto-merge-panel")
-    ?.querySelector("[data-feedback='accept-no-change-closeout']");
-  if (actionButton) {
-    actionButton.dataset.pending = "true";
-    actionButton.disabled = true;
-    actionButton.textContent = "检查中";
-  }
-  if (feedback) feedback.textContent = "正在重新检查隔离工作树...";
-  taskCloseoutStatus.textContent = "收尾中";
-  const response = await fetch("/api/task-closeout/accept-no-changes", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      packageId: taskContextPackage?.packageId ?? null,
-    }),
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    const message = payload.error ?? `无变更收尾失败：${response.status}`;
-    taskCloseoutStatus.textContent = "不能收尾";
-    taskCloseoutPanel.textContent = message;
-    if (feedback) feedback.textContent = message;
-    if (actionButton) {
-      delete actionButton.dataset.pending;
-      actionButton.disabled = false;
-      actionButton.textContent = "接受无变更完成";
     }
     return;
   }
@@ -1396,9 +1289,6 @@ function handleDocumentAction(event) {
   if (event.type === "keydown" && !["Enter", " "].includes(event.key)) return;
   event.preventDefault();
   if (actionButton.dataset.pending === "true") return;
-  if (actionButton.dataset.action === "accept-no-change-closeout") {
-    acceptNoChangeCloseout(actionButton).catch(showError);
-  }
   if (actionButton.dataset.action === "replan-auto-merge") {
     replanAutoMerge(actionButton).catch(showError);
   }
