@@ -329,6 +329,17 @@ function createAutoMergePanel(taskContextPackage) {
     panel.append(list);
   }
 
+  if (rejection && reasons.some((itemReason) => itemReason.code === "NO_CHANGES")) {
+    const closeoutButton = document.createElement("button");
+    closeoutButton.type = "button";
+    closeoutButton.className = "primary-button human-decision-action";
+    closeoutButton.textContent = "接受无变更完成";
+    closeoutButton.addEventListener("click", () => {
+      acceptNoChangeCloseout().catch(showError);
+    });
+    panel.append(closeoutButton);
+  }
+
   return panel;
 }
 
@@ -413,6 +424,7 @@ function createTaskCloseoutPanel(taskContextPackage) {
   meta.className = "auto-merge-meta";
   meta.textContent = [
     `finalStage: ${closeout.body.finalStage ?? "unknown"}`,
+    `reason: ${closeout.body.closeoutReason ?? "merged"}`,
     `closedAt: ${closeout.body.closedAt ?? closeout.appendedAt ?? "unknown"}`,
   ].join(" · ");
 
@@ -738,6 +750,35 @@ async function retryAutoMerge() {
   const payload = await response.json();
   if (!response.ok) {
     throw new Error(payload.error ?? `重试自动合并失败：${response.status}`);
+  }
+  recommendationRun = payload.recommendationRun ?? null;
+  if (recommendationRun?.taskContextPackage) {
+    const index = poolTaskContextPackages.findIndex((candidate) =>
+      candidate.packageId === recommendationRun.taskContextPackage.packageId,
+    );
+    if (index >= 0) {
+      poolTaskContextPackages[index] = recommendationRun.taskContextPackage;
+    }
+  }
+  renderRecommendationRun();
+  await loadTasks();
+}
+
+async function acceptNoChangeCloseout() {
+  const taskContextPackage = activeTaskContextPackage();
+  taskCloseoutStatus.textContent = "收尾中";
+  const response = await fetch("/api/task-closeout/accept-no-changes", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      packageId: taskContextPackage?.packageId ?? null,
+    }),
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error ?? `无变更收尾失败：${response.status}`);
   }
   recommendationRun = payload.recommendationRun ?? null;
   if (recommendationRun?.taskContextPackage) {

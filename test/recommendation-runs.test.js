@@ -955,6 +955,53 @@ test("POST /api/auto-merge/retry retries auto-merge execution", async (t) => {
   assert.equal(observedPackageId, "task-context-package:tasks/task-001.yaml");
 });
 
+test("POST /api/task-closeout/accept-no-changes closes no-change work", async (t) => {
+  const latestRun = {
+    id: "recommendation-run-test",
+    status: "succeeded",
+  };
+  let observedPackageId = null;
+  const workflowService = {
+    async acceptNoChangeCloseout({ packageId }) {
+      observedPackageId = packageId;
+      return {
+        closed: true,
+        error: null,
+        recommendationRun: latestRun,
+      };
+    },
+    getLatestRecommendationRun() {
+      return latestRun;
+    },
+    onEvent() {
+      return () => {};
+    },
+  };
+  const server = createApp({ workflowService });
+  server.listen(0);
+  t.after(() => server.close());
+  await once(server, "listening");
+
+  const response = await fetch(
+    `http://localhost:${server.address().port}/api/task-closeout/accept-no-changes`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        packageId: "task-context-package:tasks/task-004.yaml",
+      }),
+    },
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.closed, true);
+  assert.equal(payload.recommendationRun.status, "succeeded");
+  assert.equal(observedPackageId, "task-context-package:tasks/task-004.yaml");
+});
+
 test("workflow service retry closes a merged package without re-running merge", async (t) => {
   const repositoryDir = await createGitRepository(t);
   const promptPath = await writePrompt("retry-closeout");
@@ -1065,6 +1112,141 @@ test("workflow service retry closes a merged package without re-running merge", 
   assert.equal(result.error, null);
   assert.equal(result.recommendationRun.taskContextPackage.currentWorkStage, "closed");
   assert.equal(result.recommendationRun.taskCloseout.appendRequest.artifactType, "taskCloseout");
+  assert.equal(existsSync(worktreeDir), false);
+  assert.equal(
+    gitSucceeds(["show-ref", "--verify", "--quiet", `refs/heads/${branchName}`], repositoryDir),
+    false,
+  );
+});
+
+test("workflow service closes accepted work without merge after no-change rejection", async (t) => {
+  const repositoryDir = await createGitRepository(t);
+  const promptPath = await writePrompt("no-change-closeout");
+  const tasksDir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "no-change-closeout-tasks");
+  await mkdir(tasksDir, { recursive: true });
+  await writeFile(
+    join(tasksDir, "task-004.yaml"),
+    [
+      "id: task-004",
+      "title: 任务池状态模型",
+      "type: design",
+      "description: 设计任务池状态",
+      "acceptance:",
+      "  - 明确状态",
+      "",
+    ].join("\n"),
+  );
+  const headCommit = runGit(["rev-parse", "main"], repositoryDir);
+  const branchName = "workflow/tasks/tasks-task-004";
+  const worktreePath = ".workflow/worktrees/tasks/tasks-task-004";
+  const worktreeDir = join(repositoryDir, ".workflow", "worktrees", "tasks", "tasks-task-004");
+  runGit(["worktree", "add", "-b", branchName, worktreePath, "main"], repositoryDir);
+  const taskContextPackage = {
+    packageId: "task-context-package:tasks/task-004.yaml",
+    currentWorkStage: "human-decision",
+    source: {
+      path: "tasks/task-004.yaml",
+      format: "yaml",
+      contentHash: "unavailable",
+    },
+    recognition: {
+      outcome: "recognized",
+      findings: [],
+    },
+    taskDraft: {
+      id: "task-004",
+      name: "任务池状态模型",
+      kind: "design",
+      priority: "normal",
+      goal: "设计任务池状态",
+      acceptanceCriteria: ["明确状态"],
+      maxIterations: "default",
+    },
+    qualityGate: {
+      outcome: "pass",
+    },
+    artifacts: {
+      isolatedWorkspace: {
+        artifactId: "isolatedWorkspace",
+        body: {
+          worktreePath,
+          branchName,
+          baseBranch: "main",
+          baseCommit: headCommit,
+          status: "ready",
+        },
+        appendedAt: "2026-05-19T10:00:00.000Z",
+      },
+      taskCompletion: {
+        artifactId: "taskCompletion",
+        body: {
+          summary: "agent reported completion",
+          basis: ["executionReport:001", "reviewReport:001"],
+        },
+        appendedAt: "2026-05-19T10:01:00.000Z",
+      },
+      humanDecision: {
+        artifactId: "humanDecision",
+        body: {
+          decision: "accept-completion",
+          decidedAt: "2026-05-19T10:02:00.000Z",
+          taskCompletionRef: "taskCompletion",
+          acceptedWork: {
+            isolatedWorkspaceRef: "isolatedWorkspace",
+            worktreePath,
+            branchName,
+            baseCommit: headCommit,
+          },
+          worktreeSnapshot: {
+            cwd: worktreePath,
+            changedFiles: [],
+          },
+          nextRequiredStage: "auto-merge",
+        },
+        appendedAt: "2026-05-19T10:02:00.000Z",
+      },
+      autoMergeRejection: {
+        artifactId: "autoMergeRejection",
+        body: {
+          rejectedAt: "2026-05-19T10:03:00.000Z",
+          decisionRef: "humanDecision",
+          reasons: [
+            {
+              code: "NO_CHANGES",
+              message: "隔离工作树没有可合并变更。",
+            },
+          ],
+        },
+        appendedAt: "2026-05-19T10:03:00.000Z",
+      },
+    },
+    agentRuns: [],
+    timeline: [],
+  };
+  await saveTaskContextPackage({
+    storeDir: join(repositoryDir, ".workflow", "task-context-packages"),
+    taskContextPackage,
+  });
+  const service = createWorkflowService({
+    tasksDir,
+    repositoryDir,
+    recommendationPromptPath: promptPath,
+    getRepositoryStatus: async () => ({ clean: true, entries: [] }),
+    runRecommendationCommand: async () => {
+      throw new Error("should not run");
+    },
+    runExecutionAgentSession: runStubExecutionAgentSession,
+  });
+
+  const result = await service.acceptNoChangeCloseout({
+    packageId: "task-context-package:tasks/task-004.yaml",
+  });
+
+  assert.equal(result.closed, true);
+  assert.equal(result.error, null);
+  assert.equal(result.recommendationRun.taskContextPackage.currentWorkStage, "closed");
+  assert.equal(result.recommendationRun.taskCloseout.appendRequest.artifact.resultRef, "autoMergeRejection");
+  assert.equal(result.recommendationRun.taskCloseout.appendRequest.artifact.closeoutReason, "no-merge-needed");
   assert.equal(existsSync(worktreeDir), false);
   assert.equal(
     gitSucceeds(["show-ref", "--verify", "--quiet", `refs/heads/${branchName}`], repositoryDir),

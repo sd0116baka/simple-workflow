@@ -14,7 +14,7 @@ import { runOpencodeExecutionAgentSession } from "./execution-agent-flow.js";
 import { executeAutoMerge, planAutoMerge } from "./auto-merge-flow.js";
 import { acceptTaskCompletion } from "./human-decision-flow.js";
 import { runOpencodeRecommendation } from "./recommendation-runner.js";
-import { closeTask } from "./task-closeout-flow.js";
+import { closeTask, closeTaskWithoutMerge } from "./task-closeout-flow.js";
 import {
   loadTaskContextPackages,
   saveTaskContextPackage,
@@ -211,6 +211,19 @@ export function createWorkflowService({
       candidate.currentWorkStage === "auto-merge-execution"
         && candidate.artifacts?.autoMergePlan?.body
         && !candidate.artifacts?.autoMergeResult?.body,
+    ) ?? null;
+  }
+
+  async function findNoChangeCloseoutPackage(packageId) {
+    const taskContextPackages = await loadExistingTaskContextPackages();
+    if (packageId) {
+      return taskContextPackages.find((candidate) => candidate.packageId === packageId) ?? null;
+    }
+    return taskContextPackages.find((candidate) =>
+      candidate.artifacts?.humanDecision?.body?.decision === "accept-completion"
+        && candidate.artifacts?.autoMergeRejection?.body?.reasons?.some((reason) =>
+          reason.code === "NO_CHANGES")
+        && !candidate.artifacts?.taskCloseout?.body,
     ) ?? null;
   }
 
@@ -657,6 +670,48 @@ export function createWorkflowService({
 
       return {
         executed: true,
+        closed: true,
+        error: null,
+        recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+      };
+    },
+
+    async acceptNoChangeCloseout({ packageId = null } = {}) {
+      const taskContextPackage = await findNoChangeCloseoutPackage(packageId);
+      if (!taskContextPackage) {
+        return {
+          closed: false,
+          error: packageId
+            ? `没有找到可无变更收尾的任务上下文包：${packageId}`
+            : "没有可无变更收尾的任务上下文包。",
+          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+        };
+      }
+
+      ensureLatestRecommendationRun(taskContextPackage);
+      const closeout = closeTaskWithoutMerge({
+        taskContextPackage: latestRecommendationRun.taskContextPackage,
+        repositoryDir,
+      });
+      if (!closeout.appendRequest) {
+        latestRecommendationRun.taskCloseoutError = closeout.error;
+        emitRecommendationChanged(latestRecommendationRun);
+        return {
+          closed: false,
+          error: closeout.error,
+          recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
+        };
+      }
+
+      await applyAndPersistAppendRequest(
+        closeout.appendRequest,
+        { currentWorkStage: "closed" },
+      );
+      latestRecommendationRun.taskCloseout = closeout;
+      latestRecommendationRun.taskCloseoutError = null;
+      emitRecommendationChanged(latestRecommendationRun);
+
+      return {
         closed: true,
         error: null,
         recommendationRun: toRecommendationSnapshot(latestRecommendationRun),
