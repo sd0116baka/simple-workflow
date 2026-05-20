@@ -5,6 +5,12 @@ import { join, normalize, resolve } from "node:path";
 import { saveTaskContextPackage } from "./task-context-package-store.js";
 import { removeWorkspaceAndBranch } from "./task-closeout-flow.js";
 
+const TEST_ENV_GITIGNORE = [
+  ".workflow/",
+  "tasks/stub-*.yaml",
+  "",
+].join("\n");
+
 const STAGE_FIXTURES = [
   { id: "stub-task-pool", title: "Stub task-pool", fixtureKey: "task-pool", currentWorkStage: "task-pool" },
   { id: "stub-task-recommender", title: "Stub task-recommender", fixtureKey: "task-recommender", currentWorkStage: "task-recommender" },
@@ -86,6 +92,26 @@ function gitSucceeds(args, cwd) {
   } catch {
     return false;
   }
+}
+
+async function ensureTestEnvironmentGitignore(repositoryDir) {
+  if (!gitSucceeds(["rev-parse", "--git-dir"], repositoryDir)) return;
+
+  await writeFile(join(repositoryDir, ".gitignore"), TEST_ENV_GITIGNORE, "utf8");
+  runGit(["add", ".gitignore"], repositoryDir);
+  if (gitSucceeds(["diff", "--cached", "--quiet", "--", ".gitignore"], repositoryDir)) {
+    return;
+  }
+
+  runGit([
+    "-c",
+    "user.name=Simple Workflow Test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-m",
+    "ignore generated test fixtures",
+  ], repositoryDir);
 }
 
 function fixtureWorktreePath(id) {
@@ -486,6 +512,7 @@ export async function seedTestStateFixtures({
     throw new Error("repositoryDir, tasksDir and storeDir are required");
   }
   assertTestEnvironment(repositoryDir);
+  await ensureTestEnvironmentGitignore(repositoryDir);
   await mkdir(tasksDir, { recursive: true });
   await cleanupTestStateFixtures({ repositoryDir, tasksDir, storeDir });
 

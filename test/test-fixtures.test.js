@@ -138,6 +138,7 @@ test("convergence success fixture requests human decision and settles there", as
     "accept-completion",
     "request-changes",
   ]);
+  assert.equal(runGit(["status", "--porcelain"], repositoryDir), "");
 });
 
 test("refuses to seed state fixtures outside the managed test environment", async (t) => {

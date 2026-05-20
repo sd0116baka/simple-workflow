@@ -34,6 +34,15 @@ async function createRepository() {
     ].join("\n"),
     "utf8",
   );
+  await writeFile(
+    join(repositoryDir, ".gitignore"),
+    [
+      ".workflow/",
+      "tasks/stub-*.yaml",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
   await writeTask(
     "task-001.yaml",
     [
