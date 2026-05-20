@@ -226,6 +226,28 @@ function decisionMatchesRequest(decision, request) {
   return false;
 }
 
+function isClosedStage(taskContextPackage) {
+  return taskContextPackage?.currentWorkStage === "closed";
+}
+
+function isCancelledStage(taskContextPackage) {
+  return taskContextPackage?.currentWorkStage === "cancelled";
+}
+
+function humanDecisionTargetLabel(request) {
+  if (!request?.body) return "未生成";
+  if (request.body.targetType) {
+    return `${request.body.targetType}:${request.body.targetRef ?? "unknown"}`;
+  }
+  if (request.body.convergenceSuccessRef) {
+    return `convergenceSuccess:${request.body.convergenceSuccessRef}`;
+  }
+  if (request.body.targetRef) {
+    return request.body.targetRef;
+  }
+  return "未指定";
+}
+
 function createHumanDecisionPanel(taskContextPackage) {
   const request = taskContextPackage?.artifacts?.humanDecisionRequest;
   const historicalDecision = taskContextPackage?.artifacts?.humanDecision;
@@ -260,11 +282,7 @@ function createHumanDecisionPanel(taskContextPackage) {
         `decidedAt: ${decision.body.decidedAt ?? decision.appendedAt ?? "unknown"}`,
       ].join(" · ")
     : [
-        `target: ${
-          request.body.targetType
-            ? `${request.body.targetType}:${request.body.targetRef ?? "unknown"}`
-            : request.body.convergenceSuccessRef ?? request.body.targetRef ?? "unknown"
-        }`,
+        `target: ${humanDecisionTargetLabel(request)}`,
         `requestedAt: ${request.body.requestedAt ?? request.appendedAt ?? "unknown"}`,
       ].join(" · ");
 
@@ -617,16 +635,19 @@ function renderHumanDecision(taskContextPackage) {
   const convergenceSuccess = taskContextPackage?.artifacts?.convergenceSuccess ?? null;
   const convergenceFailures = taskContextPackage?.artifacts?.convergenceFailure ?? [];
   const humanConvergenceGuidance = taskContextPackage?.artifacts?.humanConvergenceGuidance ?? [];
+  const autoMergeRejection = taskContextPackage?.artifacts?.autoMergeRejection ?? null;
+  const autoMergeFailure = taskContextPackage?.artifacts?.autoMergeFailure ?? null;
   humanDecisionRaw.textContent = formatJsonBlock({
     convergenceSuccess,
     convergenceFailure: convergenceFailures.at?.(-1) ?? null,
     humanConvergenceGuidance: humanConvergenceGuidance.at?.(-1) ?? null,
+    autoMergeRejection,
+    autoMergeFailure,
     humanDecisionRequest: request,
     humanDecision: historicalDecision,
   });
   renderInputs(humanDecisionInputs, [
-    { label: "收敛成功证据", value: convergenceSuccess?.artifactId ?? "未生成" },
-    { label: "收敛失败", value: convergenceFailures.at?.(-1)?.artifactId ?? "未生成" },
+    { label: "决策目标", value: humanDecisionTargetLabel(request) },
     { label: "人工决策请求", value: request?.artifactId ?? "未请求" },
     { label: "人工决策", value: decision?.body?.decision ?? "未决策" },
     { label: "当前环节", value: taskContextPackage?.currentWorkStage ?? "未生成" },
@@ -659,6 +680,7 @@ function renderAutoMerge(taskContextPackage) {
   const humanDecision = taskContextPackage?.artifacts?.humanDecision ?? null;
   const plan = taskContextPackage?.artifacts?.autoMergePlan ?? null;
   const rejection = taskContextPackage?.artifacts?.autoMergeRejection ?? null;
+  const executionFailure = taskContextPackage?.artifacts?.autoMergeFailure ?? null;
   autoMergeRaw.textContent = formatJsonBlock({
     humanDecision,
     autoMergePlan: plan,
@@ -671,8 +693,16 @@ function renderAutoMerge(taskContextPackage) {
     { label: "拒绝记录", value: rejection?.artifactId ?? "未生成" },
   ]);
 
+  if (isCancelledStage(taskContextPackage)) {
+    autoMergeStatus.textContent = "已取消";
+    autoMergePanel.textContent = "任务已取消，不需要自动合并。";
+    return;
+  }
+
   if (plan) {
-    autoMergeStatus.textContent = "可执行合并";
+    autoMergeStatus.textContent = isClosedStage(taskContextPackage)
+      ? "已完成"
+      : executionFailure ? "计划已生成" : "可执行合并";
     const panel = createAutoMergePanel(taskContextPackage);
     autoMergePanel.append(panel);
     return;
@@ -682,6 +712,12 @@ function renderAutoMerge(taskContextPackage) {
     autoMergeStatus.textContent = "未通过";
     const panel = createAutoMergePanel(taskContextPackage);
     autoMergePanel.append(panel);
+    return;
+  }
+
+  if (isClosedStage(taskContextPackage)) {
+    autoMergeStatus.textContent = "已完成";
+    autoMergePanel.textContent = "任务已关闭。";
     return;
   }
 
@@ -728,6 +764,18 @@ function renderAutoMergeExecution(taskContextPackage) {
     return;
   }
 
+  if (isCancelledStage(taskContextPackage)) {
+    autoMergeExecutionStatus.textContent = "已取消";
+    autoMergeExecutionPanel.textContent = "任务已取消，不需要执行自动合并。";
+    return;
+  }
+
+  if (isClosedStage(taskContextPackage)) {
+    autoMergeExecutionStatus.textContent = "已完成";
+    autoMergeExecutionPanel.textContent = "任务已关闭。";
+    return;
+  }
+
   if (taskContextPackage?.currentWorkStage === "auto-merge-execution") {
     autoMergeExecutionStatus.textContent = "等待执行";
     const panel = document.createElement("div");
@@ -767,6 +815,18 @@ function renderTaskCloseout(taskContextPackage) {
     taskCloseoutStatus.textContent = closeout.body?.finalStage === "cancelled" ? "已取消" : "已关闭";
     const panel = createTaskCloseoutPanel(taskContextPackage);
     taskCloseoutPanel.append(panel);
+    return;
+  }
+
+  if (isCancelledStage(taskContextPackage)) {
+    taskCloseoutStatus.textContent = "已取消";
+    taskCloseoutPanel.textContent = "任务已取消。";
+    return;
+  }
+
+  if (isClosedStage(taskContextPackage)) {
+    taskCloseoutStatus.textContent = "已关闭";
+    taskCloseoutPanel.textContent = "任务已关闭。";
     return;
   }
 
