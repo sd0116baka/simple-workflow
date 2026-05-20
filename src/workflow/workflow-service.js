@@ -810,7 +810,7 @@ export function createWorkflowService({
       }
 
       await applyAndPersistAppendRequest(guidanceResult.appendRequest, {
-        currentWorkStage: "human-guidance",
+        currentWorkStage: "execution-agent",
       });
       latestRecommendationRun.humanConvergenceGuidance = guidanceResult;
       latestRecommendationRun.humanConvergenceGuidanceError = null;

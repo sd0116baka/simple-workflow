@@ -390,7 +390,7 @@ humanConvergenceGuidance
 
 `humanConvergenceGuidance` 是下一轮收敛 / 修正的正式输入。它应引用当前 `convergenceSuccess` 或 `convergenceFailure`，说明人工判断、修正方向、禁止重复的问题和下一轮关注点。它不是临时运行参数，也不是重新执行上一轮命令。
 
-追加 `humanConvergenceGuidance` 后，状态机可以进入下一轮修正：继续调用 `execution` Agent 和 `review` Agent，或在需要时先调用 `main` Agent 重新整理下一轮执行意见。下一轮 Agent 的 `inputArtifactRefs` 必须包含该人工意见。
+追加 `humanConvergenceGuidance` 后，状态机直接进入下一轮修正，不设置独立的 `human-guidance` 环节：通常继续调用 `execution` Agent 和 `review` Agent，或在需要时先调用 `main` Agent 重新整理下一轮执行意见。下一轮 Agent 的 `inputArtifactRefs` 必须包含该人工意见。
 
 `cancel-task` 表示人工终止任务。系统必须先追加取消决策，再进入任务收尾，由 `taskCloseout(closeoutReason: cancelled)` 删除隔离工作树和任务分支等执行侧资源，把仓库恢复到该任务执行前的状态。
 

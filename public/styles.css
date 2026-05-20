@@ -482,6 +482,129 @@ h2 {
   line-height: 1.5;
 }
 
+.stage-timeline-panel {
+  min-height: 146px;
+  padding: 14px 16px 16px;
+  overflow-x: auto;
+  color: #172033;
+  font-size: 13px;
+}
+
+.stage-timeline-frame {
+  min-width: max-content;
+}
+
+.stage-timeline-track {
+  display: flex;
+  align-items: stretch;
+}
+
+.stage-timeline-node {
+  display: grid;
+  grid-template-rows: auto auto auto auto 1fr;
+  flex: 0 0 150px;
+  min-height: 134px;
+  padding: 10px;
+  border: 1px solid #d7dfeb;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.stage-timeline-node.completed {
+  border-color: #a9d8bc;
+  background: #f3fbf6;
+}
+
+.stage-timeline-node.current {
+  border-color: #2f6fbd;
+  background: #f2f7ff;
+  box-shadow: inset 0 0 0 1px #2f6fbd;
+}
+
+.stage-timeline-node.skipped {
+  border-color: #d7dfeb;
+  background: #f8fafc;
+  color: #7d8da5;
+}
+
+.stage-timeline-node span {
+  color: #607089;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+}
+
+.stage-timeline-node strong {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.stage-timeline-node small,
+.stage-timeline-node time,
+.stage-timeline-node em {
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+  color: #607089;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.35;
+}
+
+.stage-timeline-node time {
+  color: #2f4058;
+  font-weight: 650;
+}
+
+.stage-timeline-node.current strong {
+  color: #174a86;
+}
+
+.stage-timeline-connector {
+  display: flex;
+  flex: 0 0 86px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #a3afc2;
+}
+
+.stage-timeline-connector.completed {
+  color: #2c7a4b;
+}
+
+.stage-timeline-connector span {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.stage-timeline-connector em {
+  max-width: 76px;
+  color: inherit;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.stage-timeline-notes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.stage-timeline-notes span {
+  padding: 6px 8px;
+  border: 1px solid #d7c2f2;
+  border-radius: 6px;
+  background: #fbf8ff;
+  color: #341c64;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+}
+
 .context-package-panel {
   min-height: 260px;
   max-height: 520px;

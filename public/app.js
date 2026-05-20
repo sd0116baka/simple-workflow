@@ -1,3 +1,5 @@
+import { buildStageTimeline } from "./stage-timeline.js";
+
 const taskList = document.querySelector("#taskList");
 const taskCount = document.querySelector("#taskCount");
 const taskPool = document.querySelector("#taskPool");
@@ -28,6 +30,8 @@ const recommendationIntentPanel = document.querySelector("#recommendationIntentP
 const admissionStatus = document.querySelector("#admissionStatus");
 const admissionRaw = document.querySelector("#admissionRaw");
 const admissionPanel = document.querySelector("#admissionPanel");
+const stageTimelineStatus = document.querySelector("#stageTimelineStatus");
+const stageTimelinePanel = document.querySelector("#stageTimelinePanel");
 const taskContextPackageRaw = document.querySelector("#taskContextPackageRaw");
 const taskContextPackagePanel = document.querySelector("#taskContextPackagePanel");
 const taskContextPackageStatus = document.querySelector("#taskContextPackageStatus");
@@ -208,6 +212,84 @@ function taskContextPackageLabel(taskContextPackage) {
   if (!taskContextPackage) return "等待输入";
   const sourceFile = taskContextPackage.source?.path?.split("/").pop() ?? taskContextPackage.packageId;
   return `${sourceFile} · ${taskContextPackage.currentWorkStage}`;
+}
+
+function createStageTimelinePanel(taskContextPackage) {
+  const timeline = buildStageTimeline(taskContextPackage);
+  const panel = document.createElement("div");
+  panel.className = "stage-timeline-frame";
+
+  const track = document.createElement("div");
+  track.className = "stage-timeline-track";
+
+  timeline.nodes.forEach((node, index) => {
+    const item = document.createElement("div");
+    item.className = `stage-timeline-node ${node.status}`;
+    item.innerHTML = "<span></span><strong></strong><small></small><time></time><em></em>";
+    item.querySelector("span").textContent = String(index + 1).padStart(2, "0");
+    item.querySelector("strong").textContent = node.label;
+    item.querySelector("small").textContent = node.stage;
+    item.querySelector("time").textContent = formatStageTimestamp(node);
+    item.querySelector("em").textContent = node.detail;
+    track.append(item);
+
+    const transition = timeline.transitions[index];
+    if (transition) {
+      const connector = document.createElement("div");
+      connector.className = `stage-timeline-connector ${transition.status}`;
+      connector.innerHTML = "<span></span><em></em>";
+      connector.querySelector("span").textContent = "→";
+      connector.querySelector("em").textContent = transition.label ?? "";
+      track.append(connector);
+    }
+  });
+
+  panel.append(track);
+
+  if (timeline.notes.length > 0) {
+    const notes = document.createElement("div");
+    notes.className = "stage-timeline-notes";
+    for (const note of timeline.notes) {
+      const item = document.createElement("span");
+      item.textContent = `${note.label}: ${note.text}`;
+      notes.append(item);
+    }
+    panel.append(notes);
+  }
+
+  return panel;
+}
+
+function formatStageTimestamp(node) {
+  if (node.status === "skipped") return "未进入";
+  if (!node.timestamp) return node.status === "pending" ? "未发生" : "无时间";
+  const date = new Date(node.timestamp);
+  if (Number.isNaN(date.getTime())) return node.timestamp;
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
+function renderStageTimeline(taskContextPackage) {
+  stageTimelinePanel.replaceChildren();
+  if (!taskContextPackage) {
+    stageTimelineStatus.textContent = "等待任务包";
+    stageTimelinePanel.textContent = "等待任务上下文包。";
+    return;
+  }
+
+  const timeline = buildStageTimeline(taskContextPackage);
+  const currentNode = timeline.nodes.find((node) => node.stage === timeline.currentStage);
+  const completedCount = timeline.nodes.filter((node) =>
+    ["completed", "current"].includes(node.status),
+  ).length;
+  stageTimelineStatus.textContent = `${currentNode?.label ?? timeline.currentStage} · ${completedCount}/${timeline.nodes.length}`;
+  stageTimelinePanel.append(createStageTimelinePanel(taskContextPackage));
 }
 
 function decisionMatchesRequest(decision, request) {
@@ -1153,6 +1235,7 @@ function renderRecommendationRun() {
   recommendationResult?.replaceChildren();
   recommendationIntentPanel.replaceChildren();
   admissionPanel.replaceChildren();
+  stageTimelinePanel.replaceChildren();
   taskContextPackagePanel.replaceChildren();
   humanDecisionPanel.replaceChildren();
   autoMergePanel.replaceChildren();
@@ -1182,6 +1265,7 @@ function renderRecommendationRun() {
   renderAutoMerge(taskContextPackage);
   renderAutoMergeExecution(taskContextPackage);
   renderTaskCloseout(taskContextPackage);
+  renderStageTimeline(taskContextPackage);
   runRecommendationButton.disabled = recommendationRun?.status === "running";
   if (cancelRecommendationButton) {
     cancelRecommendationButton.hidden = recommendationRun?.status !== "running";
