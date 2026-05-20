@@ -42,7 +42,7 @@ export function createBlockedRecommendationRun({ id, startupCheck, now = () => n
     stdout: "",
     stderr: "",
     exitCode: null,
-    error: "启动检查未通过，任务推荐器未运行。",
+    error: startupCheck.error ?? "启动检查未通过，任务推荐器未运行。",
   };
 }
 
@@ -108,6 +108,30 @@ export async function startRecommendationFlow({
     };
   }
 
+  if (taskPool.views.candidateTasks.length === 0) {
+    return {
+      run: createBlockedRecommendationRun({
+        id,
+        startupCheck: {
+          ...startupCheck,
+          canStartWork: false,
+          error: "没有可推荐候选任务。",
+          findings: [
+            ...(startupCheck.findings ?? []),
+            {
+              field: "candidateTasks",
+              severity: "blocking",
+              code: "NO_CANDIDATE_TASKS",
+              message: "任务池中没有可启动任务。",
+            },
+          ],
+        },
+        now,
+      }),
+      taskPool,
+    };
+  }
+
   const basePrompt = await readFile(recommendationPromptPath, "utf8");
   const run = createRunningRecommendationRun({
     id,
@@ -142,6 +166,7 @@ export async function completeRecommendationFlow({
   let taskPool = failed ? null : buildTaskPool(tasks, {
     taskContextPackages: existingTaskContextPackages,
   });
+  const candidateTasks = taskPool?.views.candidateTasks ?? [];
   taskPool = failed || !parsed.appendRequest
     ? taskPool
     : applyAppendRequest(taskPool, parsed.appendRequest, {
@@ -154,7 +179,7 @@ export async function completeRecommendationFlow({
     ? null
     : evaluateExecutionAdmission({
         taskContextPackage: intentPackage,
-        candidateTasks: taskPool.views.candidateTasks,
+        candidateTasks,
         runtimeSnapshot: startupCheck.runtimeSnapshot,
         projectProfile,
       });

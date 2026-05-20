@@ -269,6 +269,72 @@ test("task pool overlays existing workflow package status onto entries and candi
   assert.deepEqual(pool.views.candidateTasks, []);
 });
 
+test("task pool candidates include only valid tasks that have not started workflow", () => {
+  const pool = buildTaskPool(
+    [
+      {
+        id: "task-ready",
+        fileName: "task-ready.yaml",
+        parsed: {
+          id: "task-ready",
+          title: "可启动任务",
+          type: "feature",
+          priority: "normal",
+        },
+        parseError: null,
+        validation: { status: "valid", errors: [] },
+      },
+      {
+        id: "task-active",
+        fileName: "task-active.yaml",
+        parsed: {
+          id: "task-active",
+          title: "人工决策中任务",
+          type: "feature",
+          priority: "normal",
+        },
+        parseError: null,
+        validation: { status: "valid", errors: [] },
+      },
+      {
+        id: "task-invalid",
+        fileName: "task-invalid.yaml",
+        parsed: {
+          id: "task-invalid",
+          type: "feature",
+        },
+        parseError: null,
+        validation: { status: "invalid", errors: ["title must be a non-empty string"] },
+      },
+    ],
+    {
+      taskContextPackages: [
+        {
+          packageId: "task-context-package:tasks/task-active.yaml",
+          currentWorkStage: "human-decision",
+          artifacts: {
+            humanDecisionRequest: {
+              artifactId: "humanDecisionRequest",
+              body: {},
+              appendedAt: "2026-05-19T00:00:00.000Z",
+            },
+          },
+          agentRuns: [],
+          timeline: [],
+        },
+      ],
+    },
+  );
+
+  assert.deepEqual(
+    pool.views.candidateTasks.map((task) => task.packageId),
+    ["task-context-package:tasks/task-ready.yaml"],
+  );
+  assert.equal(pool.entries.find((entry) => entry.id === "task-active").status, "human-decision");
+  assert.equal(pool.entries.find((entry) => entry.id === "task-invalid").status, "blocked");
+  assert.deepEqual(pool.views.needsAttention, ["task-context-package:tasks/task-invalid.yaml"]);
+});
+
 test("task pool records agent runs and generated multi artifact refs", () => {
   const pool = buildTaskPool([
     {

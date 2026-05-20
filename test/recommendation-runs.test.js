@@ -57,6 +57,24 @@ async function writePrompt(name) {
   return promptPath;
 }
 
+async function writeValidTasksDir(name, taskId = "task-001") {
+  const tasksDir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), name, "tasks");
+  await mkdir(tasksDir, { recursive: true });
+  await writeFile(
+    join(tasksDir, `${taskId}.yaml`),
+    [
+      `id: ${taskId}`,
+      "title: 展示任务真源",
+      "type: feature",
+      "description: 展示任务",
+      "acceptance:",
+      "  - 可以看到任务",
+      "",
+    ].join("\n"),
+  );
+  return tasksDir;
+}
+
 function buildIntentJson(taskId = "task-001") {
   return JSON.stringify({
     appendRequest: {
@@ -428,10 +446,80 @@ test("workflow service does not run recommender when startup check fails", async
   assert.match(run.error, /启动检查未通过/);
 });
 
-test("workflow service keeps successful runs when recommendation intent parsing fails", async () => {
-  const promptPath = await writePrompt("recommendation-parse-failure");
+test("workflow service does not run recommender when a task workflow is active", async (t) => {
+  const repositoryDir = await createGitRepository(t);
+  const promptPath = await writePrompt("recommendation-active-work");
+  const tasksDir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "active-work-tasks");
+  await mkdir(tasksDir, { recursive: true });
+  await writeFile(
+    join(tasksDir, "task-004.yaml"),
+    [
+      "id: task-004",
+      "title: 任务池状态模型",
+      "type: design",
+      "description: 设计任务池状态",
+      "acceptance:",
+      "  - 明确状态",
+      "",
+    ].join("\n"),
+  );
+  await saveTaskContextPackage({
+    storeDir: join(repositoryDir, ".workflow", "task-context-packages"),
+    taskContextPackage: {
+      packageId: "task-context-package:tasks/task-004.yaml",
+      currentWorkStage: "human-decision",
+      source: {
+        path: "tasks/task-004.yaml",
+        format: "yaml",
+        contentHash: "unavailable",
+      },
+      recognition: { outcome: "recognized", findings: [] },
+      taskDraft: {
+        id: "task-004",
+        name: "任务池状态模型",
+        kind: "design",
+        priority: "normal",
+        goal: "设计任务池状态",
+        acceptanceCriteria: ["明确状态"],
+        maxIterations: "default",
+      },
+      qualityGate: { outcome: "pass" },
+      artifacts: {
+        humanDecisionRequest: {
+          artifactId: "humanDecisionRequest",
+          body: {},
+          appendedAt: "2026-05-19T00:00:00.000Z",
+        },
+      },
+      agentRuns: [],
+      timeline: [],
+    },
+  });
   const service = createWorkflowService({
-    tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks"),
+    tasksDir,
+    repositoryDir,
+    recommendationPromptPath: promptPath,
+    getRepositoryStatus: async () => ({ clean: true, entries: [] }),
+    runRecommendationCommand: async () => {
+      throw new Error("should not run");
+    },
+  });
+
+  const run = await service.createRecommendationRun();
+
+  assert.equal(run.status, "blocked");
+  assert.equal(run.startupCheck.canStartWork, false);
+  assert.equal(run.startupCheck.findings[0].code, "ACTIVE_WORK_EXISTS");
+  assert.equal(run.startupCheck.runtimeSnapshot.activeWork.packageId, "task-context-package:tasks/task-004.yaml");
+});
+
+test("workflow service keeps successful runs when recommendation intent parsing fails", async (t) => {
+  const repositoryDir = await createGitRepository(t);
+  const promptPath = await writePrompt("recommendation-parse-failure");
+  const tasksDir = await writeValidTasksDir("recommendation-parse-failure");
+  const service = createWorkflowService({
+    tasksDir,
+    repositoryDir,
     recommendationPromptPath: promptPath,
     getRepositoryStatus: async () => ({ clean: true, entries: [] }),
     runRecommendationCommand: async () => ({
@@ -458,10 +546,13 @@ test("workflow service keeps successful runs when recommendation intent parsing 
   assert.match(finished.executionIntentError, /Unexpected token|JSON/);
 });
 
-test("workflow service emits running progress for recommendation runs", async () => {
+test("workflow service emits running progress for recommendation runs", async (t) => {
+  const repositoryDir = await createGitRepository(t);
   const promptPath = await writePrompt("recommendation-progress");
+  const tasksDir = await writeValidTasksDir("recommendation-progress");
   const service = createWorkflowService({
-    tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks"),
+    tasksDir,
+    repositoryDir,
     recommendationPromptPath: promptPath,
     getRepositoryStatus: async () => ({ clean: true, entries: [] }),
     runRecommendationCommand: async ({ onProgress }) => {
@@ -490,10 +581,13 @@ test("workflow service emits running progress for recommendation runs", async ()
   assert.equal(running.progress[0].message, "开始运行 opencode");
 });
 
-test("workflow service cancels a running recommendation run", async () => {
+test("workflow service cancels a running recommendation run", async (t) => {
+  const repositoryDir = await createGitRepository(t);
   const promptPath = await writePrompt("recommendation-cancel");
+  const tasksDir = await writeValidTasksDir("recommendation-cancel");
   const service = createWorkflowService({
-    tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks"),
+    tasksDir,
+    repositoryDir,
     recommendationPromptPath: promptPath,
     getRepositoryStatus: async () => ({ clean: true, entries: [] }),
     runRecommendationCommand: ({ signal, onProgress }) => new Promise((resolve) => {
@@ -526,11 +620,14 @@ test("workflow service cancels a running recommendation run", async () => {
   assert.equal(latest.progress.some((entry) => entry.type === "process_cancelled"), true);
 });
 
-test("workflow service does not start a second recommendation run while one is running", async () => {
+test("workflow service does not start a second recommendation run while one is running", async (t) => {
+  const repositoryDir = await createGitRepository(t);
   const promptPath = await writePrompt("recommendation-mutual-exclusion");
+  const tasksDir = await writeValidTasksDir("recommendation-mutual-exclusion");
   let commandRuns = 0;
   const service = createWorkflowService({
-    tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks"),
+    tasksDir,
+    repositoryDir,
     recommendationPromptPath: promptPath,
     getRepositoryStatus: async () => ({ clean: true, entries: [] }),
     runRecommendationCommand: ({ signal }) => new Promise((resolve) => {
@@ -564,10 +661,13 @@ test("workflow service does not start a second recommendation run while one is r
   assert.equal(commandRuns, 1);
 });
 
-test("workflow service marks non-zero recommendation exits as failed", async () => {
+test("workflow service marks non-zero recommendation exits as failed", async (t) => {
+  const repositoryDir = await createGitRepository(t);
   const promptPath = await writePrompt("recommendation-failure");
+  const tasksDir = await writeValidTasksDir("recommendation-failure");
   const service = createWorkflowService({
-    tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks"),
+    tasksDir,
+    repositoryDir,
     recommendationPromptPath: promptPath,
     getRepositoryStatus: async () => ({ clean: true, entries: [] }),
     runRecommendationCommand: async () => ({
@@ -594,10 +694,13 @@ test("workflow service marks non-zero recommendation exits as failed", async () 
   assert.equal(finished.exitCode, 2);
 });
 
-test("workflow service marks thrown recommendation commands as failed", async () => {
+test("workflow service marks thrown recommendation commands as failed", async (t) => {
+  const repositoryDir = await createGitRepository(t);
   const promptPath = await writePrompt("recommendation-throw");
+  const tasksDir = await writeValidTasksDir("recommendation-throw");
   const service = createWorkflowService({
-    tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks"),
+    tasksDir,
+    repositoryDir,
     recommendationPromptPath: promptPath,
     getRepositoryStatus: async () => ({ clean: true, entries: [] }),
     runRecommendationCommand: () => {

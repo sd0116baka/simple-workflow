@@ -83,7 +83,7 @@ function buildViews(taskContextPackages) {
     candidateTasks: taskContextPackages
       .filter((taskPackage) =>
         taskPackage.qualityGate.outcome === "pass"
-          && taskPackage.currentWorkStage !== "closed")
+          && taskPackage.currentWorkStage === "task-pool")
       .map((taskPackage) => ({
         packageId: taskPackage.packageId,
         taskDraft: clone(taskPackage.taskDraft),

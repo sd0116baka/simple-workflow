@@ -122,8 +122,15 @@ export function createWorkflowService({
   }
 
   async function getStartupCheck() {
+    const taskPool = buildTaskPool(await listRawTasks(tasksDir), {
+      taskContextPackages: await loadExistingTaskContextPackages(),
+    });
+    const activeWork = findActiveWork(taskPool.taskContextPackages);
     return evaluateStartupCheck({
-      runtimeSnapshot: runtimeSnapshotFromRepositoryStatus(await getRepositoryStatus()),
+      runtimeSnapshot: {
+        ...runtimeSnapshotFromRepositoryStatus(await getRepositoryStatus()),
+        activeWork,
+      },
     });
   }
 
@@ -150,6 +157,20 @@ export function createWorkflowService({
       );
     }
     return [...packagesById.values()];
+  }
+
+  function findActiveWork(taskContextPackages) {
+    const activePackage = taskContextPackages.find((taskContextPackage) =>
+      taskContextPackage.currentWorkStage !== "task-pool"
+        && taskContextPackage.currentWorkStage !== "closed",
+    );
+    if (!activePackage) return null;
+    return {
+      packageId: activePackage.packageId,
+      currentWorkStage: activePackage.currentWorkStage,
+      taskName: activePackage.taskDraft?.name ?? null,
+      sourcePath: activePackage.source?.path ?? null,
+    };
   }
 
   async function persistTaskContextPackage(taskContextPackage) {

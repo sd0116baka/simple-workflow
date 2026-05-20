@@ -120,6 +120,36 @@ test("recommendation flow starts a running run with injected candidate tasks", a
   assert.match(run.prompt, /task-001/);
 });
 
+test("recommendation flow blocks when there are no candidate tasks", async () => {
+  const dir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "flow-no-candidates");
+  await mkdir(dir, { recursive: true });
+  const promptPath = join(dir, "recommender-agent.prompt.md");
+  await writeFile(promptPath, "推荐一个任务。");
+
+  const { run } = await startRecommendationFlow({
+    id: "recommendation-run-flow",
+    tasks: [
+      {
+        id: "task-invalid",
+        fileName: "task-invalid.yaml",
+        parsed: {
+          id: "task-invalid",
+          type: "feature",
+        },
+        parseError: null,
+        validation: { status: "invalid", errors: ["title must be a non-empty string"] },
+      },
+    ],
+    startupCheck,
+    recommendationPromptPath: promptPath,
+    now: () => "2026-05-18T10:00:00.000Z",
+  });
+
+  assert.equal(run.status, "blocked");
+  assert.equal(run.error, "没有可推荐候选任务。");
+  assert.equal(run.startupCheck.findings[0].code, "NO_CANDIDATE_TASKS");
+});
+
 test("recommendation flow applies module append requests through the task pool", async (t) => {
   const repositoryDir = await createGitRepository(t);
   const completed = await completeRecommendationFlow({
