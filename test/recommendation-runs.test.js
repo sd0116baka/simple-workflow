@@ -1002,6 +1002,62 @@ test("POST /api/task-closeout/accept-no-changes closes no-change work", async (t
   assert.equal(observedPackageId, "task-context-package:tasks/task-004.yaml");
 });
 
+test("POST /api/task-closeout/accept-no-changes returns compact errors", async (t) => {
+  const hugeRecommendationRun = {
+    id: "manual-workflow-action",
+    status: "succeeded",
+    taskContextPackage: {
+      artifacts: {
+        executionReport: [
+          {
+            body: {
+              summary: "x".repeat(10_000),
+            },
+          },
+        ],
+      },
+    },
+  };
+  const workflowService = {
+    async acceptNoChangeCloseout() {
+      return {
+        closed: false,
+        error: "隔离工作树已经出现变更，不能无合并收尾。",
+        recommendationRun: hugeRecommendationRun,
+      };
+    },
+    getLatestRecommendationRun() {
+      return hugeRecommendationRun;
+    },
+    onEvent() {
+      return () => {};
+    },
+  };
+  const server = createApp({ workflowService });
+  server.listen(0);
+  t.after(() => server.close());
+  await once(server, "listening");
+
+  const response = await fetch(
+    `http://localhost:${server.address().port}/api/task-closeout/accept-no-changes`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        packageId: "task-context-package:tasks/task-004.yaml",
+      }),
+    },
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 409);
+  assert.equal(payload.closed, false);
+  assert.equal(payload.error, "隔离工作树已经出现变更，不能无合并收尾。");
+  assert.equal(payload.recommendationRun, undefined);
+});
+
 test("workflow service retry closes a merged package without re-running merge", async (t) => {
   const repositoryDir = await createGitRepository(t);
   const promptPath = await writePrompt("retry-closeout");
@@ -1301,6 +1357,23 @@ test("POST /api/server/restart returns unavailable without restart handler", asy
 
   assert.equal(response.status, 501);
   assert.match(payload.error, /not available/);
+});
+
+test("static assets are not cached during workflow UI development", async (t) => {
+  const workflowService = {
+    onEvent() {
+      return () => {};
+    },
+  };
+  const server = createApp({ workflowService });
+  server.listen(0);
+  t.after(() => server.close());
+  await once(server, "listening");
+
+  const response = await fetch(`http://localhost:${server.address().port}/app.js`);
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
 });
 
 test("restart command waits for the current Windows process before starting node", () => {

@@ -75,6 +75,7 @@ async function serveStatic(request, response) {
     const body = await readFile(filePath);
     response.writeHead(200, {
       "content-type": contentTypes[extname(filePath)] ?? "application/octet-stream",
+      "cache-control": "no-store",
     });
     response.end(body);
   } catch (error) {
@@ -140,7 +141,12 @@ export function createApp({
         const result = await workflowService.acceptNoChangeCloseout({
           packageId: body.packageId,
         });
-        sendJson(response, result.error ? 409 : 200, result);
+        sendJson(response, result.error ? 409 : 200, result.error
+          ? {
+              closed: false,
+              error: result.error,
+            }
+          : result);
         return;
       }
 

@@ -464,6 +464,13 @@ h2 {
   margin-top: 6px;
 }
 
+.auto-merge-feedback {
+  margin-top: 10px;
+  color: #a7442e;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .context-package-panel {
   min-height: 260px;
   max-height: 520px;

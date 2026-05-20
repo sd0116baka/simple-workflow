@@ -333,11 +333,17 @@ function createAutoMergePanel(taskContextPackage) {
     const closeoutButton = document.createElement("button");
     closeoutButton.type = "button";
     closeoutButton.className = "primary-button human-decision-action";
+    closeoutButton.dataset.action = "accept-no-change-closeout";
     closeoutButton.textContent = "接受无变更完成";
-    closeoutButton.addEventListener("click", () => {
-      acceptNoChangeCloseout().catch(showError);
+    closeoutButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (closeoutButton.dataset.pending === "true") return;
+      acceptNoChangeCloseout(closeoutButton).catch(showError);
     });
-    panel.append(closeoutButton);
+    const closeoutFeedback = document.createElement("div");
+    closeoutFeedback.className = "auto-merge-feedback";
+    closeoutFeedback.dataset.feedback = "accept-no-change-closeout";
+    panel.append(closeoutButton, closeoutFeedback);
   }
 
   return panel;
@@ -764,8 +770,17 @@ async function retryAutoMerge() {
   await loadTasks();
 }
 
-async function acceptNoChangeCloseout() {
+async function acceptNoChangeCloseout(actionButton = null) {
   const taskContextPackage = activeTaskContextPackage();
+  const feedback = actionButton
+    ?.closest(".auto-merge-panel")
+    ?.querySelector("[data-feedback='accept-no-change-closeout']");
+  if (actionButton) {
+    actionButton.dataset.pending = "true";
+    actionButton.disabled = true;
+    actionButton.textContent = "检查中";
+  }
+  if (feedback) feedback.textContent = "正在重新检查隔离工作树...";
   taskCloseoutStatus.textContent = "收尾中";
   const response = await fetch("/api/task-closeout/accept-no-changes", {
     method: "POST",
@@ -778,7 +793,16 @@ async function acceptNoChangeCloseout() {
   });
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload.error ?? `无变更收尾失败：${response.status}`);
+    const message = payload.error ?? `无变更收尾失败：${response.status}`;
+    taskCloseoutStatus.textContent = "不能收尾";
+    taskCloseoutPanel.textContent = message;
+    if (feedback) feedback.textContent = message;
+    if (actionButton) {
+      delete actionButton.dataset.pending;
+      actionButton.disabled = false;
+      actionButton.textContent = "接受无变更完成";
+    }
+    return;
   }
   recommendationRun = payload.recommendationRun ?? null;
   if (recommendationRun?.taskContextPackage) {
@@ -1289,6 +1313,19 @@ runRecommendationButton.addEventListener("click", () => {
 cancelRecommendationButton?.addEventListener("click", () => {
   cancelRecommendationRun().catch(showError);
 });
+
+function handleDocumentAction(event) {
+  const actionButton = event.target.closest?.("[data-action='accept-no-change-closeout']");
+  if (!actionButton) return;
+  if (event.type === "keydown" && !["Enter", " "].includes(event.key)) return;
+  event.preventDefault();
+  if (actionButton.dataset.pending === "true") return;
+  acceptNoChangeCloseout(actionButton).catch(showError);
+}
+
+document.addEventListener("click", handleDocumentAction);
+document.addEventListener("pointerup", handleDocumentAction);
+document.addEventListener("keydown", handleDocumentAction);
 
 function connectWorkflowEvents() {
   if (!("EventSource" in window)) return;
