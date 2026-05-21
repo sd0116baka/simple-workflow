@@ -1,9 +1,6 @@
 import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-
-function clone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
+import { cloneJsonValue } from "./json-value.js";
 
 export function packageFileName(packageId) {
   const safePackageId = String(packageId ?? "")
@@ -44,7 +41,7 @@ export async function saveTaskContextPackage({ storeDir, taskContextPackage }) {
   const temporaryPath = `${targetPath}.tmp`;
   await writeFile(
     temporaryPath,
-    `${JSON.stringify(clone(taskContextPackage), null, 2)}\n`,
+    `${JSON.stringify(cloneJsonValue(taskContextPackage), null, 2)}\n`,
     "utf8",
   );
   await rename(temporaryPath, targetPath);

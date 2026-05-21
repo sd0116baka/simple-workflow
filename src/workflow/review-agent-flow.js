@@ -1,24 +1,12 @@
 import { createStubAgentSession } from "./agent-runner.js";
+import { latestArtifactRecord } from "./task-package-artifacts.js";
 
 function latestExecutionReport(taskContextPackage) {
-  const reports = taskContextPackage?.artifacts?.executionReport;
-  return Array.isArray(reports) && reports.length > 0
-    ? reports[reports.length - 1]
-    : null;
+  return latestArtifactRecord(taskContextPackage, "executionReport");
 }
 
 function latestConvergenceAdvice(taskContextPackage) {
-  const advice = taskContextPackage?.artifacts?.convergenceAdvice;
-  return Array.isArray(advice) && advice.length > 0
-    ? advice[advice.length - 1]
-    : null;
-}
-
-function latestArtifact(taskContextPackage, artifactType) {
-  const artifacts = taskContextPackage?.artifacts?.[artifactType];
-  return Array.isArray(artifacts) && artifacts.length > 0
-    ? artifacts[artifacts.length - 1]
-    : null;
+  return latestArtifactRecord(taskContextPackage, "convergenceAdvice");
 }
 
 function hasIsolatedWorkspace(taskContextPackage) {
@@ -39,8 +27,8 @@ function inputArtifactRefsForReview(taskContextPackage, executionReport) {
     executionReport.artifactId,
   ];
   const convergenceAdvice = latestConvergenceAdvice(taskContextPackage);
-  const convergenceFailure = latestArtifact(taskContextPackage, "convergenceFailure");
-  const humanConvergenceGuidance = latestArtifact(taskContextPackage, "humanConvergenceGuidance");
+  const convergenceFailure = latestArtifactRecord(taskContextPackage, "convergenceFailure");
+  const humanConvergenceGuidance = latestArtifactRecord(taskContextPackage, "humanConvergenceGuidance");
   const correctionRefs = [
     convergenceAdvice?.artifactId,
     convergenceFailure?.artifactId,

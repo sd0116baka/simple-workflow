@@ -5,15 +5,11 @@ import { createStubAgentSession, normalizeAgentStatus } from "./agent-runner.js"
 import { terminateProcessTree } from "./process-control.js";
 import { extractTextFromJsonEvents } from "./recommendation-runner.js";
 import { parseGitPorcelainStatus } from "./repository-status.js";
+import { normalizePathForGit } from "./git-path.js";
+import { latestArtifactRecord } from "./task-package-artifacts.js";
+import { truncateTerminalLine } from "./terminal-output.js";
 
 export const OPENCODE_EXECUTION_ARGS = ["run", "--format", "json"];
-
-function truncateTerminalLine(text, maxLength = 4000) {
-  const value = String(text ?? "");
-  return value.length > maxLength
-    ? `${value.slice(0, maxLength)}\n...[truncated ${value.length - maxLength} chars]`
-    : value;
-}
 
 function hasExecutionAuthorization(taskContextPackage) {
   return Boolean(taskContextPackage?.artifacts?.executionAuthorization?.body);
@@ -33,22 +29,15 @@ function nextExecutionRunId(taskContextPackage) {
   return `execution-agent:${String(nextIndex).padStart(3, "0")}`;
 }
 
-function latestArtifact(taskContextPackage, artifactType) {
-  const artifacts = taskContextPackage?.artifacts?.[artifactType];
-  return Array.isArray(artifacts) && artifacts.length > 0
-    ? artifacts[artifacts.length - 1]
-    : null;
-}
-
 function inputArtifactRefsForExecution(taskContextPackage) {
   const baseRefs = [
     "taskDraft",
     "executionIntent",
     "executionAuthorization",
   ];
-  const convergenceAdvice = latestArtifact(taskContextPackage, "convergenceAdvice");
-  const convergenceFailure = latestArtifact(taskContextPackage, "convergenceFailure");
-  const humanConvergenceGuidance = latestArtifact(taskContextPackage, "humanConvergenceGuidance");
+  const convergenceAdvice = latestArtifactRecord(taskContextPackage, "convergenceAdvice");
+  const convergenceFailure = latestArtifactRecord(taskContextPackage, "convergenceFailure");
+  const humanConvergenceGuidance = latestArtifactRecord(taskContextPackage, "humanConvergenceGuidance");
   const correctionRefs = [
     convergenceAdvice?.artifactId,
     convergenceFailure?.artifactId,
@@ -62,10 +51,6 @@ function inputArtifactRefsForExecution(taskContextPackage) {
 function isolatedWorkspacePath(taskContextPackage, repositoryDir) {
   const worktreePath = taskContextPackage.artifacts.isolatedWorkspace.body.worktreePath;
   return isAbsolute(worktreePath) ? worktreePath : resolve(repositoryDir, worktreePath);
-}
-
-function normalizePathForGit(filePath) {
-  return filePath.replace(/\\/g, "/");
 }
 
 function safePathSegment(value) {
@@ -148,7 +133,7 @@ function findSessionIdInJsonEvents(output) {
 }
 
 function latestExecutionArtifact(taskContextPackage, artifactType) {
-  return latestArtifact(taskContextPackage, artifactType)?.body ?? null;
+  return latestArtifactRecord(taskContextPackage, artifactType)?.body ?? null;
 }
 
 export function buildExecutionAgentPrompt({

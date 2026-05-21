@@ -1,14 +1,8 @@
 import { spawn } from "node:child_process";
 import { terminateProcessTree } from "./process-control.js";
+import { truncateTerminalLine } from "./terminal-output.js";
 
 export const OPENCODE_RECOMMENDATION_ARGS = ["run", "--format", "json"];
-
-function truncateTerminalLine(text, maxLength = 4000) {
-  const value = String(text ?? "");
-  return value.length > maxLength
-    ? `${value.slice(0, maxLength)}\n...[truncated ${value.length - maxLength} chars]`
-    : value;
-}
 
 export function toProgressEntry(event) {
   const type = event?.type ?? "event";

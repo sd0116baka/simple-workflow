@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
+import { normalizePathForGit } from "./git-path.js";
 
 function runGit(args, { cwd }) {
   return execFileSync("git", args, {
@@ -17,10 +18,6 @@ function gitSucceeds(args, { cwd }) {
   } catch {
     return false;
   }
-}
-
-function normalizePathForGit(filePath) {
-  return filePath.replace(/\\/g, "/");
 }
 
 function resolveWorktreePath(worktreePath, repositoryDir) {

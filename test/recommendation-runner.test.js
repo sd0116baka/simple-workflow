@@ -12,6 +12,21 @@ test("extracts final text from opencode JSON events", () => {
   assert.equal(extractTextFromJsonEvents(output), "```json\n{\"ok\":true}\n```");
 });
 
+test("joins multiple text events from opencode JSON output", () => {
+  const output = [
+    JSON.stringify({ type: "text", part: { type: "text", text: "first" } }),
+    JSON.stringify({ type: "text", part: { type: "text", text: "second" } }),
+  ].join("\n");
+
+  assert.equal(extractTextFromJsonEvents(output), "first\nsecond");
+});
+
+test("keeps empty JSON event output unchanged", () => {
+  const output = JSON.stringify({ type: "step_finish", part: { reason: "stop" } });
+
+  assert.equal(extractTextFromJsonEvents(output), output);
+});
+
 test("falls back to raw output when stdout is not JSON events", () => {
   const output = "plain stdout";
 

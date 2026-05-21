@@ -9,6 +9,18 @@ import {
   saveTaskContextPackage,
 } from "../src/workflow/task-context-package-store.js";
 
+test("builds safe package file names from package ids", () => {
+  assert.equal(
+    packageFileName("task-context-package:tasks/task-006-closeout-demo.yaml"),
+    "tasks-task-006-closeout-demo.yaml.json",
+  );
+  assert.equal(
+    packageFileName("task-context-package:../bad\\path:?*"),
+    "..-bad-path.json",
+  );
+  assert.equal(packageFileName(""), "unknown-package.json");
+});
+
 test("saves and loads task context packages by package id", async (t) => {
   const storeDir = await mkdtemp(join(tmpdir(), "simple-workflow-package-store-"));
   t.after(() => rm(storeDir, { recursive: true, force: true }));

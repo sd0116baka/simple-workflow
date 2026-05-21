@@ -2,7 +2,14 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { listRawTasks } from "../src/workflow/task-source.js";
+import { isSupportedTaskFile, listRawTasks } from "../src/workflow/task-source.js";
+
+test("detects supported task source files", () => {
+  assert.equal(isSupportedTaskFile("task.yaml"), true);
+  assert.equal(isSupportedTaskFile("task.YML"), true);
+  assert.equal(isSupportedTaskFile("notes.txt"), false);
+  assert.equal(isSupportedTaskFile(null), false);
+});
 
 test("lists YAML task files as raw text without parsing them", async (t) => {
   const dir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "raw-list");

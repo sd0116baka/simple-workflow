@@ -1,6 +1,6 @@
 import { watch } from "node:fs";
 import { mkdir } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { join } from "node:path";
 import {
   evaluateStartupCheck,
   runtimeSnapshotFromRepositoryStatus,
@@ -15,6 +15,7 @@ import {
   runOpencodeExecutionAgentSession,
 } from "./execution-agent-flow.js";
 import { executeAutoMerge, planAutoMerge } from "./auto-merge-flow.js";
+import { cloneJsonValue } from "./json-value.js";
 import {
   acceptConvergenceSuccess,
   cancelTaskAfterHumanDecisionRequest,
@@ -32,17 +33,11 @@ import {
   saveTaskContextPackage,
 } from "./task-context-package-store.js";
 import { applyAppendRequest, buildTaskPool } from "./task-pool.js";
-import { listRawTasks } from "./task-source.js";
+import { isSupportedTaskFile, listRawTasks } from "./task-source.js";
 import {
   cleanupTestStateFixtures,
   seedTestStateFixtures,
 } from "./state-fixtures.js";
-
-const TASK_EXTENSIONS = new Set([".yaml", ".yml"]);
-
-function isTaskFile(fileName) {
-  return fileName && TASK_EXTENSIONS.has(extname(String(fileName)).toLowerCase());
-}
 
 export function createWorkflowService({
   tasksDir,
@@ -78,76 +73,76 @@ export function createWorkflowService({
       ? {
           ...run,
           args: [...run.args],
-          startupCheck: run.startupCheck ? JSON.parse(JSON.stringify(run.startupCheck)) : null,
+          startupCheck: run.startupCheck ? cloneJsonValue(run.startupCheck) : null,
           progress: run.progress.map((entry) => ({ ...entry })),
           executionIntent: run.executionIntent
-            ? JSON.parse(JSON.stringify(run.executionIntent))
+            ? cloneJsonValue(run.executionIntent)
             : null,
           executionAdmission: run.executionAdmission
-            ? JSON.parse(JSON.stringify(run.executionAdmission))
+            ? cloneJsonValue(run.executionAdmission)
             : null,
           isolatedWorkspaceAllocation: run.isolatedWorkspaceAllocation
-            ? JSON.parse(JSON.stringify(run.isolatedWorkspaceAllocation))
+            ? cloneJsonValue(run.isolatedWorkspaceAllocation)
             : null,
           isolatedWorkspaceError: run.isolatedWorkspaceError ?? null,
           mainAgentInitialization: run.mainAgentInitialization
-            ? JSON.parse(JSON.stringify(run.mainAgentInitialization))
+            ? cloneJsonValue(run.mainAgentInitialization)
             : null,
           executionAgentRuns: run.executionAgentRuns
-            ? JSON.parse(JSON.stringify(run.executionAgentRuns))
+            ? cloneJsonValue(run.executionAgentRuns)
             : [],
           executionAgentErrors: run.executionAgentErrors
             ? [...run.executionAgentErrors]
             : [],
           reviewAgentRuns: run.reviewAgentRuns
-            ? JSON.parse(JSON.stringify(run.reviewAgentRuns))
+            ? cloneJsonValue(run.reviewAgentRuns)
             : [],
           reviewAgentErrors: run.reviewAgentErrors
             ? [...run.reviewAgentErrors]
             : [],
           convergenceRuns: run.convergenceRuns
-            ? JSON.parse(JSON.stringify(run.convergenceRuns))
+            ? cloneJsonValue(run.convergenceRuns)
             : [],
           convergenceErrors: run.convergenceErrors
             ? [...run.convergenceErrors]
             : [],
           successHumanDecisionRequest: run.successHumanDecisionRequest
-            ? JSON.parse(JSON.stringify(run.successHumanDecisionRequest))
+            ? cloneJsonValue(run.successHumanDecisionRequest)
             : null,
           successHumanDecisionError: run.successHumanDecisionError ?? null,
           failureHumanDecisionRequest: run.failureHumanDecisionRequest
-            ? JSON.parse(JSON.stringify(run.failureHumanDecisionRequest))
+            ? cloneJsonValue(run.failureHumanDecisionRequest)
             : null,
           failureHumanDecisionError: run.failureHumanDecisionError ?? null,
           humanConvergenceGuidance: run.humanConvergenceGuidance
-            ? JSON.parse(JSON.stringify(run.humanConvergenceGuidance))
+            ? cloneJsonValue(run.humanConvergenceGuidance)
             : null,
           humanConvergenceGuidanceError: run.humanConvergenceGuidanceError ?? null,
           taskCancellation: run.taskCancellation
-            ? JSON.parse(JSON.stringify(run.taskCancellation))
+            ? cloneJsonValue(run.taskCancellation)
             : null,
           taskCancellationError: run.taskCancellationError ?? null,
           autoMergePlanning: run.autoMergePlanning
-            ? JSON.parse(JSON.stringify(run.autoMergePlanning))
+            ? cloneJsonValue(run.autoMergePlanning)
             : null,
           autoMergePlanningError: run.autoMergePlanningError ?? null,
           autoMergeExecution: run.autoMergeExecution
-            ? JSON.parse(JSON.stringify(run.autoMergeExecution))
+            ? cloneJsonValue(run.autoMergeExecution)
             : null,
           autoMergeExecutionError: run.autoMergeExecutionError ?? null,
           autoMergeHumanDecisionRequest: run.autoMergeHumanDecisionRequest
-            ? JSON.parse(JSON.stringify(run.autoMergeHumanDecisionRequest))
+            ? cloneJsonValue(run.autoMergeHumanDecisionRequest)
             : null,
           autoMergeHumanDecisionError: run.autoMergeHumanDecisionError ?? null,
           taskCloseout: run.taskCloseout
-            ? JSON.parse(JSON.stringify(run.taskCloseout))
+            ? cloneJsonValue(run.taskCloseout)
             : null,
           taskCloseoutError: run.taskCloseoutError ?? null,
           executionIntentAppendRequest: run.executionIntentAppendRequest
-            ? JSON.parse(JSON.stringify(run.executionIntentAppendRequest))
+            ? cloneJsonValue(run.executionIntentAppendRequest)
             : null,
           taskContextPackage: run.taskContextPackage
-            ? JSON.parse(JSON.stringify(run.taskContextPackage))
+            ? cloneJsonValue(run.taskContextPackage)
             : null,
         }
       : null;
@@ -904,7 +899,7 @@ export function createWorkflowService({
       if (watcher) return;
       await mkdir(tasksDir, { recursive: true });
       watcher = watch(tasksDir, (eventType, fileName) => {
-        if (!isTaskFile(fileName)) return;
+        if (!isSupportedTaskFile(fileName)) return;
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           emit({

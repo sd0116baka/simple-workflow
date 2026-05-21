@@ -1,6 +1,4 @@
-function clone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
+import { cloneJsonValue } from "./json-value.js";
 
 function toChangedFiles(repositoryStatus) {
   return (repositoryStatus?.entries ?? []).map((entry) => entry.path);
@@ -187,7 +185,7 @@ export function evaluateExecutionAdmission({
       goal: taskContextPackage.taskDraft?.goal ?? null,
       acceptanceCriteria: [...(taskContextPackage.taskDraft?.acceptanceCriteria ?? [])],
     },
-    runtimeSnapshot: clone(startupCheck.runtimeSnapshot),
+    runtimeSnapshot: cloneJsonValue(startupCheck.runtimeSnapshot),
     termination: {
       maxIterations,
     },

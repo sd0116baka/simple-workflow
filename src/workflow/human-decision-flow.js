@@ -1,24 +1,19 @@
 import { execFileSync } from "node:child_process";
 import { isAbsolute, relative, resolve } from "node:path";
+import { normalizePathForGit } from "./git-path.js";
+import { latestArtifactRecord } from "./task-package-artifacts.js";
 
 function latestConvergenceSuccess(taskContextPackage) {
   return taskContextPackage?.artifacts?.convergenceSuccess ?? null;
 }
 
-function latestArtifact(taskContextPackage, artifactType) {
-  const artifacts = taskContextPackage?.artifacts?.[artifactType];
-  return Array.isArray(artifacts) && artifacts.length > 0
-    ? artifacts[artifacts.length - 1]
-    : null;
-}
-
 function latestConvergenceFailure(taskContextPackage) {
-  return latestArtifact(taskContextPackage, "convergenceFailure");
+  return latestArtifactRecord(taskContextPackage, "convergenceFailure");
 }
 
 function artifactByType(taskContextPackage, artifactType) {
   if (artifactType === "convergenceFailure" || artifactType === "humanConvergenceGuidance") {
-    return latestArtifact(taskContextPackage, artifactType);
+    return latestArtifactRecord(taskContextPackage, artifactType);
   }
   return taskContextPackage?.artifacts?.[artifactType] ?? null;
 }
@@ -91,10 +86,6 @@ function humanDecisionRequestMatchesTarget(humanDecisionRequest, target) {
       && humanDecisionRequest.body.targetRef === target.artifact.artifactId;
   }
   return humanDecisionRequest.body[target.requestRefField] === target.artifact.artifactId;
-}
-
-function normalizePathForGit(filePath) {
-  return filePath.replace(/\\/g, "/");
 }
 
 function worktreeCwd(taskContextPackage, repositoryDir) {

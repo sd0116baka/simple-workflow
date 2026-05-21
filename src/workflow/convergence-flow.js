@@ -1,11 +1,5 @@
 import { createStubAgentSession } from "./agent-runner.js";
-
-function latestArtifact(taskContextPackage, artifactType) {
-  const artifacts = taskContextPackage?.artifacts?.[artifactType];
-  return Array.isArray(artifacts) && artifacts.length > 0
-    ? artifacts[artifacts.length - 1]
-    : null;
-}
+import { latestArtifactRecord } from "./task-package-artifacts.js";
 
 function mainAgentSessionId(taskContextPackage) {
   const mainInitialization = taskContextPackage?.agentRuns?.[0];
@@ -19,8 +13,8 @@ function nextConvergenceRunId(taskContextPackage) {
 }
 
 function inputArtifactRefsForConvergence(taskContextPackage, executionReport, reviewReport) {
-  const failure = latestArtifact(taskContextPackage, "convergenceFailure");
-  const guidance = latestArtifact(taskContextPackage, "humanConvergenceGuidance");
+  const failure = latestArtifactRecord(taskContextPackage, "convergenceFailure");
+  const guidance = latestArtifactRecord(taskContextPackage, "humanConvergenceGuidance");
   const refs = [
     "taskDraft",
     "executionIntent",
@@ -28,7 +22,7 @@ function inputArtifactRefsForConvergence(taskContextPackage, executionReport, re
     executionReport.artifactId,
     reviewReport.artifactId,
   ];
-  const convergenceAdvice = latestArtifact(taskContextPackage, "convergenceAdvice");
+  const convergenceAdvice = latestArtifactRecord(taskContextPackage, "convergenceAdvice");
   const inputRefs = convergenceAdvice
     ? [
         "taskDraft",
@@ -55,7 +49,7 @@ function inputArtifactRefsForConvergence(taskContextPackage, executionReport, re
 function shouldCompleteTask(taskContextPackage, reviewReport) {
   return Boolean(
     reviewReport?.body?.outcome === "passed"
-      && latestArtifact(taskContextPackage, "convergenceAdvice"),
+      && latestArtifactRecord(taskContextPackage, "convergenceAdvice"),
   );
 }
 
@@ -137,7 +131,7 @@ export function runConvergence({
     };
   }
 
-  const executionReport = latestArtifact(taskContextPackage, "executionReport");
+  const executionReport = latestArtifactRecord(taskContextPackage, "executionReport");
   if (!executionReport) {
     return {
       appendRequest: null,
@@ -145,7 +139,7 @@ export function runConvergence({
     };
   }
 
-  const reviewReport = latestArtifact(taskContextPackage, "reviewReport");
+  const reviewReport = latestArtifactRecord(taskContextPackage, "reviewReport");
   if (!reviewReport) {
     return {
       appendRequest: null,

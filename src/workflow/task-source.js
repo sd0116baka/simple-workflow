@@ -8,6 +8,10 @@ const SUPPORTED_EXTENSIONS = new Map([
   [".yml", "yaml"],
 ]);
 
+export function isSupportedTaskFile(fileName) {
+  return Boolean(fileName) && SUPPORTED_EXTENSIONS.has(extname(String(fileName)).toLowerCase());
+}
+
 export async function listRawTasks(tasksDir) {
   let entries;
   try {
@@ -20,7 +24,7 @@ export async function listRawTasks(tasksDir) {
   const files = entries
     .filter((entry) => entry.isFile())
     .map((entry) => entry.name)
-    .filter((fileName) => SUPPORTED_EXTENSIONS.has(extname(fileName).toLowerCase()))
+    .filter((fileName) => isSupportedTaskFile(fileName))
     .sort((left, right) => left.localeCompare(right));
 
   return Promise.all(

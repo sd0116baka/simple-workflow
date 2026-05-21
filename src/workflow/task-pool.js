@@ -1,6 +1,4 @@
-function clone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
+import { cloneJsonValue } from "./json-value.js";
 
 const MULTI_ARTIFACT_TYPES = new Set([
   "executionReport",
@@ -53,9 +51,9 @@ function toTaskContextPackage(entry, existingPackage = null) {
     recognition: toRecognition(entry),
     taskDraft: toTaskDraft(entry),
     qualityGate: toQualityGate(entry),
-    artifacts: clone(existingPackage?.artifacts ?? {}),
-    agentRuns: clone(existingPackage?.agentRuns ?? []),
-    timeline: clone(existingPackage?.timeline ?? []),
+    artifacts: cloneJsonValue(existingPackage?.artifacts ?? {}),
+    agentRuns: cloneJsonValue(existingPackage?.agentRuns ?? []),
+    timeline: cloneJsonValue(existingPackage?.timeline ?? []),
   };
 }
 
@@ -88,7 +86,7 @@ function buildViews(taskContextPackages) {
           && taskPackage.currentWorkStage === "task-pool")
       .map((taskPackage) => ({
         packageId: taskPackage.packageId,
-        taskDraft: clone(taskPackage.taskDraft),
+        taskDraft: cloneJsonValue(taskPackage.taskDraft),
       })),
     needsAttention: taskContextPackages
       .filter((taskPackage) => taskPackage.recognition.outcome === "incomplete")
@@ -133,7 +131,7 @@ export function findTaskContextPackage(taskPool, packageId) {
 function artifactRecord({ artifactId, artifact, appendedAt }) {
   return {
     artifactId,
-    body: clone(artifact),
+    body: cloneJsonValue(artifact),
     appendedAt,
   };
 }
@@ -183,7 +181,7 @@ function appendArtifact(artifacts, appendRequest, appendedAt) {
 function normalizeAgentRun(agentRun, artifactId) {
   if (!agentRun) return null;
   return {
-    ...clone(agentRun),
+    ...cloneJsonValue(agentRun),
     outputArtifactRefs: artifactId ? [artifactId] : [],
   };
 }

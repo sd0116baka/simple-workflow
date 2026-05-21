@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { normalizePathForGit } from "./git-path.js";
 
 function safePackageIdFromSourcePath(sourcePath) {
   return String(sourcePath ?? "")
@@ -25,10 +26,6 @@ function gitSucceeds(args, { cwd }) {
   } catch {
     return false;
   }
-}
-
-function normalizePathForGit(filePath) {
-  return filePath.replace(/\\/g, "/");
 }
 
 function worktreePathFromSafePackageId(safePackageId) {
