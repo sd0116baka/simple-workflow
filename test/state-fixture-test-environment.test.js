@@ -1,12 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   assertTestEnvironment,
   ensureTestEnvironmentGitignore,
+  resetManagedStateFixtureEnvironment,
   TEST_ENV_GITIGNORE,
 } from "../src/workflow/state-fixture-test-environment.js";
 import {
@@ -50,6 +51,27 @@ test("gitignore setup removes stale managed test repository index locks", async 
   await ensureTestEnvironmentGitignore(repositoryDir);
 
   assert.equal(existsSync(lockPath), false);
+  assert.equal(await readFile(join(repositoryDir, ".gitignore"), "utf8"), TEST_ENV_GITIGNORE);
+  assert.equal(runFixtureGit(["status", "--porcelain"], repositoryDir), "");
+});
+
+test("managed state fixture environment reset cleans generated state", async (t) => {
+  const repositoryDir = await createManagedTestRepository(t);
+  const tasksDir = join(repositoryDir, "tasks");
+  const storeDir = join(repositoryDir, ".workflow", "task-context-packages");
+  await mkdir(tasksDir, { recursive: true });
+  await mkdir(storeDir, { recursive: true });
+  await writeFile(join(tasksDir, "stub-old.yaml"), "id: stub-old\n", "utf8");
+  await writeFile(join(storeDir, "tasks-stub-old.yaml.json"), "{}\n", "utf8");
+
+  const result = await resetManagedStateFixtureEnvironment({
+    repositoryDir,
+    tasksDir,
+    storeDir,
+  });
+
+  assert.equal(result.removedTaskFiles, 1);
+  assert.equal(result.removedPackages, 1);
   assert.equal(await readFile(join(repositoryDir, ".gitignore"), "utf8"), TEST_ENV_GITIGNORE);
   assert.equal(runFixtureGit(["status", "--porcelain"], repositoryDir), "");
 });

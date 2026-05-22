@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   saveTaskContextPackage,
@@ -12,15 +12,9 @@ import {
 } from "./state-fixture-catalog.js";
 import { needsFixtureWorktree } from "./state-fixture-paths.js";
 import {
-  assertTestEnvironment,
-  ensureTestEnvironmentGitignore,
+  resetManagedStateFixtureEnvironment,
 } from "./state-fixture-test-environment.js";
-import { resetMainToStubFixtureBase } from "./state-fixture-base-reset.js";
 import { createFixtureWorktree } from "./state-fixture-worktree-create.js";
-import { removeExistingStubWorktrees } from "./state-fixture-worktree-cleanup.js";
-import {
-  cleanupStateFixtureStorage,
-} from "./state-fixture-storage-cleanup.js";
 
 export async function seedTestStateFixtures({
   repositoryDir,
@@ -32,10 +26,7 @@ export async function seedTestStateFixtures({
   if (!repositoryDir || !tasksDir || !storeDir) {
     throw new Error("repositoryDir, tasksDir and storeDir are required");
   }
-  assertTestEnvironment(repositoryDir);
-  await mkdir(tasksDir, { recursive: true });
-  await cleanupTestStateFixtures({ repositoryDir, tasksDir, storeDir });
-  await ensureTestEnvironmentGitignore(repositoryDir);
+  await resetManagedStateFixtureEnvironment({ repositoryDir, tasksDir, storeDir });
 
   const timestamp = now();
   const fixture = STAGE_FIXTURES.find((item) => item.fixtureKey === fixtureKey)
@@ -80,19 +71,5 @@ export async function cleanupTestStateFixtures({
   if (!repositoryDir || !tasksDir || !storeDir) {
     throw new Error("repositoryDir, tasksDir and storeDir are required");
   }
-  assertTestEnvironment(repositoryDir);
-  const resetCommit = await resetMainToStubFixtureBase({ repositoryDir, storeDir });
-  const removedWorktrees = removeExistingStubWorktrees(repositoryDir);
-  const { removedTaskFiles, removedPackages } = await cleanupStateFixtureStorage({
-    tasksDir,
-    storeDir,
-  });
-  await ensureTestEnvironmentGitignore(repositoryDir);
-
-  return {
-    removedTaskFiles,
-    removedPackages,
-    removedWorktrees,
-    resetCommit,
-  };
+  return resetManagedStateFixtureEnvironment({ repositoryDir, tasksDir, storeDir });
 }

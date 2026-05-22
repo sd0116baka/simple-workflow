@@ -1,6 +1,9 @@
-import { unlink, writeFile } from "node:fs/promises";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
 import { join, normalize, resolve } from "node:path";
 import { gitSucceeds, runGit } from "./git-worktree-state.js";
+import { resetMainToStubFixtureBase } from "./state-fixture-base-reset.js";
+import { cleanupStateFixtureStorage } from "./state-fixture-storage-cleanup.js";
+import { removeExistingStubWorktrees } from "./state-fixture-worktree-cleanup.js";
 
 export const TEST_ENV_GITIGNORE = [
   ".workflow/",
@@ -42,4 +45,30 @@ export async function ensureTestEnvironmentGitignore(repositoryDir) {
     "-m",
     "ignore generated test fixtures",
   ], { cwd: repositoryDir });
+}
+
+export async function resetManagedStateFixtureEnvironment({
+  repositoryDir,
+  tasksDir,
+  storeDir,
+} = {}) {
+  if (!repositoryDir || !tasksDir || !storeDir) {
+    throw new Error("repositoryDir, tasksDir and storeDir are required");
+  }
+  assertTestEnvironment(repositoryDir);
+  await mkdir(tasksDir, { recursive: true });
+  const resetCommit = await resetMainToStubFixtureBase({ repositoryDir, storeDir });
+  const removedWorktrees = removeExistingStubWorktrees(repositoryDir);
+  const { removedTaskFiles, removedPackages } = await cleanupStateFixtureStorage({
+    tasksDir,
+    storeDir,
+  });
+  await ensureTestEnvironmentGitignore(repositoryDir);
+
+  return {
+    removedTaskFiles,
+    removedPackages,
+    removedWorktrees,
+    resetCommit,
+  };
 }
