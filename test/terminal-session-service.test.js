@@ -83,3 +83,25 @@ test("terminal session service rejects missing sessions and inactive input", asy
     /not running/,
   );
 });
+
+test("terminal session service runs command sessions and returns collected output", async () => {
+  const events = [];
+  const service = createTerminalSessionService({
+    shell: false,
+    emitTerminalSessionChanged: (session) => events.push(session),
+  });
+
+  const result = await service.runTerminalCommand({
+    command: process.execPath,
+    args: ["-e", "process.stdin.pipe(process.stdout); console.error('warn');"],
+    prompt: "hello from prompt\n",
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.error, null);
+  assert.match(result.stdout, /hello from prompt/);
+  assert.match(result.stderr, /warn/);
+  assert.equal(result.terminalSession.status, "exited");
+  assert.equal(service.getLatestTerminalSession().id, result.terminalSession.id);
+  assert.equal(events.some((event) => event.output.some((entry) => entry.stream === "stdout")), true);
+});

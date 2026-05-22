@@ -53,6 +53,7 @@ test("completion projection builds terminal succeeded run snapshot", () => {
       stderr: "",
       exitCode: 0,
       error: null,
+      terminalSessionId: "terminal-session-1",
     },
     preparation: successfulPreparation(),
     sequence: {
@@ -103,6 +104,7 @@ test("completion projection builds terminal succeeded run snapshot", () => {
   assert.equal(completed.finishedAt, "2026-05-22T10:01:00.000Z");
   assert.equal(completed.stdout, "result stdout");
   assert.equal(completed.exitCode, 0);
+  assert.equal(completed.terminalSessionId, "terminal-session-1");
   assert.equal(completed.executionIntent.confidence, "high");
   assert.equal(completed.executionIntentAppendRequest.artifactType, "executionIntent");
   assert.equal(completed.executionAdmission.appendRequest.artifactType, "executionAuthorization");

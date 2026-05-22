@@ -34,6 +34,10 @@ function snapshotSession(session) {
   };
 }
 
+function buildCommandLine({ command, args }) {
+  return [command, ...args].join(" ");
+}
+
 export function createTerminalSessionService({
   repositoryDir = process.cwd(),
   env = process.env,
@@ -85,11 +89,19 @@ export function createTerminalSessionService({
     emit(session);
   }
 
-  function createTerminalSession({
+  function startTerminalProcess({
     command,
     args = [],
     cwd = repositoryDir,
+    env: processEnv = env,
     title = null,
+    prompt = null,
+    closeStdin = false,
+    signal = null,
+    onStarted,
+    onStdoutChunk,
+    onStderrChunk,
+    onFinish,
   } = {}) {
     if (!command || typeof command !== "string") {
       throw new Error("command is required");
@@ -115,36 +127,108 @@ export function createTerminalSessionService({
     sessions.set(session.id, session);
     latestSessionId = session.id;
 
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    let cancelled = false;
+    let resolveDone;
+    const done = new Promise((resolve) => {
+      resolveDone = resolve;
+    });
+
+    function settle(result = {}) {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener("abort", abortRun);
+      onFinish?.();
+      resolveDone({
+        stdout,
+        stderr,
+        exitCode: result.exitCode ?? null,
+        error: cancelled ? "cancelled" : result.error ?? null,
+        cancelled,
+        terminalSession: snapshotSession(session),
+      });
+    }
+
+    function abortRun() {
+      if (settled) return;
+      cancelled = true;
+      appendOutput(session, { stream: "system", text: "cancel requested" });
+      terminateProcessTree(session.child);
+      finishSession(session, { status: "cancelled", error: "cancelled" });
+      settle({ error: "cancelled" });
+    }
+
+    if (signal?.aborted) {
+      session.status = "cancelled";
+      session.finishedAt = now();
+      session.error = "cancelled";
+      emit(session);
+      settle({ error: "cancelled" });
+      return { session, done };
+    }
+
     const child = spawnProcess(session.command, session.args, {
       cwd: session.cwd,
-      env,
+      env: processEnv,
       shell,
       windowsHide: true,
     });
     session.child = child;
     appendOutput(session, {
       stream: "system",
-      text: `$ ${[session.command, ...session.args].join(" ")}\ncwd: ${session.cwd}\npid: ${child.pid ?? "unknown"}`,
+      text: `$ ${buildCommandLine(session)}\ncwd: ${session.cwd}\npid: ${child.pid ?? "unknown"}`,
     });
+    onStarted?.(snapshotSession(session));
+    signal?.addEventListener("abort", abortRun, { once: true });
 
     child.stdout?.setEncoding("utf8");
     child.stderr?.setEncoding("utf8");
     child.stdout?.on("data", (chunk) => {
+      stdout += chunk;
       appendOutput(session, { stream: "stdout", text: chunk });
+      onStdoutChunk?.(chunk);
     });
     child.stderr?.on("data", (chunk) => {
+      stderr += chunk;
       appendOutput(session, { stream: "stderr", text: chunk });
+      onStderrChunk?.(chunk);
     });
     child.on("error", (error) => {
+      if (settled) return;
       appendOutput(session, { stream: "system", text: `error: ${error.message}` });
       finishSession(session, { error: error.message });
+      settle({ error: error.message });
     });
     child.on("close", (exitCode) => {
+      if (settled) return;
       appendOutput(session, { stream: "system", text: `exited with code ${exitCode}` });
       finishSession(session, { exitCode });
+      settle({ exitCode });
     });
 
+    if (prompt) {
+      child.stdin?.write(prompt);
+    }
+    if (closeStdin) {
+      child.stdin?.end();
+    }
+
+    return { session, done };
+  }
+
+  function createTerminalSession(input = {}) {
+    const { session } = startTerminalProcess(input);
     return snapshotSession(session);
+  }
+
+  function runTerminalCommand(input = {}) {
+    const { done } = startTerminalProcess({
+      ...input,
+      closeStdin: input.closeStdin ?? true,
+    });
+    return done;
   }
 
   function writeTerminalSessionInput({ sessionId, input } = {}) {
@@ -182,6 +266,7 @@ export function createTerminalSessionService({
     createTerminalSession,
     getLatestTerminalSession,
     getTerminalSession,
+    runTerminalCommand,
     writeTerminalSessionInput,
   };
 }

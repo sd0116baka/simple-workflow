@@ -39,6 +39,12 @@ export function buildRecommendationRunViewModel({
     { label: "任务池", value: `${poolEntryCount ?? 0} 个条目` },
     { label: "启动检查", value: startupCheck ? String(startupCheck.canStartWork) : "未载入" },
   ];
+  if (recommendationRun?.terminalSessionId) {
+    recommendationInputs.push({
+      label: "终端会话",
+      value: recommendationRun.terminalSessionId,
+    });
+  }
   const controls = {
     runDisabled: recommendationRun?.status === "running",
     cancelHidden: recommendationRun?.status !== "running",

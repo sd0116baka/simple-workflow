@@ -58,6 +58,9 @@ test("recommendation command start creates controller and hands command to compl
 
   calls[2][1].run.args.push("mutated");
   assert.deepEqual(run.args, ["run"]);
+  calls[2][1].onTerminalSession({ id: "terminal-session-1" });
+  assert.equal(run.terminalSessionId, "terminal-session-1");
+  assert.equal(calls.at(-1)[0], "emit");
 
   capturedProgress({
     stage: "recommendation",

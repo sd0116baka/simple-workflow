@@ -53,6 +53,7 @@ test("recommendation run snapshot fills optional fields with read defaults", () 
   assert.equal(snapshot.stdout, "");
   assert.equal(snapshot.stderr, "");
   assert.equal(snapshot.exitCode, null);
+  assert.equal(snapshot.terminalSessionId, null);
 });
 
 test("recommendation run snapshot uses fresh field default collections", () => {

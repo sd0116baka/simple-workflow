@@ -18,6 +18,7 @@ test("recommendation run field defaults cover downstream workflow states", () =>
   assert.equal(fields.taskCloseout, null);
   assert.equal(fields.stdout, "");
   assert.equal(fields.exitCode, null);
+  assert.equal(fields.terminalSessionId, null);
 });
 
 test("recommendation run field defaults return fresh mutable collections", () => {
@@ -51,6 +52,10 @@ test("recommendation run field clone groups classify default fields", () => {
   );
   assert.equal(
     Object.hasOwn(RECOMMENDATION_RUN_FIELD_CLONE_GROUPS.scalarDefaults, "exitCode"),
+    true,
+  );
+  assert.equal(
+    Object.hasOwn(RECOMMENDATION_RUN_FIELD_CLONE_GROUPS.scalarDefaults, "terminalSessionId"),
     true,
   );
 });

@@ -20,13 +20,7 @@ export function createWorkflowService({
   getRepositoryStatus = () => readRepositoryStatus({ cwd: repositoryDir }),
   recommendationPromptPath = join(repositoryDir, "project_profiles", "recommender-agent.prompt.md"),
   taskContextPackageStoreDir = join(repositoryDir, ".workflow", "task-context-packages"),
-  runRecommendationCommand = ({ prompt, onProgress, signal }) =>
-    runOpencodeRecommendation({
-      prompt,
-      cwd: repositoryDir,
-      onProgress,
-      signal,
-    }),
+  runRecommendationCommand = null,
   runMainAgentSession,
   runExecutionAgentSession = runOpencodeExecutionAgentSession,
   runReviewAgentSession,
@@ -43,6 +37,20 @@ export function createWorkflowService({
     watchDebounceMs,
     onTaskChange: workflowEventBus.emitTaskChange,
   });
+  const terminalSessionService = createTerminalSessionService({
+    repositoryDir,
+    emitTerminalSessionChanged: workflowEventBus.emitTerminalSessionChanged,
+  });
+  const effectiveRunRecommendationCommand = runRecommendationCommand
+    ?? (({ prompt, onProgress, onTerminalSession, signal }) =>
+      runOpencodeRecommendation({
+        prompt,
+        cwd: repositoryDir,
+        onProgress,
+        onTerminalSession,
+        signal,
+        terminalSessionService,
+      }));
 
   const taskContextMutationService = createWorkflowTaskContextMutationService({
     taskContextWorkspace,
@@ -55,7 +63,7 @@ export function createWorkflowService({
     taskContextWorkspace,
     getStartupCheck: () => workflowReadModelService.getStartupCheck(),
     persistTaskContextPackage: taskContextMutationService.persistTaskContextPackage,
-    runRecommendationCommand,
+    runRecommendationCommand: effectiveRunRecommendationCommand,
     runMainAgentSession,
     runExecutionAgentSession,
     runReviewAgentSession,
@@ -82,10 +90,6 @@ export function createWorkflowService({
     storeDir: taskContextPackageStoreDir,
     recommendationRunLifecycle,
     emitTaskChange: workflowEventBus.emitTaskChange,
-  });
-  const terminalSessionService = createTerminalSessionService({
-    repositoryDir,
-    emitTerminalSessionChanged: workflowEventBus.emitTerminalSessionChanged,
   });
   const workflowReadModelService = createWorkflowReadModelService({
     tasksDir,

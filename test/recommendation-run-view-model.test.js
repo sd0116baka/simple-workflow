@@ -46,6 +46,7 @@ test("recommendation run view model renders a running run", () => {
       id: "recommendation-run:001",
       startedAt: "2026-05-21T10:00:00.000Z",
       args: ["run", "--format", "json"],
+      terminalSessionId: "terminal-session-1",
       progress: [{ message: "启动推荐器" }],
       executionIntent: {
         recommendedPackageId: "task-context-package:tasks/task-001.yaml",
@@ -62,6 +63,10 @@ test("recommendation run view model renders a running run", () => {
   assert.equal(viewModel.metaText, "opencode run --format json");
   assert.equal(viewModel.controls.runDisabled, true);
   assert.equal(viewModel.controls.cancelHidden, false);
+  assert.deepEqual(viewModel.recommendationInputs.at(-1), {
+    label: "终端会话",
+    value: "terminal-session-1",
+  });
   assert.equal(viewModel.admissionInputs[0].value, "task-context-package:tasks/task-001.yaml");
   assert.match(viewModel.rawText, /运行进度/);
 });

@@ -18,6 +18,10 @@ export function startRecommendationRunCommand({
       prompt: run.prompt,
       run: toRecommendationSnapshot(run),
       onProgress: appendProgress,
+      onTerminalSession: (terminalSession) => {
+        run.terminalSessionId = terminalSession?.id ?? null;
+        emitRecommendationChanged(run);
+      },
       signal: controller.signal,
     }),
   );

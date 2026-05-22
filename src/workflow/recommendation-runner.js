@@ -13,9 +13,41 @@ export function runOpencodeRecommendation({
   cwd = process.cwd(),
   env = process.env,
   onProgress,
+  onTerminalSession,
   signal,
+  terminalSessionService = null,
 } = {}) {
   let stdoutBuffer = "";
+  const processStdoutChunk = (chunk) => {
+    stdoutBuffer = readJsonEventLines(stdoutBuffer + chunk, onProgress);
+  };
+  const flushStdoutBuffer = () => {
+    if (stdoutBuffer) {
+      stdoutBuffer = readJsonEventLines(`${stdoutBuffer}\n`, onProgress);
+    }
+  };
+
+  if (terminalSessionService) {
+    return terminalSessionService.runTerminalCommand({
+      command,
+      args,
+      cwd,
+      env,
+      prompt,
+      signal,
+      title: "任务推荐器",
+      onStarted: onTerminalSession,
+      onStdoutChunk: processStdoutChunk,
+      onFinish: flushStdoutBuffer,
+    }).then((result) => ({
+      stdout: extractTextFromJsonEvents(result.stdout),
+      stderr: result.stderr,
+      exitCode: result.exitCode,
+      error: result.error,
+      terminalSessionId: result.terminalSession?.id ?? null,
+    }));
+  }
+
   return runAgentProcess({
     command,
     args,
@@ -24,14 +56,8 @@ export function runOpencodeRecommendation({
     prompt,
     signal,
     onProgress,
-    onStdoutChunk: (chunk) => {
-      stdoutBuffer = readJsonEventLines(stdoutBuffer + chunk, onProgress);
-    },
-    beforeFinish: () => {
-      if (stdoutBuffer) {
-        stdoutBuffer = readJsonEventLines(`${stdoutBuffer}\n`, onProgress);
-      }
-    },
+    onStdoutChunk: processStdoutChunk,
+    beforeFinish: flushStdoutBuffer,
   }).then((result) => {
     return {
       stdout: extractTextFromJsonEvents(result.stdout),
