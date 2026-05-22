@@ -25,6 +25,21 @@ test("builds workflow runtime config from environment paths", () => {
     config.taskContextPackageStoreDir,
     "D:\\Project\\simple-workflow\\.workflow\\test-environment\\repository\\.workflow\\task-context-packages",
   );
+  assert.equal(
+    config.recommendationPromptPath,
+    "D:\\Project\\simple-workflow\\project_profiles\\recommender-agent.prompt.md",
+  );
+});
+
+test("allows overriding recommendation prompt path", () => {
+  const config = runtimeConfigFromEnv({
+    SIMPLE_WORKFLOW_RECOMMENDATION_PROMPT_PATH: "D:\\Project\\simple-workflow\\.workflow\\prompt.md",
+  }, "D:\\Project\\simple-workflow");
+
+  assert.equal(
+    config.recommendationPromptPath,
+    "D:\\Project\\simple-workflow\\.workflow\\prompt.md",
+  );
 });
 
 test("builds server port from environment with the default management port", () => {

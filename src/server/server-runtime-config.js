@@ -14,9 +14,14 @@ export function runtimeConfigFromEnv(env = process.env, cwd = rootDir) {
   const taskContextPackageStoreDir = resolve(
     env.SIMPLE_WORKFLOW_CONTEXT_STORE_DIR ?? join(repositoryDir, ".workflow", "task-context-packages"),
   );
+  const recommendationPromptPath = resolve(
+    env.SIMPLE_WORKFLOW_RECOMMENDATION_PROMPT_PATH
+      ?? join(cwd, "project_profiles", "recommender-agent.prompt.md"),
+  );
   return {
     repositoryDir,
     tasksDir,
     taskContextPackageStoreDir,
+    recommendationPromptPath,
   };
 }
