@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { renderWorkflowStageTimelineSection } from "../public/workflow-stage-timeline-section-renderer.js";
+import { renderWorkflowStageTimelineSection } from "../public/workflow-section-renderer.js";
 import { FakeElement, markerElement } from "./support/fake-dom.js";
 
 function createElements() {

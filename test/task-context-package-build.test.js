@@ -4,7 +4,7 @@ import {
   taskContextPackageFromEntry,
   taskContextPackagesFromEntries,
 } from "../src/workflow/task-context-package-build.js";
-import { taskPoolEntryFromSource } from "../src/workflow/task-pool-entry.js";
+import { taskPoolEntryFromSource } from "../src/workflow/task-pool.js";
 import {
   createExistingTaskContextPackage,
   createTaskSource,

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildValidationViewModel } from "../public/workflow-overview-validation-view-model.js";
+import { buildValidationViewModel } from "../public/workflow-overview-validation-renderer.js";
 
 test("overview validation view model renders empty validation state", () => {
   assert.deepEqual(buildValidationViewModel(null), {

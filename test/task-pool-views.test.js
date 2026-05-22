@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildTaskPoolViews } from "../src/workflow/task-pool-views.js";
+import { buildTaskPoolViews } from "../src/workflow/task-pool.js";
 
 test("task pool views expose candidate tasks and attention packages", () => {
   const views = buildTaskPoolViews([

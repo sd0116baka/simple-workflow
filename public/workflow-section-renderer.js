@@ -2,7 +2,7 @@ import { buildAutoMergeExecutionSectionViewModel } from "./workflow-auto-merge-e
 import { buildAutoMergeSectionViewModel } from "./workflow-auto-merge-section-view-model.js";
 import { renderWorkflowArtifactSection } from "./workflow-artifact-section-renderer.js";
 import { buildHumanDecisionSectionViewModel } from "./workflow-human-decision-section-view-model.js";
-import { renderWorkflowStageTimelineSection } from "./workflow-stage-timeline-section-renderer.js";
+import { buildStageTimelineSectionViewModel } from "./stage-timeline-section-view-model.js";
 import { buildTaskCloseoutSectionViewModel } from "./workflow-task-closeout-section-view-model.js";
 
 export function createWorkflowSectionRenderer({
@@ -76,4 +76,22 @@ export function createWorkflowSectionRenderer({
     renderTaskCloseout,
     renderStageTimeline,
   };
+}
+
+export function renderWorkflowStageTimelineSection({
+  elements,
+  taskContextPackage,
+  workflowPanelRenderers,
+}) {
+  const viewModel = buildStageTimelineSectionViewModel(taskContextPackage);
+  elements.panel.replaceChildren();
+  elements.status.textContent = viewModel.statusText;
+
+  if (viewModel.emptyText) {
+    elements.panel.textContent = viewModel.emptyText;
+    return viewModel;
+  }
+
+  elements.panel.append(workflowPanelRenderers.createStageTimelinePanel(viewModel));
+  return viewModel;
 }

@@ -2,12 +2,8 @@ import {
   applyAppendRequestToTaskPackage,
 } from "./task-package-append-request.js";
 import { assertAppendRequest } from "./task-package-append-validation.js";
-import {
-  entryStatusFromPackage,
-  taskPoolEntriesFromSources,
-} from "./task-pool-entry.js";
 import { taskContextPackagesFromEntries } from "./task-context-package-build.js";
-import { buildTaskPoolViews } from "./task-pool-views.js";
+import { cloneJsonValue } from "./json-value.js";
 
 export function buildTaskPool(tasks, existingTaskPool = null) {
   const entries = taskPoolEntriesFromSources(tasks);
@@ -49,5 +45,49 @@ export function applyAppendRequest(taskPool, appendRequest, { currentWorkStage }
     ...taskPool,
     taskContextPackages: updatedPackages,
     views: buildTaskPoolViews(updatedPackages),
+  };
+}
+
+export function taskPoolEntryFromSource(task) {
+  return {
+    id: task.parsed.id ?? task.id,
+    packageId: `task-context-package:tasks/${task.fileName}`,
+    sourceFile: task.fileName,
+    title: task.parsed.title ?? null,
+    type: task.parsed.type ?? null,
+    priority: task.parsed.priority ?? null,
+    status: task.validation?.status === "valid" ? "ready" : "blocked",
+    parsed: task.parsed,
+    validation: task.validation,
+  };
+}
+
+export function taskPoolEntriesFromSources(tasks) {
+  return tasks
+    .filter((task) => task.parseError === null && task.parsed)
+    .map(taskPoolEntryFromSource);
+}
+
+export function entryStatusFromPackage(entry, taskPackage) {
+  if (entry.status !== "ready") return entry.status;
+  return taskPackage.currentWorkStage === "task-pool"
+    ? "ready"
+    : taskPackage.currentWorkStage;
+}
+
+export function buildTaskPoolViews(taskContextPackages) {
+  return {
+    candidateTasks: taskContextPackages
+      .filter((taskPackage) =>
+        taskPackage.qualityGate.outcome === "pass"
+          && taskPackage.currentWorkStage === "task-pool")
+      .map((taskPackage) => ({
+        packageId: taskPackage.packageId,
+        taskDraft: cloneJsonValue(taskPackage.taskDraft),
+      })),
+    needsAttention: taskContextPackages
+      .filter((taskPackage) => taskPackage.recognition.outcome === "incomplete")
+      .map((taskPackage) => taskPackage.packageId),
+    brokenContent: [],
   };
 }

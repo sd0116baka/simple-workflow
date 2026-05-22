@@ -1,4 +1,3 @@
-import { buildRecommendationPrompt } from "./recommendation-prompt.js";
 import { createEmptyRecommendationRunFields } from "./recommendation-run-field-defaults.js";
 import { OPENCODE_RECOMMENDATION_ARGS } from "./recommendation-runner.js";
 
@@ -39,4 +38,21 @@ export function createRunningRecommendationRun({
       candidateTasks: taskPool.views.candidateTasks,
     }),
   };
+}
+
+export function buildRecommendationPrompt({ basePrompt, candidateTasks = [] } = {}) {
+  const context = {
+    candidateTasks,
+  };
+
+  return [
+    basePrompt,
+    "",
+    "系统注入的推荐器输入如下。你只能使用这段 JSON 中的 candidateTasks 作为候选任务来源：",
+    "",
+    "```json",
+    JSON.stringify(context, null, 2),
+    "```",
+    "",
+  ].join("\n");
 }

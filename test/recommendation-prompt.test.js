@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildRecommendationPrompt } from "../src/workflow/recommendation-prompt.js";
+import { buildRecommendationPrompt } from "../src/workflow/recommendation-run-records.js";
 
 test("recommendation prompt injects only task pool candidates", () => {
   const prompt = buildRecommendationPrompt({

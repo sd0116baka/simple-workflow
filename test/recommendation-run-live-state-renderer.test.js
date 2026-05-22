@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { renderRecommendationRunLiveState } from "../public/recommendation-run-live-state-renderer.js";
+import { renderRecommendationRunLiveState } from "../public/workflow-recommendation-run-renderer.js";
 import { fakeElements } from "./support/fake-dom.js";
 import { createRunningRecommendationRunFixture } from "./support/recommendation-run-fixtures.js";
 

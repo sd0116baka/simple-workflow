@@ -4,7 +4,7 @@ import {
   entryStatusFromPackage,
   taskPoolEntriesFromSources,
   taskPoolEntryFromSource,
-} from "../src/workflow/task-pool-entry.js";
+} from "../src/workflow/task-pool.js";
 import { createTaskSource } from "./support/task-pool-fixtures.js";
 
 test("task pool entry projection maps valid and invalid task sources", () => {
