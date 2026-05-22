@@ -26,7 +26,9 @@ export function buildRecommendationRunViewModel({
   const recommendationInputs = [
     {
       label: "模式",
-      value: recommendationRun?.mode === "probe" ? "推荐探针" : "工作流流程",
+      value: recommendationRun?.mode === "probe"
+        ? "推荐探针（不启动后续 Agent）"
+        : "完整 Agent 流程",
     },
     { label: "prompt", value: "project_profiles/recommender-agent.prompt.md" },
     { label: "命令", value: "opencode run --format json" },

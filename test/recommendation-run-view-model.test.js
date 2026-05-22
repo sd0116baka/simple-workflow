@@ -35,6 +35,10 @@ test("recommendation run view model renders the empty state", () => {
     { label: "任务池", value: "3 个条目" },
     { label: "启动检查", value: "true" },
   ]);
+  assert.deepEqual(viewModel.recommendationInputs[0], {
+    label: "模式",
+    value: "完整 Agent 流程",
+  });
 });
 
 test("recommendation run view model renders a running run", () => {
@@ -69,6 +73,19 @@ test("recommendation run view model renders a running run", () => {
   });
   assert.equal(viewModel.admissionInputs[0].value, "task-context-package:tasks/task-001.yaml");
   assert.match(viewModel.rawText, /运行进度/);
+});
+
+test("recommendation run view model labels probe mode as recommendation only", () => {
+  const viewModel = buildRecommendationRunViewModel({
+    recommendationRun: createSucceededRecommendationRunFixture({
+      mode: "probe",
+    }),
+  });
+
+  assert.deepEqual(viewModel.recommendationInputs[0], {
+    label: "模式",
+    value: "推荐探针（不启动后续 Agent）",
+  });
 });
 
 test("recommendation run view model renders terminal states and output", () => {

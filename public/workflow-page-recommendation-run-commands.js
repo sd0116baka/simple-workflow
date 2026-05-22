@@ -15,7 +15,7 @@ export function createWorkflowPageRecommendationRunCommands({
     return startRecommendationRunAction({
       workflowApi,
       mode,
-      pendingText: isProbe ? "正在启动推荐探针..." : "正在启动完整流程...",
+      pendingText: isProbe ? "正在启动推荐探针..." : "正在启动完整 Agent 流程...",
       setRecommendationRun,
       renderRecommendationRun,
       setRecommendationStatus: pageStatus.setRecommendationStatus,
