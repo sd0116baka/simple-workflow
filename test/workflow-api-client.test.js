@@ -1,0 +1,107 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  createWorkflowApiClient,
+  WorkflowApiError,
+} from "../public/workflow-api-client.js";
+
+function jsonResponse(payload, { ok = true, status = 200 } = {}) {
+  return {
+    ok,
+    status,
+    json: async () => payload,
+  };
+}
+
+test("workflow API client loads the workflow snapshot from the three source endpoints", async () => {
+  const calls = [];
+  const client = createWorkflowApiClient({
+    fetchImpl: async (path, options = {}) => {
+      calls.push({ path, options });
+      if (path === "/api/tasks") return jsonResponse({ tasks: [{ fileName: "task-001.yaml" }] });
+      if (path === "/api/task-pool") return jsonResponse({ taskPool: { entries: [{ id: "task-001" }] } });
+      if (path === "/api/startup-check") return jsonResponse({ startupCheck: { canStartWork: true } });
+      throw new Error(`unexpected path: ${path}`);
+    },
+  });
+
+  const snapshot = await client.loadWorkflowSnapshot();
+
+  assert.deepEqual(snapshot, {
+    tasks: [{ fileName: "task-001.yaml" }],
+    taskPool: { entries: [{ id: "task-001" }] },
+    startupCheck: { canStartWork: true },
+  });
+  assert.deepEqual(calls.map((call) => call.path), [
+    "/api/tasks",
+    "/api/task-pool",
+    "/api/startup-check",
+  ]);
+});
+
+test("workflow API client posts action payloads as JSON", async () => {
+  const calls = [];
+  const client = createWorkflowApiClient({
+    fetchImpl: async (path, options = {}) => {
+      calls.push({ path, options });
+      return jsonResponse({ recommendationRun: { id: "recommendation-run:001" } });
+    },
+  });
+
+  const payload = await client.continueConvergenceWithGuidance({
+    packageId: "task-context-package:tasks/task-001.yaml",
+    guidance: "补充边界测试",
+    expectedNextOutcome: "下一轮收敛成功",
+  });
+
+  assert.equal(payload.recommendationRun.id, "recommendation-run:001");
+  assert.equal(calls[0].path, "/api/human-decisions/continue-convergence-with-guidance");
+  assert.equal(calls[0].options.method, "POST");
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    packageId: "task-context-package:tasks/task-001.yaml",
+    guidance: "补充边界测试",
+    expectedNextOutcome: "下一轮收敛成功",
+  });
+  assert.deepEqual(calls[0].options.headers, {
+    "content-type": "application/json",
+  });
+});
+
+test("workflow API client preserves error status and payload", async () => {
+  const client = createWorkflowApiClient({
+    fetchImpl: async () => jsonResponse(
+      {
+        error: "已有推荐运行正在执行。",
+        recommendationRun: { id: "recommendation-run:running" },
+      },
+      { ok: false, status: 409 },
+    ),
+  });
+
+  await assert.rejects(
+    () => client.startRecommendationRun(),
+    (error) => {
+      assert.equal(error instanceof WorkflowApiError, true);
+      assert.equal(error.status, 409);
+      assert.equal(error.message, "已有推荐运行正在执行。");
+      assert.equal(error.payload.recommendationRun.id, "recommendation-run:running");
+      return true;
+    },
+  );
+});
+
+test("workflow API client probes restart readiness without forcing JSON parsing", async () => {
+  const calls = [];
+  const response = { ok: true, status: 204 };
+  const client = createWorkflowApiClient({
+    now: () => 123456,
+    fetchImpl: async (path, options = {}) => {
+      calls.push({ path, options });
+      return response;
+    },
+  });
+
+  assert.equal(await client.probeStartupCheck(), response);
+  assert.equal(calls[0].path, "/api/startup-check?restartProbe=123456");
+  assert.deepEqual(calls[0].options, { cache: "no-store" });
+});

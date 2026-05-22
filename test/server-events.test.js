@@ -1,7 +1,7 @@
 import { once } from "node:events";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createApp } from "../src/server/server.js";
+import { createApp } from "../src/server/server-app.js";
 
 test("GET /api/events streams workflow events as server-sent events", async (t) => {
   const listeners = new Set();

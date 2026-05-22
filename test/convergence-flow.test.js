@@ -1,72 +1,50 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runConvergence } from "../src/workflow/convergence-flow.js";
+import { createArtifactRecordFixture } from "./support/task-context-package-fixtures.js";
+import { createConvergenceReadyPackageFixture } from "./support/convergence-ready-package-fixtures.js";
 
 function convergenceReadyPackage() {
-  return {
-    packageId: "task-context-package:tasks/task-003.yaml",
-    artifacts: {
-      executionIntent: {
-        artifactId: "executionIntent",
-        body: {},
-        appendedAt: "2026-05-18T09:00:00.000Z",
-      },
-      executionAuthorization: {
-        artifactId: "executionAuthorization",
-        body: {},
-        appendedAt: "2026-05-18T09:01:00.000Z",
-      },
-      executionReport: [
-        {
-          artifactId: "executionReport:001",
-          body: {},
-          appendedAt: "2026-05-18T10:00:01.000Z",
-        },
-      ],
-      reviewReport: [
-        {
-          artifactId: "reviewReport:001",
-          body: {},
-          appendedAt: "2026-05-18T10:00:02.000Z",
-        },
-      ],
-    },
-    agentRuns: [
-      {
-        runId: "main-agent:initialization",
-        role: "main",
-        sessionId: "session:main",
-        inputArtifactRefs: ["taskDraft", "executionIntent", "executionAuthorization"],
-        outputArtifactRefs: [],
-        status: "succeeded",
-        startedAt: "2026-05-18T10:00:00.000Z",
-        finishedAt: "2026-05-18T10:00:00.000Z",
-      },
-    ],
-  };
+  return createConvergenceReadyPackageFixture();
 }
 
-test("runs convergence with main agent session and requests advice append", () => {
-  const result = runConvergence({
+test("runs convergence with main agent session and requests advice append", async () => {
+  let observed = null;
+  const result = await runConvergence({
     taskContextPackage: convergenceReadyPackage(),
-    runAgentSession: ({ role, sessionId }) => ({
-      sessionId: `resumed:${role}:${sessionId}`,
-      status: "succeeded",
-    }),
+    runAgentSession: ({ role, sessionId, runId, inputArtifactRefs }) => {
+      observed = { role, sessionId, runId, inputArtifactRefs };
+      return {
+        sessionId: `resumed:${role}:${sessionId}`,
+        status: "succeeded",
+      };
+    },
     now: () => "2026-05-18T10:00:03.000Z",
   });
 
   assert.equal(result.error, null);
   assert.equal(result.appendRequest.packageId, "task-context-package:tasks/task-003.yaml");
   assert.equal(result.appendRequest.artifactType, "convergenceAdvice");
-  assert.equal(result.appendRequest.artifact.summary, "stub convergence advice");
-  assert.deepEqual(result.appendRequest.artifact.basis, [
-    "executionReport:001",
-    "reviewReport:001",
-  ]);
+  assert.deepEqual(result.appendRequest.artifact, {
+    summary: "stub convergence advice",
+    nextAction: "等待真实 main agent 根据执行和审查结果给出下一轮执行意见。",
+    basis: ["executionReport:001", "reviewReport:001"],
+  });
   assert.equal(result.appendRequest.agentRun.runId, "main-agent:convergence:001");
   assert.equal(result.appendRequest.agentRun.role, "main");
   assert.equal(result.appendRequest.agentRun.sessionId, "resumed:main:session:main");
+  assert.deepEqual(observed, {
+    role: "main",
+    sessionId: "session:main",
+    runId: "main-agent:convergence:001",
+    inputArtifactRefs: [
+      "taskDraft",
+      "executionIntent",
+      "executionAuthorization",
+      "executionReport:001",
+      "reviewReport:001",
+    ],
+  });
   assert.deepEqual(result.appendRequest.agentRun.inputArtifactRefs, [
     "taskDraft",
     "executionIntent",
@@ -76,46 +54,46 @@ test("runs convergence with main agent session and requests advice append", () =
   ]);
 });
 
-test("increments convergence run id from existing advice", () => {
+test("increments convergence run id from existing advice", async () => {
   const taskPackage = convergenceReadyPackage();
   taskPackage.artifacts.convergenceAdvice = [
-    {
-      artifactId: "convergenceAdvice:001",
-      body: {},
+    createArtifactRecordFixture("convergenceAdvice:001", {}, {
       appendedAt: "2026-05-18T10:00:03.000Z",
-    },
+    }),
   ];
 
-  const result = runConvergence({
+  const result = await runConvergence({
     taskContextPackage: taskPackage,
   });
 
   assert.equal(result.appendRequest.agentRun.runId, "main-agent:convergence:002");
 });
 
-test("completes task after a reviewed execution that used convergence advice", () => {
+test("completes task after a reviewed execution that used convergence advice", async () => {
   const taskPackage = convergenceReadyPackage();
   taskPackage.artifacts.convergenceAdvice = [
-    {
-      artifactId: "convergenceAdvice:001",
-      body: {},
+    createArtifactRecordFixture("convergenceAdvice:001", {}, {
       appendedAt: "2026-05-18T10:00:03.000Z",
-    },
+    }),
   ];
-  taskPackage.artifacts.executionReport.push({
-    artifactId: "executionReport:002",
-    body: {},
-    appendedAt: "2026-05-18T10:00:04.000Z",
-  });
-  taskPackage.artifacts.reviewReport.push({
-    artifactId: "reviewReport:002",
-    body: {
-      outcome: "passed",
-    },
-    appendedAt: "2026-05-18T10:00:05.000Z",
-  });
+  taskPackage.artifacts.executionReport.push(
+    createArtifactRecordFixture("executionReport:002", {}, {
+      appendedAt: "2026-05-18T10:00:04.000Z",
+    }),
+  );
+  taskPackage.artifacts.reviewReport.push(
+    createArtifactRecordFixture(
+      "reviewReport:002",
+      {
+        outcome: "passed",
+      },
+      {
+        appendedAt: "2026-05-18T10:00:05.000Z",
+      },
+    ),
+  );
 
-  const result = runConvergence({
+  const result = await runConvergence({
     taskContextPackage: taskPackage,
   });
 
@@ -135,32 +113,38 @@ test("completes task after a reviewed execution that used convergence advice", (
   ]);
 });
 
-test("returns convergence failure when automatic iteration budget is exhausted", () => {
+test("returns convergence failure when automatic iteration budget is exhausted", async () => {
   const taskPackage = convergenceReadyPackage();
   taskPackage.artifacts.convergenceAdvice = [
-    {
-      artifactId: "convergenceAdvice:001",
-      body: {
+    createArtifactRecordFixture(
+      "convergenceAdvice:001",
+      {
         summary: "first fix",
       },
-      appendedAt: "2026-05-18T10:00:03.000Z",
-    },
+      {
+        appendedAt: "2026-05-18T10:00:03.000Z",
+      },
+    ),
   ];
-  taskPackage.artifacts.executionReport.push({
-    artifactId: "executionReport:002",
-    body: {},
-    appendedAt: "2026-05-18T10:00:04.000Z",
-  });
-  taskPackage.artifacts.reviewReport.push({
-    artifactId: "reviewReport:002",
-    body: {
-      outcome: "failed",
-      findings: [{ code: "still-broken" }],
-    },
-    appendedAt: "2026-05-18T10:00:05.000Z",
-  });
+  taskPackage.artifacts.executionReport.push(
+    createArtifactRecordFixture("executionReport:002", {}, {
+      appendedAt: "2026-05-18T10:00:04.000Z",
+    }),
+  );
+  taskPackage.artifacts.reviewReport.push(
+    createArtifactRecordFixture(
+      "reviewReport:002",
+      {
+        outcome: "failed",
+        findings: [{ code: "still-broken" }],
+      },
+      {
+        appendedAt: "2026-05-18T10:00:05.000Z",
+      },
+    ),
+  );
 
-  const result = runConvergence({
+  const result = await runConvergence({
     taskContextPackage: taskPackage,
     maxIterations: 1,
   });
@@ -172,29 +156,31 @@ test("returns convergence failure when automatic iteration budget is exhausted",
     "reviewReport:002",
   ]);
   assert.deepEqual(result.appendRequest.artifact.attemptedFixes, ["convergenceAdvice:001"]);
+  assert.deepEqual(result.appendRequest.artifact.unresolvedIssues, [{ code: "still-broken" }]);
+  assert.equal(result.appendRequest.artifact.completedIterations, 1);
   assert.deepEqual(result.appendRequest.agentRun.outputArtifactRefs, []);
 });
 
-test("includes human convergence guidance in the next convergence input", () => {
+test("includes human convergence guidance in the next convergence input", async () => {
   const taskPackage = convergenceReadyPackage();
   taskPackage.artifacts.convergenceFailure = [
-    {
-      artifactId: "convergenceFailure:001",
-      body: {},
+    createArtifactRecordFixture("convergenceFailure:001", {}, {
       appendedAt: "2026-05-18T10:00:03.000Z",
-    },
+    }),
   ];
   taskPackage.artifacts.humanConvergenceGuidance = [
-    {
-      artifactId: "humanConvergenceGuidance:001",
-      body: {
+    createArtifactRecordFixture(
+      "humanConvergenceGuidance:001",
+      {
         guidance: "先修正状态泄漏。",
       },
-      appendedAt: "2026-05-18T10:00:04.000Z",
-    },
+      {
+        appendedAt: "2026-05-18T10:00:04.000Z",
+      },
+    ),
   ];
 
-  const result = runConvergence({
+  const result = await runConvergence({
     taskContextPackage: taskPackage,
   });
 
@@ -209,14 +195,27 @@ test("includes human convergence guidance in the next convergence input", () => 
   ]);
 });
 
-test("does not run convergence before review report exists", () => {
+test("does not run convergence before review report exists", async () => {
   const taskPackage = convergenceReadyPackage();
   delete taskPackage.artifacts.reviewReport;
 
-  const result = runConvergence({
+  const result = await runConvergence({
     taskContextPackage: taskPackage,
   });
 
   assert.equal(result.appendRequest, null);
   assert.match(result.error, /缺少 reviewReport/);
+});
+
+test("awaits asynchronous convergence session runners", async () => {
+  const result = await runConvergence({
+    taskContextPackage: convergenceReadyPackage(),
+    runAgentSession: async ({ runId }) => ({
+      sessionId: `async-session:${runId}`,
+      status: "succeeded",
+    }),
+  });
+
+  assert.equal(result.error, null);
+  assert.equal(result.appendRequest.agentRun.sessionId, "async-session:main-agent:convergence:001");
 });

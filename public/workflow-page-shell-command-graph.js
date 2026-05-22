@@ -1,0 +1,27 @@
+import { createWorkflowPageCommands } from "./workflow-page-commands.js";
+import { createWorkflowPageCommandTargets } from "./workflow-page-shell-targets.js";
+
+export function createWorkflowPageShellCommandGraph({
+  workflowApi,
+  elements,
+  workflowPageDataController,
+  showError,
+  createCommands = createWorkflowPageCommands,
+} = {}) {
+  const workflowPageCommands = createCommands({
+    workflowApi,
+    activeTaskContextPackage: workflowPageDataController.activeTaskContextPackage,
+    setRecommendationRun: workflowPageDataController.setRecommendationRun,
+    renderRecommendationRun: workflowPageDataController.renderRecommendationRun,
+    loadTasks: workflowPageDataController.loadTasks,
+    loadRecommendationRun: workflowPageDataController.loadRecommendationRun,
+    getSelectedFileName: workflowPageDataController.getSelectedFileName,
+    setSelectedFileName: workflowPageDataController.setSelectedFileName,
+    elements: createWorkflowPageCommandTargets(elements),
+    showError,
+  });
+
+  return {
+    workflowPageCommands,
+  };
+}

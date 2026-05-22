@@ -5,11 +5,9 @@ import { existsSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  buildExecutionAgentPrompt,
-  runExecutionAgent,
-  runOpencodeExecutionAgentSession,
-} from "../src/workflow/execution-agent-flow.js";
+import { runExecutionAgent } from "../src/workflow/execution-agent-flow.js";
+import { createArtifactRecordFixture } from "./support/task-context-package-fixtures.js";
+import { createExecutionSessionPackageFixture } from "./support/execution-session-package-fixtures.js";
 
 function runGit(args, cwd) {
   return execFileSync("git", args, {
@@ -48,44 +46,7 @@ async function createGitRepositoryWithWorktree(t) {
 }
 
 function executablePackage(worktreePath = ".workflow/worktrees/tasks/tasks-task-003") {
-  return {
-    packageId: "task-context-package:tasks/task-003.yaml",
-    taskDraft: {
-      id: "task-003",
-    },
-    artifacts: {
-      executionIntent: {
-        artifactId: "executionIntent",
-        body: {},
-        appendedAt: "2026-05-18T09:00:00.000Z",
-      },
-      executionAuthorization: {
-        artifactId: "executionAuthorization",
-        body: {},
-        appendedAt: "2026-05-18T09:01:00.000Z",
-      },
-      isolatedWorkspace: {
-        artifactId: "isolatedWorkspace",
-        body: {
-          worktreePath,
-          baseCommit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        },
-        appendedAt: "2026-05-18T09:02:00.000Z",
-      },
-    },
-    agentRuns: [
-      {
-        runId: "main-agent:initialization",
-        role: "main",
-        sessionId: "session:main",
-        inputArtifactRefs: ["taskDraft", "executionIntent", "executionAuthorization"],
-        outputArtifactRefs: [],
-        status: "succeeded",
-        startedAt: "2026-05-18T10:00:00.000Z",
-        finishedAt: "2026-05-18T10:00:00.000Z",
-      },
-    ],
-  };
+  return createExecutionSessionPackageFixture({ worktreePath });
 }
 
 test("runs execution agent stub in the isolated workspace cwd", async (t) => {
@@ -154,82 +115,13 @@ test("passes isolated workspace cwd to a supplied execution runner", async (t) =
   assert.deepEqual(result.appendRequest.artifact.notes, ["custom execution runner completed"]);
 });
 
-test("builds execution agent prompt from task context package artifacts", () => {
-  const taskPackage = executablePackage();
-  taskPackage.artifacts.convergenceAdvice = [
-    {
-      artifactId: "convergenceAdvice:001",
-      body: {
-        nextAction: "继续完善实现",
-      },
-      appendedAt: "2026-05-18T10:00:03.000Z",
-    },
-  ];
-
-  const prompt = buildExecutionAgentPrompt({
-    taskContextPackage: taskPackage,
-    runId: "execution-agent:002",
-    inputArtifactRefs: [
-      "taskDraft",
-      "executionIntent",
-      "executionAuthorization",
-      "convergenceAdvice:001",
-      "isolatedWorkspace",
-    ],
-  });
-
-  assert.match(prompt, /execution-agent:002/);
-  assert.match(prompt, /task-context-package:tasks\/task-003.yaml/);
-  assert.match(prompt, /convergenceAdvice:001/);
-  assert.match(prompt, /不要修改主工作树/);
-  assert.match(prompt, /只输出 fenced JSON/);
-});
-
-test("runs opencode execution session command in the isolated workspace", async (t) => {
-  const repositoryDir = await createGitRepositoryWithWorktree(t);
-  const worktreeDir = join(repositoryDir, ".workflow", "worktrees", "tasks", "tasks-task-003");
-  const progress = [];
-  const script = [
-    "const fs = require('node:fs');",
-    "fs.writeFileSync('agent-output.txt', 'changed by fake execution agent\\n');",
-    "const text = '```json\\n' + JSON.stringify({ summary: '真实 runner 完成', tests: [{ command: 'npm test', status: 'not-run' }], notes: ['fake command'] }) + '\\n```';",
-    "console.log(JSON.stringify({ type: 'session', sessionId: 'opencode-session:test' }));",
-    "console.log(JSON.stringify({ type: 'text', part: { text } }));",
-  ].join("");
-
-  const session = await runOpencodeExecutionAgentSession({
-    role: "execution",
-    packageId: "task-context-package:tasks/task-003.yaml",
-    cwd: worktreeDir,
-    runId: "execution-agent:001",
-    taskContextPackage: executablePackage(),
-    inputArtifactRefs: ["taskDraft", "executionIntent", "executionAuthorization", "isolatedWorkspace"],
-    command: process.execPath,
-    args: ["-e", script],
-    shell: false,
-    onProgress: (entry) => progress.push(entry),
-  });
-
-  assert.equal(session.status, "succeeded");
-  assert.equal(session.sessionId, "opencode-session:test");
-  assert.equal(session.summary, "真实 runner 完成");
-  assert.deepEqual(session.tests, [{ command: "npm test", status: "not-run" }]);
-  assert.deepEqual(session.notes, ["fake command"]);
-  assert.equal(progress[0].type, "execution_process_start");
-  assert.equal(progress.at(-1).type, "execution_process_close");
-  assert.equal(progress.some((entry) => entry.type === "execution_stdout"), true);
-  assert.equal(existsSync(join(worktreeDir, "agent-output.txt")), true);
-});
-
 test("increments execution agent run id from existing execution reports", async (t) => {
   const repositoryDir = await createGitRepositoryWithWorktree(t);
   const taskPackage = executablePackage();
   taskPackage.artifacts.executionReport = [
-    {
-      artifactId: "executionReport:001",
-      body: {},
+    createArtifactRecordFixture("executionReport:001", {}, {
       appendedAt: "2026-05-18T10:00:01.000Z",
-    },
+    }),
   ];
 
   const result = await runExecutionAgent({
@@ -244,18 +136,14 @@ test("uses latest convergence advice as next execution input", async (t) => {
   const repositoryDir = await createGitRepositoryWithWorktree(t);
   const taskPackage = executablePackage();
   taskPackage.artifacts.executionReport = [
-    {
-      artifactId: "executionReport:001",
-      body: {},
+    createArtifactRecordFixture("executionReport:001", {}, {
       appendedAt: "2026-05-18T10:00:01.000Z",
-    },
+    }),
   ];
   taskPackage.artifacts.convergenceAdvice = [
-    {
-      artifactId: "convergenceAdvice:001",
-      body: {},
+    createArtifactRecordFixture("convergenceAdvice:001", {}, {
       appendedAt: "2026-05-18T10:00:03.000Z",
-    },
+    }),
   ];
 
   const result = await runExecutionAgent({

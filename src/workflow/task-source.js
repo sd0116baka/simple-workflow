@@ -1,6 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
-import { parseRawTask } from "./task-parser.js";
+import YAML from "yaml";
 import { validateParsedTask } from "./task-validator.js";
 
 const SUPPORTED_EXTENSIONS = new Map([
@@ -10,6 +10,20 @@ const SUPPORTED_EXTENSIONS = new Map([
 
 export function isSupportedTaskFile(fileName) {
   return Boolean(fileName) && SUPPORTED_EXTENSIONS.has(extname(String(fileName)).toLowerCase());
+}
+
+function parseRawTask(task) {
+  try {
+    return {
+      parsed: YAML.parse(task.rawText),
+      parseError: null,
+    };
+  } catch (error) {
+    return {
+      parsed: null,
+      parseError: `YAML parse error: ${error.message}`,
+    };
+  }
 }
 
 export async function listRawTasks(tasksDir) {

@@ -1,0 +1,73 @@
+const WORKFLOW_PAGE_SELECTORS = {
+  taskList: "#taskList",
+  taskCount: "#taskCount",
+  taskPool: "#taskPool",
+  poolCount: "#poolCount",
+  startupCheckPanel: "#startupCheckPanel",
+  startupCheckStatus: "#startupCheckStatus",
+  selectedTitle: "#selectedTitle",
+  selectedMeta: "#selectedMeta",
+  rawText: "#rawText",
+  parsedText: "#parsedText",
+  parseStatus: "#parseStatus",
+  validationResult: "#validationResult",
+  validationStatus: "#validationStatus",
+  seedStateFixtureSelect: "#seedStateFixtureSelect",
+  seedStateFixturesButton: "#seedStateFixturesButton",
+  cleanupStateFixturesButton: "#cleanupStateFixturesButton",
+  restartButton: "#restartButton",
+  refreshButton: "#refreshButton",
+  recommendationStatus: "#recommendationStatus",
+  recommendationResult: "#recommendationResult",
+  runRecommendationButton: "#runRecommendationButton",
+  cancelRecommendationButton: "#cancelRecommendationButton",
+  taskPoolRaw: "#taskPoolRaw",
+  startupCheckRaw: "#startupCheckRaw",
+  recommendationRaw: "#recommendationRaw",
+  recommendationTerminal: "#recommendationTerminal",
+  recommendationIntentPanel: "#recommendationIntentPanel",
+  admissionStatus: "#admissionStatus",
+  admissionRaw: "#admissionRaw",
+  admissionPanel: "#admissionPanel",
+  stageTimelineStatus: "#stageTimelineStatus",
+  stageTimelinePanel: "#stageTimelinePanel",
+  taskContextPackageRaw: "#taskContextPackageRaw",
+  taskContextPackagePanel: "#taskContextPackagePanel",
+  taskContextPackageStatus: "#taskContextPackageStatus",
+  taskSourceInputs: "#taskSourceInputs",
+  taskPoolInputs: "#taskPoolInputs",
+  startupCheckInputs: "#startupCheckInputs",
+  recommendationInputs: "#recommendationInputs",
+  admissionInputs: "#admissionInputs",
+  humanDecisionStatus: "#humanDecisionStatus",
+  humanDecisionInputs: "#humanDecisionInputs",
+  humanDecisionRaw: "#humanDecisionRaw",
+  humanDecisionPanel: "#humanDecisionPanel",
+  autoMergeStatus: "#autoMergeStatus",
+  autoMergeInputs: "#autoMergeInputs",
+  autoMergeRaw: "#autoMergeRaw",
+  autoMergePanel: "#autoMergePanel",
+  autoMergeExecutionStatus: "#autoMergeExecutionStatus",
+  autoMergeExecutionInputs: "#autoMergeExecutionInputs",
+  autoMergeExecutionRaw: "#autoMergeExecutionRaw",
+  autoMergeExecutionPanel: "#autoMergeExecutionPanel",
+  taskCloseoutStatus: "#taskCloseoutStatus",
+  taskCloseoutInputs: "#taskCloseoutInputs",
+  taskCloseoutRaw: "#taskCloseoutRaw",
+  taskCloseoutPanel: "#taskCloseoutPanel",
+};
+
+export function workflowPageSelectors() {
+  return { ...WORKFLOW_PAGE_SELECTORS };
+}
+
+export function createWorkflowPageElements({
+  documentRef = document,
+} = {}) {
+  return Object.fromEntries(
+    Object.entries(WORKFLOW_PAGE_SELECTORS).map(([name, selector]) => [
+      name,
+      documentRef.querySelector(selector),
+    ]),
+  );
+}

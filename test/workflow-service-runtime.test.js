@@ -1,0 +1,189 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { createWorkflowServiceRuntime } from "../src/workflow/workflow-service-runtime.js";
+
+function createRuntimeHarness() {
+  const calls = [];
+  const latestRun = { id: "run-1", status: "completed" };
+  const listener = () => {};
+  const unsubscribe = () => {};
+  const runtime = createWorkflowServiceRuntime({
+    workflowReadModelService: {
+      listTasks() {
+        calls.push(["listTasks"]);
+        return [{ fileName: "task.yaml" }];
+      },
+      async listTaskPool() {
+        calls.push(["listTaskPool"]);
+        return { taskContextPackages: [] };
+      },
+      async getStartupCheck() {
+        calls.push(["getStartupCheck"]);
+        return { ok: true };
+      },
+    },
+    workflowTestFixtureService: {
+      async seedTestStateFixtures(input) {
+        calls.push(["seedTestStateFixtures", input]);
+        return { seeded: true };
+      },
+      async cleanupTestStateFixtures() {
+        calls.push(["cleanupTestStateFixtures"]);
+        return { cleaned: true };
+      },
+    },
+    recommendationRunLifecycle: {
+      async createRecommendationRun() {
+        calls.push(["createRecommendationRun"]);
+        return { id: "run-2" };
+      },
+      cancelRecommendationRun() {
+        calls.push(["cancelRecommendationRun"]);
+        return { cancelled: true };
+      },
+      getLatestRecommendationRun() {
+        calls.push(["getLatestRecommendationRun"]);
+        return latestRun;
+      },
+    },
+    manualWorkflowActionService: {
+      async acceptConvergenceSuccess(input) {
+        calls.push(["acceptConvergenceSuccess", input]);
+        return { accepted: true };
+      },
+      async replanAutoMerge(input) {
+        calls.push(["replanAutoMerge", input]);
+        return { planned: true };
+      },
+      async continueConvergenceWithGuidance(input) {
+        calls.push(["continueConvergenceWithGuidance", input]);
+        return { continued: true };
+      },
+      async cancelTask(input) {
+        calls.push(["cancelTask", input]);
+        return { cancelled: true };
+      },
+    },
+    workflowEventBus: {
+      onEvent(observedListener) {
+        calls.push(["onEvent", observedListener]);
+        return unsubscribe;
+      },
+      clear() {
+        calls.push(["clear"]);
+      },
+    },
+    taskSourceWatcher: {
+      async start() {
+        calls.push(["start"]);
+      },
+      stop() {
+        calls.push(["stop"]);
+      },
+    },
+    toRecommendationSnapshot(run) {
+      calls.push(["toRecommendationSnapshot", run]);
+      return { snapshotId: run.id };
+    },
+  });
+
+  return { calls, listener, runtime, unsubscribe };
+}
+
+test("workflow service runtime delegates read, fixture, and recommendation operations", async () => {
+  const { calls, runtime } = createRuntimeHarness();
+
+  assert.deepEqual(runtime.listTasks(), [{ fileName: "task.yaml" }]);
+  assert.deepEqual(await runtime.listTaskPool(), { taskContextPackages: [] });
+  assert.deepEqual(await runtime.getStartupCheck(), { ok: true });
+  assert.deepEqual(await runtime.seedTestStateFixtures({ fixtureKey: "human-guided-execution" }), {
+    seeded: true,
+  });
+  assert.deepEqual(await runtime.cleanupTestStateFixtures(), { cleaned: true });
+  assert.deepEqual(await runtime.createRecommendationRun(), { id: "run-2" });
+  assert.deepEqual(runtime.cancelRecommendationRun(), { cancelled: true });
+  assert.deepEqual(runtime.getLatestRecommendationRun(), { snapshotId: "run-1" });
+
+  assert.deepEqual(calls, [
+    ["listTasks"],
+    ["listTaskPool"],
+    ["getStartupCheck"],
+    ["seedTestStateFixtures", { fixtureKey: "human-guided-execution" }],
+    ["cleanupTestStateFixtures"],
+    ["createRecommendationRun"],
+    ["cancelRecommendationRun"],
+    ["getLatestRecommendationRun"],
+    ["toRecommendationSnapshot", { id: "run-1", status: "completed" }],
+  ]);
+});
+
+test("workflow service runtime delegates manual workflow actions with default inputs", async () => {
+  const { calls, runtime } = createRuntimeHarness();
+
+  assert.deepEqual(await runtime.acceptConvergenceSuccess(), { accepted: true });
+  assert.deepEqual(await runtime.replanAutoMerge(), { planned: true });
+  assert.deepEqual(await runtime.continueConvergenceWithGuidance(), { continued: true });
+  assert.deepEqual(await runtime.cancelTask(), { cancelled: true });
+
+  assert.deepEqual(calls, [
+    ["acceptConvergenceSuccess", { packageId: null }],
+    ["replanAutoMerge", { packageId: null }],
+    [
+      "continueConvergenceWithGuidance",
+      {
+        packageId: null,
+        guidance: "",
+        focusAreas: [],
+        avoidRepeating: [],
+        expectedNextOutcome: "",
+      },
+    ],
+    ["cancelTask", { packageId: null }],
+  ]);
+});
+
+test("workflow service runtime delegates manual workflow actions with provided inputs", async () => {
+  const { calls, runtime } = createRuntimeHarness();
+
+  await runtime.acceptConvergenceSuccess({ packageId: "pkg-1" });
+  await runtime.replanAutoMerge({ packageId: "pkg-2" });
+  await runtime.continueConvergenceWithGuidance({
+    packageId: "pkg-3",
+    guidance: "继续收窄。",
+    focusAreas: ["tests"],
+    avoidRepeating: "不要重复。",
+    expectedNextOutcome: "证明修复路径。",
+  });
+  await runtime.cancelTask({ packageId: "pkg-4" });
+
+  assert.deepEqual(calls, [
+    ["acceptConvergenceSuccess", { packageId: "pkg-1" }],
+    ["replanAutoMerge", { packageId: "pkg-2" }],
+    [
+      "continueConvergenceWithGuidance",
+      {
+        packageId: "pkg-3",
+        guidance: "继续收窄。",
+        focusAreas: ["tests"],
+        avoidRepeating: "不要重复。",
+        expectedNextOutcome: "证明修复路径。",
+      },
+    ],
+    ["cancelTask", { packageId: "pkg-4" }],
+  ]);
+});
+
+test("workflow service runtime delegates event subscription and watcher lifecycle", async () => {
+  const { calls, listener, runtime, unsubscribe } = createRuntimeHarness();
+
+  assert.equal(runtime.onEvent(listener), unsubscribe);
+  await runtime.startWatching();
+  runtime.stopWatching();
+
+  assert.deepEqual(calls, [
+    ["onEvent", listener],
+    ["start"],
+    ["stop"],
+    ["clear"],
+  ]);
+});

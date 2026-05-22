@@ -61,11 +61,21 @@ test("allocates a task-scoped git worktree", async (t) => {
   assert.equal(result.error, null);
   assert.equal(result.appendRequest.packageId, "task-context-package:tasks/task-003.yaml");
   assert.equal(result.appendRequest.artifactType, "isolatedWorkspace");
-  assert.equal(result.appendRequest.artifact.worktreePath, ".workflow/worktrees/tasks/tasks-task-003");
-  assert.equal(result.appendRequest.artifact.branchName, "workflow/tasks/tasks-task-003");
-  assert.equal(result.appendRequest.artifact.baseBranch, "main");
+  assert.deepEqual(
+    {
+      worktreePath: result.appendRequest.artifact.worktreePath,
+      branchName: result.appendRequest.artifact.branchName,
+      baseBranch: result.appendRequest.artifact.baseBranch,
+      status: result.appendRequest.artifact.status,
+    },
+    {
+      worktreePath: ".workflow/worktrees/tasks/tasks-task-003",
+      branchName: "workflow/tasks/tasks-task-003",
+      baseBranch: "main",
+      status: "ready",
+    },
+  );
   assert.match(result.appendRequest.artifact.baseCommit, /^[0-9a-f]{40}$/);
-  assert.equal(result.appendRequest.artifact.status, "ready");
   assert.equal(
     existsSync(join(repositoryDir, ".workflow", "worktrees", "tasks", "tasks-task-003")),
     true,

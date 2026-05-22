@@ -6,6 +6,10 @@ import { join } from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { closeCancelledTask, closeTask } from "../src/workflow/task-closeout-flow.js";
+import {
+  createCancelledCloseoutPackageFixture,
+  createMergedCloseoutPackageFixture,
+} from "./support/task-closeout-package-fixtures.js";
 
 function runGit(args, cwd) {
   return execFileSync("git", args, {
@@ -83,45 +87,12 @@ function mergedPackage({
   worktreePath = ".workflow/worktrees/tasks/tasks-task-003",
   branchName = "workflow/tasks/tasks-task-003",
 } = {}) {
-  return {
-    packageId: "task-context-package:tasks/task-003.yaml",
-    currentWorkStage: "merged",
-    artifacts: {
-      isolatedWorkspace: {
-        artifactId: "isolatedWorkspace",
-        body: {
-          worktreePath,
-          branchName,
-          baseBranch: "main",
-          baseCommit,
-          status: "ready",
-        },
-        appendedAt: "2026-05-19T10:00:04.000Z",
-      },
-      autoMergeResult: {
-        artifactId: "autoMergeResult",
-        body: {
-          mergedAt: "2026-05-19T10:05:00.000Z",
-          planRef: "autoMergePlan",
-          source: {
-            worktreePath,
-            branchName,
-            baseCommit,
-            commit: sourceCommit,
-          },
-          target: {
-            branchName: "main",
-            beforeCommit: baseCommit,
-            afterCommit: sourceCommit,
-          },
-          changeSet: {
-            changedFiles: ["result.txt"],
-          },
-        },
-        appendedAt: "2026-05-19T10:05:00.000Z",
-      },
-    },
-  };
+  return createMergedCloseoutPackageFixture({
+    baseCommit,
+    sourceCommit,
+    worktreePath,
+    branchName,
+  });
 }
 
 function cancelledPackage({
@@ -129,34 +100,11 @@ function cancelledPackage({
   worktreePath = ".workflow/worktrees/tasks/tasks-task-003",
   branchName = "workflow/tasks/tasks-task-003",
 } = {}) {
-  return {
-    packageId: "task-context-package:tasks/task-003.yaml",
-    currentWorkStage: "task-closeout",
-    artifacts: {
-      isolatedWorkspace: {
-        artifactId: "isolatedWorkspace",
-        body: {
-          worktreePath,
-          branchName,
-          baseBranch: "main",
-          baseCommit,
-          status: "ready",
-        },
-        appendedAt: "2026-05-19T10:00:04.000Z",
-      },
-      humanDecision: {
-        artifactId: "humanDecision",
-        body: {
-          decision: "cancel-task",
-          decidedAt: "2026-05-19T10:09:00.000Z",
-          targetType: "convergenceFailure",
-          targetRef: "convergenceFailure:001",
-          nextRequiredStage: "task-closeout",
-        },
-        appendedAt: "2026-05-19T10:09:00.000Z",
-      },
-    },
-  };
+  return createCancelledCloseoutPackageFixture({
+    baseCommit,
+    worktreePath,
+    branchName,
+  });
 }
 
 test("closes a merged task and removes worktree plus branch", async (t) => {
@@ -248,6 +196,36 @@ test("does not close a task before merged stage", async (t) => {
 
   assert.equal(result.appendRequest, null);
   assert.match(result.error, /merged/);
+});
+
+test("does not close when single artifacts use multi artifact shape", async (t) => {
+  const repository = await createMergedTaskRepository(t);
+  const taskPackage = mergedPackage(repository);
+  taskPackage.artifacts.autoMergeResult = [taskPackage.artifacts.autoMergeResult];
+
+  const result = closeTask({
+    taskContextPackage: taskPackage,
+    repositoryDir: repository.repositoryDir,
+  });
+
+  assert.equal(result.appendRequest, null);
+  assert.match(result.error, /缺少 autoMergeResult/);
+  assert.equal(existsSync(repository.worktreeDir), true);
+});
+
+test("does not close cancelled task when human decision uses multi artifact shape", async (t) => {
+  const repository = await createMergedTaskRepository(t);
+  const taskPackage = cancelledPackage(repository);
+  taskPackage.artifacts.humanDecision = [taskPackage.artifacts.humanDecision];
+
+  const result = closeCancelledTask({
+    taskContextPackage: taskPackage,
+    repositoryDir: repository.repositoryDir,
+  });
+
+  assert.equal(result.appendRequest, null);
+  assert.match(result.error, /缺少取消决策/);
+  assert.equal(existsSync(repository.worktreeDir), true);
 });
 
 test("does not delete branch unless source commit is merged", async (t) => {

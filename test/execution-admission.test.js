@@ -5,10 +5,10 @@ import {
   evaluateStartupCheck,
   runtimeSnapshotFromRepositoryStatus,
 } from "../src/workflow/execution-admission.js";
+import { createTaskContextPackageFixture } from "./support/task-context-package-fixtures.js";
 
 function taskContextPackage(overrides = {}) {
-  return {
-    packageId: "task-context-package:tasks/task-001.yaml",
+  return createTaskContextPackageFixture({
     currentWorkStage: "task-recommender",
     taskDraft: {
       id: "task-001",
@@ -28,7 +28,7 @@ function taskContextPackage(overrides = {}) {
       },
     },
     ...overrides,
-  };
+  });
 }
 
 const candidateTasks = [{ packageId: "task-context-package:tasks/task-001.yaml" }];
@@ -94,8 +94,19 @@ test("requests execution authorization when all deterministic checks pass", () =
 
   assert.equal(admission.appendRequest.packageId, "task-context-package:tasks/task-001.yaml");
   assert.equal(admission.appendRequest.artifactType, "executionAuthorization");
-  assert.equal(admission.appendRequest.artifact.authorizedAt, "2026-05-18T10:00:00.000Z");
-  assert.equal(admission.appendRequest.artifact.termination.maxIterations, 3);
+  assert.deepEqual(admission.appendRequest.artifact, {
+    authorizedAt: "2026-05-18T10:00:00.000Z",
+    task: {
+      id: "task-001",
+      name: "展示任务真源",
+      goal: "展示任务",
+      acceptanceCriteria: ["可以看到任务"],
+    },
+    runtimeSnapshot: cleanRuntimeSnapshot,
+    termination: {
+      maxIterations: 3,
+    },
+  });
 });
 
 test("requests admission rejection when execution intent is not a candidate", () => {

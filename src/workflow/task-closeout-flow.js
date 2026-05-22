@@ -1,88 +1,9 @@
-import { execFileSync } from "node:child_process";
-import { existsSync, rmSync } from "node:fs";
-import { isAbsolute, resolve } from "node:path";
-import { normalizePathForGit } from "./git-path.js";
-
-function runGit(args, { cwd }) {
-  return execFileSync("git", args, {
-    cwd,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  }).trim();
-}
-
-function gitSucceeds(args, { cwd }) {
-  try {
-    runGit(args, { cwd });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function resolveWorktreePath(worktreePath, repositoryDir) {
-  if (!worktreePath) return null;
-  return isAbsolute(worktreePath) ? worktreePath : resolve(repositoryDir, worktreePath);
-}
-
-function isPathInside(parentPath, childPath) {
-  const parent = resolve(parentPath);
-  const child = resolve(childPath);
-  return child === parent || child.startsWith(`${parent}\\`) || child.startsWith(`${parent}/`);
-}
-
-function listedWorktreePaths(repositoryDir) {
-  const output = runGit(["worktree", "list", "--porcelain"], { cwd: repositoryDir });
-  return output
-    .split(/\r?\n/)
-    .filter((line) => line.startsWith("worktree "))
-    .map((line) => resolve(line.slice("worktree ".length)));
-}
-
-export function removeWorkspaceAndBranch({ repositoryDir, worktreePath, branchName }) {
-  const absoluteWorktreePath = resolveWorktreePath(worktreePath, repositoryDir);
-  if (!absoluteWorktreePath) {
-    return {
-      error: "隔离工作树路径为空，不能收尾。",
-    };
-  }
-
-  if (existsSync(absoluteWorktreePath)) {
-    const isRegisteredWorktree = listedWorktreePaths(repositoryDir)
-      .includes(resolve(absoluteWorktreePath));
-    if (isRegisteredWorktree) {
-      runGit(["worktree", "remove", "--force", normalizePathForGit(absoluteWorktreePath)], {
-        cwd: repositoryDir,
-      });
-    } else {
-      const worktreeRoot = resolve(repositoryDir, ".workflow", "worktrees");
-      if (!isPathInside(worktreeRoot, absoluteWorktreePath)) {
-        return {
-          error: "残留目录不在 .workflow/worktrees 下，不能自动删除。",
-        };
-      }
-      rmSync(absoluteWorktreePath, { recursive: true, force: true });
-    }
-  }
-  runGit(["worktree", "prune"], { cwd: repositoryDir });
-  if (branchName && gitSucceeds(["show-ref", "--verify", "--quiet", `refs/heads/${branchName}`], {
-    cwd: repositoryDir,
-  })) {
-    runGit(["branch", "-D", branchName], { cwd: repositoryDir });
-  }
-  const branchStillExists = branchName
-    ? gitSucceeds(["show-ref", "--verify", "--quiet", `refs/heads/${branchName}`], {
-        cwd: repositoryDir,
-      })
-    : false;
-  if (existsSync(absoluteWorktreePath) || branchStillExists) {
-    return {
-      error: "执行侧资源未清理干净，不能完成取消或收尾。",
-    };
-  }
-
-  return { error: null };
-}
+import {
+  buildCancelledTaskCloseoutRequest,
+  buildMergedTaskCloseoutRequest,
+} from "./task-closeout-contract.js";
+import { removeWorkspaceAndBranch } from "./task-closeout-cleanup-transaction.js";
+import { artifactBody } from "./task-package-artifacts.js";
 
 export function closeTask({
   taskContextPackage,
@@ -99,24 +20,24 @@ export function closeTask({
     };
   }
 
-  const autoMergeResult = taskContextPackage.artifacts?.autoMergeResult;
-  if (!autoMergeResult?.body) {
+  const autoMergeResult = artifactBody(taskContextPackage, "autoMergeResult");
+  if (!autoMergeResult) {
     return {
       appendRequest: null,
       error: "任务上下文包缺少 autoMergeResult，不能收尾。",
     };
   }
 
-  const isolatedWorkspace = taskContextPackage.artifacts?.isolatedWorkspace;
-  if (!isolatedWorkspace?.body) {
+  const isolatedWorkspace = artifactBody(taskContextPackage, "isolatedWorkspace");
+  if (!isolatedWorkspace) {
     return {
       appendRequest: null,
       error: "任务上下文包缺少 isolatedWorkspace，不能收尾。",
     };
   }
 
-  const sourceCommit = autoMergeResult.body.source?.commit;
-  const targetCommit = autoMergeResult.body.target?.afterCommit;
+  const sourceCommit = autoMergeResult.source?.commit;
+  const targetCommit = autoMergeResult.target?.afterCommit;
   if (!sourceCommit || sourceCommit !== targetCommit) {
     return {
       appendRequest: null,
@@ -124,8 +45,8 @@ export function closeTask({
     };
   }
 
-  const worktreePath = isolatedWorkspace.body.worktreePath;
-  const branchName = isolatedWorkspace.body.branchName;
+  const worktreePath = isolatedWorkspace.worktreePath;
+  const branchName = isolatedWorkspace.branchName;
   try {
     const cleanup = removeWorkspaceAndBranch({ repositoryDir, worktreePath, branchName });
     if (cleanup.error) return { appendRequest: null, error: cleanup.error };
@@ -137,27 +58,12 @@ export function closeTask({
   }
 
   return {
-    appendRequest: {
-      packageId: taskContextPackage.packageId,
-      artifactType: "taskCloseout",
-      artifact: {
-        closeoutAt: now(),
-        closedAt: now(),
-        closeoutReason: "merged",
-        resultRef: "autoMergeResult",
-        cleanup: {
-          worktree: {
-            path: normalizePathForGit(worktreePath),
-            removed: true,
-          },
-          branch: {
-            name: branchName,
-            deleted: true,
-          },
-        },
-        finalStage: "closed",
-      },
-    },
+    appendRequest: buildMergedTaskCloseoutRequest({
+      taskContextPackage,
+      closeoutAt: now(),
+      worktreePath,
+      branchName,
+    }),
     error: null,
   };
 }
@@ -176,24 +82,24 @@ export function closeCancelledTask({
       error: "任务不在 task-closeout 环节，不能执行取消收尾。",
     };
   }
-  const humanDecision = taskContextPackage.artifacts?.humanDecision;
-  if (humanDecision?.body?.decision !== "cancel-task") {
+  const humanDecision = artifactBody(taskContextPackage, "humanDecision");
+  if (humanDecision?.decision !== "cancel-task") {
     return {
       appendRequest: null,
       error: "任务缺少取消决策，不能执行取消收尾。",
     };
   }
 
-  const isolatedWorkspace = taskContextPackage.artifacts?.isolatedWorkspace;
-  if (!isolatedWorkspace?.body) {
+  const isolatedWorkspace = artifactBody(taskContextPackage, "isolatedWorkspace");
+  if (!isolatedWorkspace) {
     return {
       appendRequest: null,
       error: "任务上下文包缺少 isolatedWorkspace，不能执行取消收尾。",
     };
   }
 
-  const worktreePath = isolatedWorkspace.body.worktreePath;
-  const branchName = isolatedWorkspace.body.branchName;
+  const worktreePath = isolatedWorkspace.worktreePath;
+  const branchName = isolatedWorkspace.branchName;
   try {
     const cleanup = removeWorkspaceAndBranch({ repositoryDir, worktreePath, branchName });
     if (cleanup.error) return { appendRequest: null, error: cleanup.error };
@@ -205,26 +111,12 @@ export function closeCancelledTask({
   }
 
   return {
-    appendRequest: {
-      packageId: taskContextPackage.packageId,
-      artifactType: "taskCloseout",
-      artifact: {
-        closeoutAt: now(),
-        closeoutReason: "cancelled",
-        decisionRef: "humanDecision",
-        cleanup: {
-          worktree: {
-            path: normalizePathForGit(worktreePath),
-            removed: true,
-          },
-          branch: {
-            name: branchName,
-            deleted: true,
-          },
-        },
-        finalStage: "cancelled",
-      },
-    },
+    appendRequest: buildCancelledTaskCloseoutRequest({
+      taskContextPackage,
+      closeoutAt: now(),
+      worktreePath,
+      branchName,
+    }),
     error: null,
   };
 }

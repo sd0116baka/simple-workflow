@@ -1,51 +1,18 @@
-import { createStubAgentSession } from "./agent-runner.js";
-import { latestArtifactRecord } from "./task-package-artifacts.js";
-
-function latestExecutionReport(taskContextPackage) {
-  return latestArtifactRecord(taskContextPackage, "executionReport");
-}
-
-function latestConvergenceAdvice(taskContextPackage) {
-  return latestArtifactRecord(taskContextPackage, "convergenceAdvice");
-}
+import {
+  createAgentSessionRequest,
+  createStubAgentSession,
+} from "./agent-session-contract.js";
+import { inputArtifactRefsForReview } from "./agent-input-refs.js";
+import { nextReviewAgentRunId } from "./agent-run-ids.js";
+import { buildReviewReportRequest } from "./review-report-contract.js";
+import { latestExecutionReport } from "./reviewed-execution-artifacts.js";
+import { hasArtifactBody } from "./task-package-artifacts.js";
 
 function hasIsolatedWorkspace(taskContextPackage) {
-  return Boolean(taskContextPackage?.artifacts?.isolatedWorkspace?.body);
+  return hasArtifactBody(taskContextPackage, "isolatedWorkspace");
 }
 
-function nextReviewRunId(taskContextPackage) {
-  const existingReports = taskContextPackage?.artifacts?.reviewReport ?? [];
-  const nextIndex = Array.isArray(existingReports) ? existingReports.length + 1 : 1;
-  return `review-agent:${String(nextIndex).padStart(3, "0")}`;
-}
-
-function inputArtifactRefsForReview(taskContextPackage, executionReport) {
-  const refs = [
-    "taskDraft",
-    "executionAuthorization",
-    "isolatedWorkspace",
-    executionReport.artifactId,
-  ];
-  const convergenceAdvice = latestConvergenceAdvice(taskContextPackage);
-  const convergenceFailure = latestArtifactRecord(taskContextPackage, "convergenceFailure");
-  const humanConvergenceGuidance = latestArtifactRecord(taskContextPackage, "humanConvergenceGuidance");
-  const correctionRefs = [
-    convergenceAdvice?.artifactId,
-    convergenceFailure?.artifactId,
-    humanConvergenceGuidance?.artifactId,
-  ].filter(Boolean);
-  return correctionRefs.length > 0
-    ? [
-        "taskDraft",
-        "executionAuthorization",
-        ...correctionRefs,
-        "isolatedWorkspace",
-        executionReport.artifactId,
-      ]
-    : refs;
-}
-
-export function runReviewAgent({
+export async function runReviewAgent({
   taskContextPackage,
   runAgentSession = createStubAgentSession,
   now = () => new Date().toISOString(),
@@ -68,34 +35,27 @@ export function runReviewAgent({
     };
   }
 
+  const runId = nextReviewAgentRunId(taskContextPackage);
+  const inputArtifactRefs = inputArtifactRefsForReview(taskContextPackage, executionReport);
   const startedAt = now();
-  const session = runAgentSession({
+  const session = await runAgentSession(createAgentSessionRequest({
     role: "review",
     packageId: taskContextPackage.packageId,
     taskContextPackage,
-  });
+    runId,
+    inputArtifactRefs,
+  }));
   const finishedAt = now();
 
   return {
-    appendRequest: {
-      packageId: taskContextPackage.packageId,
-      artifactType: "reviewReport",
-      artifact: {
-        outcome: "passed",
-        summary: "stub review passed",
-        findings: [],
-      },
-      agentRun: {
-        runId: nextReviewRunId(taskContextPackage),
-        role: "review",
-        sessionId: session.sessionId,
-        inputArtifactRefs: inputArtifactRefsForReview(taskContextPackage, executionReport),
-        outputArtifactRefs: [],
-        status: session.status,
-        startedAt,
-        finishedAt,
-      },
-    },
+    appendRequest: buildReviewReportRequest({
+      taskContextPackage,
+      runId,
+      session,
+      inputArtifactRefs,
+      startedAt,
+      finishedAt,
+    }),
     error: null,
   };
 }

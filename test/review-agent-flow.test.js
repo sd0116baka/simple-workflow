@@ -1,78 +1,52 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runReviewAgent } from "../src/workflow/review-agent-flow.js";
+import { createArtifactRecordFixture } from "./support/task-context-package-fixtures.js";
+import { createReviewReadyPackageFixture } from "./support/review-ready-package-fixtures.js";
 
 function reviewablePackage() {
-  return {
-    packageId: "task-context-package:tasks/task-003.yaml",
-    artifacts: {
-      executionAuthorization: {
-        artifactId: "executionAuthorization",
-        body: {},
-        appendedAt: "2026-05-18T09:01:00.000Z",
-      },
-      isolatedWorkspace: {
-        artifactId: "isolatedWorkspace",
-        body: {
-          worktreePath: ".workflow/worktrees/tasks/tasks-task-003",
-        },
-        appendedAt: "2026-05-18T09:02:00.000Z",
-      },
-      executionReport: [
-        {
-          artifactId: "executionReport:001",
-          body: {
-            summary: "stub execution completed",
-          },
-          appendedAt: "2026-05-18T10:00:01.000Z",
-        },
-      ],
-    },
-    agentRuns: [
-      {
-        runId: "main-agent:initialization",
-        role: "main",
-        sessionId: "session:main",
-        inputArtifactRefs: ["taskDraft", "executionIntent", "executionAuthorization"],
-        outputArtifactRefs: [],
-        status: "succeeded",
-        startedAt: "2026-05-18T10:00:00.000Z",
-        finishedAt: "2026-05-18T10:00:00.000Z",
-      },
-      {
-        runId: "execution-agent:001",
-        role: "execution",
-        sessionId: "session:execution",
-        inputArtifactRefs: ["taskDraft", "executionIntent", "executionAuthorization"],
-        outputArtifactRefs: ["executionReport:001"],
-        status: "succeeded",
-        startedAt: "2026-05-18T10:00:01.000Z",
-        finishedAt: "2026-05-18T10:00:01.000Z",
-      },
-    ],
-  };
+  return createReviewReadyPackageFixture();
 }
 
-test("runs review agent stub and requests review report append", () => {
-  const result = runReviewAgent({
+test("runs review agent stub and requests review report append", async () => {
+  let observed = null;
+  const result = await runReviewAgent({
     taskContextPackage: reviewablePackage(),
-    runAgentSession: ({ role, packageId }) => ({
-      sessionId: `session:${role}:${packageId}`,
-      status: "succeeded",
-    }),
+    runAgentSession: ({ role, packageId, runId, inputArtifactRefs }) => {
+      observed = { role, packageId, runId, inputArtifactRefs };
+      return {
+        sessionId: `session:${role}:${packageId}`,
+        status: "succeeded",
+      };
+    },
     now: () => "2026-05-18T10:00:02.000Z",
   });
 
   assert.equal(result.error, null);
   assert.equal(result.appendRequest.packageId, "task-context-package:tasks/task-003.yaml");
   assert.equal(result.appendRequest.artifactType, "reviewReport");
-  assert.equal(result.appendRequest.artifact.outcome, "passed");
+  assert.deepEqual(result.appendRequest.artifact, {
+    outcome: "passed",
+    summary: "stub review passed",
+    findings: [],
+  });
   assert.equal(result.appendRequest.agentRun.runId, "review-agent:001");
   assert.equal(result.appendRequest.agentRun.role, "review");
   assert.equal(
     result.appendRequest.agentRun.sessionId,
     "session:review:task-context-package:tasks/task-003.yaml",
   );
+  assert.deepEqual(observed, {
+    role: "review",
+    packageId: "task-context-package:tasks/task-003.yaml",
+    runId: "review-agent:001",
+    inputArtifactRefs: [
+      "taskDraft",
+      "executionAuthorization",
+      "isolatedWorkspace",
+      "executionReport:001",
+    ],
+  });
   assert.deepEqual(result.appendRequest.agentRun.inputArtifactRefs, [
     "taskDraft",
     "executionAuthorization",
@@ -81,46 +55,40 @@ test("runs review agent stub and requests review report append", () => {
   ]);
 });
 
-test("increments review agent run id from existing review reports", () => {
+test("increments review agent run id from existing review reports", async () => {
   const taskPackage = reviewablePackage();
   taskPackage.artifacts.reviewReport = [
-    {
-      artifactId: "reviewReport:001",
-      body: {},
+    createArtifactRecordFixture("reviewReport:001", {}, {
       appendedAt: "2026-05-18T10:00:02.000Z",
-    },
+    }),
   ];
 
-  const result = runReviewAgent({
+  const result = await runReviewAgent({
     taskContextPackage: taskPackage,
   });
 
   assert.equal(result.appendRequest.agentRun.runId, "review-agent:002");
 });
 
-test("uses latest convergence advice when reviewing a later execution", () => {
+test("uses latest convergence advice when reviewing a later execution", async () => {
   const taskPackage = reviewablePackage();
   taskPackage.artifacts.convergenceAdvice = [
-    {
-      artifactId: "convergenceAdvice:001",
-      body: {},
+    createArtifactRecordFixture("convergenceAdvice:001", {}, {
       appendedAt: "2026-05-18T10:00:03.000Z",
-    },
+    }),
   ];
-  taskPackage.artifacts.executionReport.push({
-    artifactId: "executionReport:002",
-    body: {},
-    appendedAt: "2026-05-18T10:00:04.000Z",
-  });
+  taskPackage.artifacts.executionReport.push(
+    createArtifactRecordFixture("executionReport:002", {}, {
+      appendedAt: "2026-05-18T10:00:04.000Z",
+    }),
+  );
   taskPackage.artifacts.reviewReport = [
-    {
-      artifactId: "reviewReport:001",
-      body: {},
+    createArtifactRecordFixture("reviewReport:001", {}, {
       appendedAt: "2026-05-18T10:00:02.000Z",
-    },
+    }),
   ];
 
-  const result = runReviewAgent({
+  const result = await runReviewAgent({
     taskContextPackage: taskPackage,
   });
 
@@ -134,11 +102,11 @@ test("uses latest convergence advice when reviewing a later execution", () => {
   ]);
 });
 
-test("does not run review agent before isolated workspace exists", () => {
+test("does not run review agent before isolated workspace exists", async () => {
   const taskPackage = reviewablePackage();
   delete taskPackage.artifacts.isolatedWorkspace;
 
-  const result = runReviewAgent({
+  const result = await runReviewAgent({
     taskContextPackage: taskPackage,
   });
 
@@ -146,14 +114,27 @@ test("does not run review agent before isolated workspace exists", () => {
   assert.match(result.error, /缺少 isolatedWorkspace/);
 });
 
-test("does not run review agent before execution report exists", () => {
+test("does not run review agent before execution report exists", async () => {
   const taskPackage = reviewablePackage();
   delete taskPackage.artifacts.executionReport;
 
-  const result = runReviewAgent({
+  const result = await runReviewAgent({
     taskContextPackage: taskPackage,
   });
 
   assert.equal(result.appendRequest, null);
   assert.match(result.error, /缺少 executionReport/);
+});
+
+test("awaits asynchronous review agent session runners", async () => {
+  const result = await runReviewAgent({
+    taskContextPackage: reviewablePackage(),
+    runAgentSession: async ({ runId }) => ({
+      sessionId: `async-session:${runId}`,
+      status: "succeeded",
+    }),
+  });
+
+  assert.equal(result.error, null);
+  assert.equal(result.appendRequest.agentRun.sessionId, "async-session:review-agent:001");
 });

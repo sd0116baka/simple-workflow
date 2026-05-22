@@ -4,14 +4,20 @@ import { execFileSync } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { acceptConvergenceSuccess } from "../src/workflow/accept-convergence-decision.js";
+import { cancelTaskAfterHumanDecisionRequest } from "../src/workflow/cancel-task-decision.js";
+import { provideHumanConvergenceGuidance } from "../src/workflow/human-convergence-guidance-decision.js";
 import {
-  acceptConvergenceSuccess,
-  cancelTaskAfterHumanDecisionRequest,
-  provideHumanConvergenceGuidance,
   requestHumanDecisionForAutoMergeIssue,
   requestHumanDecisionForConvergenceFailure,
   requestHumanDecisionForConvergenceSuccess,
-} from "../src/workflow/human-decision-flow.js";
+} from "../src/workflow/human-decision-request-flow.js";
+import { createArtifactRecordFixture } from "./support/task-context-package-fixtures.js";
+import {
+  createHumanDecisionAutoMergeIssuePackageFixture,
+  createHumanDecisionConvergenceFailurePackageFixture,
+  createHumanDecisionConvergenceSuccessPackageFixture,
+} from "./support/human-decision-package-fixtures.js";
 
 function runGit(args, cwd) {
   return execFileSync("git", args, {
@@ -54,95 +60,15 @@ async function createGitRepositoryWithWorktree(t) {
 }
 
 function completedPackage() {
-  return {
-    packageId: "task-context-package:tasks/task-003.yaml",
-    currentWorkStage: "human-decision",
-    artifacts: {
-      isolatedWorkspace: {
-        artifactId: "isolatedWorkspace",
-        body: {
-          worktreePath: ".workflow/worktrees/tasks/tasks-task-003",
-          branchName: "workflow/tasks/tasks-task-003",
-          baseBranch: "main",
-          baseCommit: "base-commit",
-          status: "ready",
-        },
-        appendedAt: "2026-05-18T10:00:04.000Z",
-      },
-      convergenceSuccess: {
-        artifactId: "convergenceSuccess",
-        body: {
-          summary: "stub task completed",
-        },
-        appendedAt: "2026-05-18T10:00:06.000Z",
-      },
-      humanDecisionRequest: {
-        artifactId: "humanDecisionRequest",
-        body: {
-          requestedAt: "2026-05-18T10:00:07.000Z",
-          convergenceSuccessRef: "convergenceSuccess",
-          decisionOptions: ["accept-convergence", "continue-convergence-with-guidance", "cancel-task"],
-        },
-        appendedAt: "2026-05-18T10:00:07.000Z",
-      },
-    },
-  };
+  return createHumanDecisionConvergenceSuccessPackageFixture();
 }
 
 function convergenceFailedPackage() {
-  const taskPackage = completedPackage();
-  delete taskPackage.artifacts.convergenceSuccess;
-  taskPackage.artifacts.convergenceFailure = [
-    {
-      artifactId: "convergenceFailure:001",
-      body: {
-        summary: "无法自动收敛",
-        reasonCode: "max-iterations-reached",
-        basisRefs: ["executionReport:001", "reviewReport:001"],
-      },
-      appendedAt: "2026-05-18T10:00:06.000Z",
-    },
-  ];
-  taskPackage.artifacts.humanDecisionRequest = {
-    artifactId: "humanDecisionRequest",
-    body: {
-      requestedAt: "2026-05-18T10:00:07.000Z",
-      targetRef: "convergenceFailure:001",
-      decisionOptions: ["continue-convergence-with-guidance", "cancel-task"],
-    },
-    appendedAt: "2026-05-18T10:00:07.000Z",
-  };
-  return taskPackage;
+  return createHumanDecisionConvergenceFailurePackageFixture();
 }
 
 function autoMergeIssuePackage(artifactType = "autoMergeRejection") {
-  const taskPackage = completedPackage();
-  delete taskPackage.artifacts.convergenceSuccess;
-  taskPackage.currentWorkStage = "human-decision";
-  taskPackage.artifacts[artifactType] = {
-    artifactId: artifactType,
-    body: {
-      [artifactType === "autoMergeRejection" ? "rejectedAt" : "failedAt"]: "2026-05-18T10:00:06.000Z",
-      reasons: [
-        {
-          code: artifactType === "autoMergeRejection" ? "NO_CHANGES" : "TARGET_MOVED",
-          message: "自动合并无法继续。",
-        },
-      ],
-    },
-    appendedAt: "2026-05-18T10:00:06.000Z",
-  };
-  taskPackage.artifacts.humanDecisionRequest = {
-    artifactId: "humanDecisionRequest",
-    body: {
-      requestedAt: "2026-05-18T10:00:07.000Z",
-      targetType: artifactType,
-      targetRef: artifactType,
-      decisionOptions: ["continue-convergence-with-guidance", "cancel-task"],
-    },
-    appendedAt: "2026-05-18T10:00:07.000Z",
-  };
-  return taskPackage;
+  return createHumanDecisionAutoMergeIssuePackageFixture({ artifactType });
 }
 
 test("requests human decision after convergence success", () => {
@@ -317,13 +243,15 @@ test("adds human convergence guidance against current success", () => {
 test("uses the current human decision request when success and failure both exist", () => {
   const taskPackage = completedPackage();
   taskPackage.artifacts.convergenceFailure = [
-    {
-      artifactId: "convergenceFailure:001",
-      body: {
+    createArtifactRecordFixture(
+      "convergenceFailure:001",
+      {
         summary: "previous failure",
       },
-      appendedAt: "2026-05-18T09:00:00.000Z",
-    },
+      {
+        appendedAt: "2026-05-18T09:00:00.000Z",
+      },
+    ),
   ];
 
   const result = provideHumanConvergenceGuidance({

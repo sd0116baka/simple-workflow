@@ -11,7 +11,7 @@ test("detects supported task source files", () => {
   assert.equal(isSupportedTaskFile(null), false);
 });
 
-test("lists YAML task files as raw text without parsing them", async (t) => {
+test("lists YAML task files with parsed and validated task data", async (t) => {
   const dir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "raw-list");
   await mkdir(dir, { recursive: true });
   await writeFile(join(dir, "first.yaml"), "id: first\ntitle: 第一项任务\n");
@@ -27,10 +27,24 @@ test("lists YAML task files as raw text without parsing them", async (t) => {
   );
   assert.equal(tasks[0].format, "yaml");
   assert.equal(tasks[0].rawText, "id: first\ntitle: 第一项任务\n");
+  assert.deepEqual(tasks[0].parsed, { id: "first", title: "第一项任务" });
   assert.equal(tasks[0].validation.status, "invalid");
   assert.equal(tasks[1].format, "yaml");
   assert.equal(tasks[1].rawText, "id: second\n");
+  assert.deepEqual(tasks[1].parsed, { id: "second" });
   assert.equal(tasks[1].validation.status, "invalid");
+});
+
+test("lists YAML parse errors without throwing", async () => {
+  const dir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "parse-error");
+  await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, "broken.yaml"), "id: task-001\nacceptance:\n  - ok\n - broken");
+
+  const [task] = await listRawTasks(dir);
+
+  assert.equal(task.parsed, null);
+  assert.match(task.parseError, /yaml/i);
+  assert.equal(task.validation.status, "invalid");
 });
 
 test("returns an empty list when the tasks directory does not exist", async () => {

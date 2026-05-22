@@ -1,49 +1,24 @@
-import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
-import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 import { normalizePathForGit } from "./git-path.js";
-
-function safePackageIdFromSourcePath(sourcePath) {
-  return String(sourcePath ?? "")
-    .replace(/\.[^/.]+$/, "")
-    .replace(/[^a-zA-Z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .toLowerCase();
-}
-
-function runGit(args, { cwd }) {
-  return execFileSync("git", args, {
-    cwd,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  }).trim();
-}
-
-function gitSucceeds(args, { cwd }) {
-  try {
-    runGit(args, { cwd });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function worktreePathFromSafePackageId(safePackageId) {
-  return `.workflow/worktrees/tasks/${safePackageId}`;
-}
+import {
+  gitSucceeds,
+  isPathInside,
+  listedWorktreePaths,
+  resolveWorktreePath,
+  runGit,
+} from "./git-worktree-state.js";
+import {
+  buildIsolatedWorkspaceRequest,
+  isolatedWorkspaceNamingFor,
+} from "./isolated-workspace-contract.js";
+import { hasArtifactBody } from "./task-package-artifacts.js";
 
 function findRegisteredWorktree({ repositoryDir, absoluteWorktreePath }) {
-  const output = runGit(["worktree", "list", "--porcelain"], { cwd: repositoryDir });
   const normalizedTarget = resolve(absoluteWorktreePath).toLowerCase();
 
-  return output
-    .split(/\n(?=worktree )/)
-    .filter(Boolean)
-    .some((entry) => {
-      const firstLine = entry.split(/\r?\n/, 1)[0] ?? "";
-      const registeredPath = firstLine.replace(/^worktree /, "");
-      return resolve(registeredPath).toLowerCase() === normalizedTarget;
-    });
+  return listedWorktreePaths(repositoryDir)
+    .some((registeredPath) => resolve(registeredPath).toLowerCase() === normalizedTarget);
 }
 
 function resetAndCleanGitWorktree({ absoluteWorktreePath, baseBranch }) {
@@ -54,12 +29,6 @@ function resetAndCleanGitWorktree({ absoluteWorktreePath, baseBranch }) {
 
 function managedWorktreeRoot(repositoryDir) {
   return resolve(repositoryDir, ".workflow", "worktrees", "tasks");
-}
-
-function isPathInside(parentPath, childPath) {
-  const parent = resolve(parentPath).toLowerCase();
-  const child = resolve(childPath).toLowerCase();
-  return child === parent || child.startsWith(`${parent}\\`) || child.startsWith(`${parent}/`);
 }
 
 function removeResidualWorktreePath({ repositoryDir, absoluteWorktreePath, worktreePath }) {
@@ -75,9 +44,7 @@ function ensureGitWorktree({
   branchName,
   baseBranch,
 }) {
-  const absoluteWorktreePath = isAbsolute(worktreePath)
-    ? worktreePath
-    : resolve(repositoryDir, worktreePath);
+  const absoluteWorktreePath = resolveWorktreePath(worktreePath, repositoryDir);
   const baseCommit = runGit(["rev-parse", baseBranch], { cwd: repositoryDir });
   const worktreeIsRegistered = findRegisteredWorktree({
     repositoryDir,
@@ -125,16 +92,14 @@ export function allocateIsolatedWorkspace({
   if (!taskContextPackage?.packageId) {
     throw new Error("taskContextPackage.packageId is required");
   }
-  if (!taskContextPackage?.artifacts?.executionAuthorization?.body) {
+  if (!hasArtifactBody(taskContextPackage, "executionAuthorization")) {
     return {
       appendRequest: null,
       error: "任务上下文包缺少执行授权，不能分配隔离工作树。",
     };
   }
 
-  const safePackageId = safePackageIdFromSourcePath(taskContextPackage.source?.path);
-  const worktreePath = worktreePathFromSafePackageId(safePackageId);
-  const branchName = `workflow/tasks/${safePackageId}`;
+  const { worktreePath, branchName } = isolatedWorkspaceNamingFor(taskContextPackage);
   let baseCommit;
 
   try {
@@ -152,17 +117,13 @@ export function allocateIsolatedWorkspace({
   }
 
   return {
-    appendRequest: {
-      packageId: taskContextPackage.packageId,
-      artifactType: "isolatedWorkspace",
-      artifact: {
-        worktreePath: normalizePathForGit(relative(repositoryDir, resolve(repositoryDir, worktreePath))),
-        branchName,
-        baseBranch,
-        baseCommit,
-        status: "ready",
-      },
-    },
+    appendRequest: buildIsolatedWorkspaceRequest({
+      taskContextPackage,
+      worktreePath: relative(repositoryDir, resolve(repositoryDir, worktreePath)),
+      branchName,
+      baseBranch,
+      baseCommit,
+    }),
     error: null,
   };
 }

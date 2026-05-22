@@ -1,101 +1,7 @@
-import { readFile } from "node:fs/promises";
-import { runConvergence } from "./convergence-flow.js";
-import { evaluateExecutionAdmission } from "./execution-admission.js";
-import { runExecutionAgent } from "./execution-agent-flow.js";
-import {
-  requestHumanDecisionForConvergenceFailure,
-  requestHumanDecisionForConvergenceSuccess,
-} from "./human-decision-flow.js";
-import { allocateIsolatedWorkspace } from "./isolated-workspace-flow.js";
-import { initializeMainAgent } from "./main-agent-flow.js";
-import { parseRecommendationIntent } from "./recommendation-intent.js";
-import { buildRecommendationPrompt } from "./recommendation-prompt.js";
-import { OPENCODE_RECOMMENDATION_ARGS } from "./recommendation-runner.js";
-import { runReviewAgent } from "./review-agent-flow.js";
-import { applyAppendRequest, buildTaskPool, findTaskContextPackage } from "./task-pool.js";
-
-export function createBlockedRecommendationRun({ id, startupCheck, now = () => new Date().toISOString() }) {
-  const timestamp = now();
-  return {
-    id,
-    status: "blocked",
-    startedAt: timestamp,
-    finishedAt: timestamp,
-    command: null,
-    args: [],
-    startupCheck,
-    progress: [],
-    executionIntent: null,
-    executionIntentAppendRequest: null,
-    executionIntentError: null,
-    executionAdmission: null,
-    isolatedWorkspaceAllocation: null,
-    isolatedWorkspaceError: null,
-    mainAgentInitialization: null,
-    mainAgentInitializationError: null,
-    executionAgentRuns: [],
-    executionAgentErrors: [],
-    reviewAgentRuns: [],
-    reviewAgentErrors: [],
-    convergenceRuns: [],
-    convergenceErrors: [],
-    successHumanDecisionRequest: null,
-    successHumanDecisionError: null,
-    failureHumanDecisionRequest: null,
-    failureHumanDecisionError: null,
-    taskContextPackage: null,
-    stdout: "",
-    stderr: "",
-    exitCode: null,
-    error: startupCheck.error ?? "启动检查未通过，任务推荐器未运行。",
-  };
-}
-
-export function createRunningRecommendationRun({
-  id,
-  basePrompt,
-  taskPool,
-  startupCheck,
-  now = () => new Date().toISOString(),
-}) {
-  return {
-    id,
-    status: "running",
-    startedAt: now(),
-    finishedAt: null,
-    command: "opencode",
-    args: OPENCODE_RECOMMENDATION_ARGS,
-    startupCheck,
-    progress: [],
-    executionIntent: null,
-    executionIntentAppendRequest: null,
-    executionIntentError: null,
-    executionAdmission: null,
-    isolatedWorkspaceAllocation: null,
-    isolatedWorkspaceError: null,
-    mainAgentInitialization: null,
-    mainAgentInitializationError: null,
-    executionAgentRuns: [],
-    executionAgentErrors: [],
-    reviewAgentRuns: [],
-    reviewAgentErrors: [],
-    convergenceRuns: [],
-    convergenceErrors: [],
-    successHumanDecisionRequest: null,
-    successHumanDecisionError: null,
-    failureHumanDecisionRequest: null,
-    failureHumanDecisionError: null,
-    taskContextPackage: null,
-    stdout: "",
-    stderr: "",
-    exitCode: null,
-    error: null,
-    prompt: buildRecommendationPrompt({
-      basePrompt,
-      candidateTasks: taskPool.views.candidateTasks,
-    }),
-  };
-}
+import { prepareRecommendationExecution } from "./recommendation-execution-preparation.js";
+import { runRecommendationCompletionSequence } from "./recommendation-completion-sequence.js";
+import { buildCompletedRecommendationRun } from "./recommendation-run-completion-projection.js";
+import { decideRecommendationRunStart } from "./recommendation-run-start-decision.js";
 
 export async function startRecommendationFlow({
   id,
@@ -105,49 +11,14 @@ export async function startRecommendationFlow({
   existingTaskContextPackages = [],
   now = () => new Date().toISOString(),
 }) {
-  const taskPool = buildTaskPool(tasks, {
-    taskContextPackages: existingTaskContextPackages,
-  });
-  if (!startupCheck.canStartWork) {
-    return {
-      run: createBlockedRecommendationRun({ id, startupCheck, now }),
-      taskPool,
-    };
-  }
-
-  if (taskPool.views.candidateTasks.length === 0) {
-    return {
-      run: createBlockedRecommendationRun({
-        id,
-        startupCheck: {
-          ...startupCheck,
-          canStartWork: false,
-          error: "没有可推荐候选任务。",
-          findings: [
-            ...(startupCheck.findings ?? []),
-            {
-              field: "candidateTasks",
-              severity: "blocking",
-              code: "NO_CANDIDATE_TASKS",
-              message: "任务池中没有可启动任务。",
-            },
-          ],
-        },
-        now,
-      }),
-      taskPool,
-    };
-  }
-
-  const basePrompt = await readFile(recommendationPromptPath, "utf8");
-  const run = createRunningRecommendationRun({
+  return decideRecommendationRunStart({
     id,
-    basePrompt,
-    taskPool,
+    tasks,
     startupCheck,
+    recommendationPromptPath,
+    existingTaskContextPackages,
     now,
   });
-  return { run, taskPool };
 }
 
 export async function completeRecommendationFlow({
@@ -166,242 +37,33 @@ export async function completeRecommendationFlow({
   onProgress,
   signal,
 }) {
-  const maxIterations = projectProfile?.defaults?.maxIterations ?? null;
-  const failed = commandResult.error || commandResult.exitCode !== 0;
-  const parsed = failed
-    ? { appendRequest: null, intent: null, error: null }
-    : parseRecommendationIntent(commandResult.stdout ?? "");
-  let taskPool = failed ? null : buildTaskPool(tasks, {
-    taskContextPackages: existingTaskContextPackages,
+  const preparation = await prepareRecommendationExecution({
+    commandResult,
+    tasks,
+    startupCheck,
+    projectProfile,
+    existingTaskContextPackages,
+    runMainAgentSession,
+    repositoryDir,
+    now,
   });
-  const candidateTasks = taskPool?.views.candidateTasks ?? [];
-  taskPool = failed || !parsed.appendRequest
-    ? taskPool
-    : applyAppendRequest(taskPool, parsed.appendRequest, {
-        currentWorkStage: "task-recommender",
-      });
-  const intentPackage = failed || !parsed.appendRequest
-    ? null
-    : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
-  const admission = failed || !parsed.appendRequest
-    ? null
-    : evaluateExecutionAdmission({
-        taskContextPackage: intentPackage,
-        candidateTasks,
-        runtimeSnapshot: startupCheck.runtimeSnapshot,
-        projectProfile,
-      });
-  taskPool = failed || !admission?.appendRequest
-    ? taskPool
-    : applyAppendRequest(taskPool, admission.appendRequest, {
-        currentWorkStage: "execution-admission",
-      });
-  const authorizedPackage = failed || !parsed.appendRequest
-    ? null
-    : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
-  const isolatedWorkspaceAllocation =
-    !authorizedPackage || admission?.appendRequest?.artifactType !== "executionAuthorization"
-      ? null
-      : allocateIsolatedWorkspace({
-          taskContextPackage: authorizedPackage,
-          repositoryDir,
-        });
-  taskPool = !isolatedWorkspaceAllocation?.appendRequest
-    ? taskPool
-    : applyAppendRequest(taskPool, isolatedWorkspaceAllocation.appendRequest, {
-        currentWorkStage: "isolated-workspace",
-      });
-  const workspaceReadyPackage = failed || !parsed.appendRequest
-    ? null
-    : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
-  const mainAgentInitialization =
-    !workspaceReadyPackage || !isolatedWorkspaceAllocation?.appendRequest
-      ? null
-      : initializeMainAgent({
-          taskContextPackage: workspaceReadyPackage,
-          runAgentSession: runMainAgentSession,
-          now,
-        });
-  taskPool = !mainAgentInitialization?.appendRequest
-    ? taskPool
-    : applyAppendRequest(taskPool, mainAgentInitialization.appendRequest, {
-        currentWorkStage: "main-agent",
-      });
-  const mainInitializedPackage = failed || !parsed.appendRequest
-    ? null
-    : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
-  const executionAgentRun = !mainInitializedPackage || !mainAgentInitialization?.appendRequest
-    ? null
-    : await runExecutionAgent({
-        taskContextPackage: mainInitializedPackage,
-        runAgentSession: runExecutionAgentSession,
-        repositoryDir,
-        now,
-        onProgress,
-        signal,
-      });
-  taskPool = !executionAgentRun?.appendRequest
-    ? taskPool
-    : applyAppendRequest(taskPool, executionAgentRun.appendRequest, {
-        currentWorkStage: "execution-agent",
-      });
-  const executionCompletedPackage = failed || !parsed.appendRequest
-    ? null
-    : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
-  const reviewAgentRun = !executionCompletedPackage || !executionAgentRun?.appendRequest || executionAgentRun.error
-    ? null
-    : runReviewAgent({
-        taskContextPackage: executionCompletedPackage,
-        runAgentSession: runReviewAgentSession,
-        now,
-      });
-  taskPool = !reviewAgentRun?.appendRequest
-    ? taskPool
-    : applyAppendRequest(taskPool, reviewAgentRun.appendRequest, {
-        currentWorkStage: "review-agent",
-      });
-  const reviewedPackage = failed || !parsed.appendRequest
-    ? null
-    : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
-  const convergenceRun = !reviewedPackage || !reviewAgentRun?.appendRequest
-    ? null
-    : runConvergence({
-        taskContextPackage: reviewedPackage,
-        runAgentSession: runConvergenceSession,
-        maxIterations,
-        now,
-      });
-  taskPool = !convergenceRun?.appendRequest
-    ? taskPool
-    : applyAppendRequest(taskPool, convergenceRun.appendRequest, {
-        currentWorkStage: "convergence",
-      });
-  const convergedPackage = failed || !parsed.appendRequest
-    ? null
-    : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
-  const nextExecutionAgentRun = !convergedPackage
-    || convergenceRun?.appendRequest?.artifactType !== "convergenceAdvice"
-    ? null
-    : await runExecutionAgent({
-        taskContextPackage: convergedPackage,
-        runAgentSession: runExecutionAgentSession,
-        repositoryDir,
-        now,
-        onProgress,
-        signal,
-      });
-  taskPool = !nextExecutionAgentRun?.appendRequest
-    ? taskPool
-    : applyAppendRequest(taskPool, nextExecutionAgentRun.appendRequest, {
-        currentWorkStage: "execution-agent",
-      });
-  const secondExecutionCompletedPackage = failed || !parsed.appendRequest
-    ? null
-    : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
-  const nextReviewAgentRun = !secondExecutionCompletedPackage || !nextExecutionAgentRun?.appendRequest || nextExecutionAgentRun.error
-    ? null
-    : runReviewAgent({
-        taskContextPackage: secondExecutionCompletedPackage,
-        runAgentSession: runReviewAgentSession,
-        now,
-      });
-  taskPool = !nextReviewAgentRun?.appendRequest
-    ? taskPool
-    : applyAppendRequest(taskPool, nextReviewAgentRun.appendRequest, {
-        currentWorkStage: "review-agent",
-      });
-  const secondReviewedPackage = failed || !parsed.appendRequest
-    ? null
-    : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
-  const nextConvergenceRun = !secondReviewedPackage || !nextReviewAgentRun?.appendRequest
-    ? null
-    : runConvergence({
-        taskContextPackage: secondReviewedPackage,
-        runAgentSession: runConvergenceSession,
-        maxIterations,
-        now,
-      });
-  taskPool = !nextConvergenceRun?.appendRequest
-    ? taskPool
-    : applyAppendRequest(taskPool, nextConvergenceRun.appendRequest, {
-        currentWorkStage: "convergence",
-      });
-  const completedPackage = failed || !parsed.appendRequest
-    ? null
-    : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
-  const terminalConvergenceRun = nextConvergenceRun ?? convergenceRun;
-  const successHumanDecisionRequest =
-    !completedPackage || terminalConvergenceRun?.appendRequest?.artifactType !== "convergenceSuccess"
-      ? null
-      : requestHumanDecisionForConvergenceSuccess({
-          taskContextPackage: completedPackage,
-          now,
-        });
-  const failureHumanDecisionRequest =
-    !completedPackage || terminalConvergenceRun?.appendRequest?.artifactType !== "convergenceFailure"
-      ? null
-      : requestHumanDecisionForConvergenceFailure({
-          taskContextPackage: completedPackage,
-          now,
-        });
-  taskPool = !successHumanDecisionRequest?.appendRequest
-    ? taskPool
-    : applyAppendRequest(taskPool, successHumanDecisionRequest.appendRequest, {
-        currentWorkStage: "human-decision",
-      });
-  taskPool = !failureHumanDecisionRequest?.appendRequest
-    ? taskPool
-    : applyAppendRequest(taskPool, failureHumanDecisionRequest.appendRequest, {
-        currentWorkStage: "human-decision",
-      });
-  const taskContextPackage = failed || !parsed.appendRequest
-    ? null
-    : findTaskContextPackage(taskPool, parsed.appendRequest.packageId);
-  const executionAgentRuns = [
-    executionAgentRun,
-    nextExecutionAgentRun,
-  ].filter(Boolean);
-  const reviewAgentRuns = [
-    reviewAgentRun,
-    nextReviewAgentRun,
-  ].filter(Boolean);
-  const convergenceRuns = [
-    convergenceRun,
-    nextConvergenceRun,
-  ].filter(Boolean);
+  const sequence = await runRecommendationCompletionSequence({
+    preparation,
+    projectProfile,
+    runExecutionAgentSession,
+    runReviewAgentSession,
+    runConvergenceSession,
+    repositoryDir,
+    now,
+    onProgress,
+    signal,
+  });
 
-  return {
-    ...run,
-    status: failed ? "failed" : "succeeded",
-    finishedAt: now(),
-    stdout: commandResult.stdout ?? "",
-    stderr: commandResult.stderr ?? "",
-    exitCode: commandResult.exitCode ?? null,
-    error: commandResult.error ?? null,
-    executionIntent: parsed.intent,
-    executionIntentAppendRequest: parsed.appendRequest,
-    executionIntentError: parsed.error,
-    executionAdmission: admission,
-    isolatedWorkspaceAllocation,
-    isolatedWorkspaceError: isolatedWorkspaceAllocation?.error ?? null,
-    mainAgentInitialization,
-    mainAgentInitializationError: mainAgentInitialization?.error ?? null,
-    executionAgentRuns,
-    executionAgentErrors: executionAgentRuns
-      .map((agentRun) => agentRun.error)
-      .filter(Boolean),
-    reviewAgentRuns,
-    reviewAgentErrors: reviewAgentRuns
-      .map((agentRun) => agentRun.error)
-      .filter(Boolean),
-    convergenceRuns,
-    convergenceErrors: convergenceRuns
-      .map((agentRun) => agentRun.error)
-      .filter(Boolean),
-    successHumanDecisionRequest,
-    successHumanDecisionError: successHumanDecisionRequest?.error ?? null,
-    failureHumanDecisionRequest,
-    failureHumanDecisionError: failureHumanDecisionRequest?.error ?? null,
-    taskContextPackage,
-  };
+  return buildCompletedRecommendationRun({
+    run,
+    commandResult,
+    preparation,
+    sequence,
+    now,
+  });
 }

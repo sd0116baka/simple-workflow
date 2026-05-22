@@ -1,18 +1,12 @@
-import { cloneJsonValue } from "./json-value.js";
+import {
+  buildAdmissionDefaultDecisionRequest,
+  buildAdmissionRejectionRequest,
+  buildExecutionAuthorizationRequest,
+} from "./execution-admission-append-request.js";
+import { normalizeRuntimeSnapshot } from "./execution-admission-runtime.js";
+import { artifactBody } from "./task-package-artifacts.js";
 
-function toChangedFiles(repositoryStatus) {
-  return (repositoryStatus?.entries ?? []).map((entry) => entry.path);
-}
-
-function normalizeRuntimeSnapshot(runtimeSnapshot = {}) {
-  return {
-    activeWork: runtimeSnapshot.activeWork ?? null,
-    worktree: {
-      clean: runtimeSnapshot.worktree?.clean ?? true,
-      changedFiles: [...(runtimeSnapshot.worktree?.changedFiles ?? [])],
-    },
-  };
-}
+export { runtimeSnapshotFromRepositoryStatus } from "./execution-admission-runtime.js";
 
 function blockingFinding(field, code, message) {
   return {
@@ -25,20 +19,6 @@ function blockingFinding(field, code, message) {
 
 function hasBlockingFindings(findings) {
   return findings.some((finding) => finding.severity === "blocking");
-}
-
-function buildAppendRequest(packageId, artifactType, artifact) {
-  return {
-    appendRequest: {
-      packageId,
-      artifactType,
-      artifact,
-    },
-  };
-}
-
-function artifactBody(record) {
-  return record?.body ?? null;
 }
 
 function findDefault(defaults, fieldName) {
@@ -62,16 +42,6 @@ function resolveDefaultField({ fieldName, value, projectProfile, findings }) {
     return null;
   }
   return resolved;
-}
-
-export function runtimeSnapshotFromRepositoryStatus(repositoryStatus = { clean: true, entries: [] }) {
-  return {
-    activeWork: null,
-    worktree: {
-      clean: repositoryStatus.clean ?? true,
-      changedFiles: toChangedFiles(repositoryStatus),
-    },
-  };
 }
 
 export function evaluateStartupCheck({ runtimeSnapshot } = {}) {
@@ -108,7 +78,8 @@ export function evaluateExecutionAdmission({
   const findings = [];
 
   if (!taskContextPackage) {
-    return buildAppendRequest(null, "admissionRejection", {
+    return buildAdmissionRejectionRequest({
+      packageId: null,
       rejectedAt: now(),
       findings: [
         blockingFinding(
@@ -120,7 +91,7 @@ export function evaluateExecutionAdmission({
     });
   }
 
-  const executionIntent = artifactBody(taskContextPackage.artifacts?.executionIntent);
+  const executionIntent = artifactBody(taskContextPackage, "executionIntent");
   if (!executionIntent) {
     findings.push(
       blockingFinding(
@@ -163,31 +134,25 @@ export function evaluateExecutionAdmission({
   });
 
   if (findings.some((finding) => finding.code === "DEFAULT_NOT_RESOLVED")) {
-    return buildAppendRequest(packageId, "humanDecisionRequest", {
+    return buildAdmissionDefaultDecisionRequest({
+      packageId,
       requestedAt: now(),
-      reason: "执行授权需要 Project Profile 默认值，但当前无法确定。",
       findings,
     });
   }
 
   if (hasBlockingFindings(findings)) {
-    return buildAppendRequest(packageId, "admissionRejection", {
+    return buildAdmissionRejectionRequest({
+      packageId,
       rejectedAt: now(),
       findings,
     });
   }
 
-  return buildAppendRequest(packageId, "executionAuthorization", {
+  return buildExecutionAuthorizationRequest({
+    taskContextPackage,
     authorizedAt: now(),
-    task: {
-      id: taskContextPackage.taskDraft?.id ?? null,
-      name: taskContextPackage.taskDraft?.name ?? null,
-      goal: taskContextPackage.taskDraft?.goal ?? null,
-      acceptanceCriteria: [...(taskContextPackage.taskDraft?.acceptanceCriteria ?? [])],
-    },
-    runtimeSnapshot: cloneJsonValue(startupCheck.runtimeSnapshot),
-    termination: {
-      maxIterations,
-    },
+    runtimeSnapshot: startupCheck.runtimeSnapshot,
+    maxIterations,
   });
 }

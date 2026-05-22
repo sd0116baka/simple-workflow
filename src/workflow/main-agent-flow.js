@@ -1,10 +1,19 @@
-import { createStubAgentSession } from "./agent-runner.js";
+import {
+  createAgentSessionRequest,
+  createStubAgentSession,
+} from "./agent-session-contract.js";
+import {
+  buildMainAgentInitializationRequest,
+  MAIN_AGENT_INITIALIZATION_INPUT_REFS,
+  MAIN_AGENT_INITIALIZATION_RUN_ID,
+} from "./main-agent-contract.js";
+import { hasArtifactBody } from "./task-package-artifacts.js";
 
 function hasExecutionAuthorization(taskContextPackage) {
-  return Boolean(taskContextPackage?.artifacts?.executionAuthorization?.body);
+  return hasArtifactBody(taskContextPackage, "executionAuthorization");
 }
 
-export function initializeMainAgent({
+export async function initializeMainAgent({
   taskContextPackage,
   runAgentSession = createStubAgentSession,
   now = () => new Date().toISOString(),
@@ -20,31 +29,22 @@ export function initializeMainAgent({
   }
 
   const startedAt = now();
-  const session = runAgentSession({
+  const session = await runAgentSession(createAgentSessionRequest({
     role: "main",
     packageId: taskContextPackage.packageId,
+    runId: MAIN_AGENT_INITIALIZATION_RUN_ID,
+    inputArtifactRefs: MAIN_AGENT_INITIALIZATION_INPUT_REFS,
     taskContextPackage,
-  });
+  }));
   const finishedAt = now();
 
   return {
-    appendRequest: {
-      packageId: taskContextPackage.packageId,
-      agentRun: {
-        runId: "main-agent:initialization",
-        role: "main",
-        sessionId: session.sessionId,
-        inputArtifactRefs: [
-          "taskDraft",
-          "executionIntent",
-          "executionAuthorization",
-        ],
-        outputArtifactRefs: [],
-        status: session.status,
-        startedAt,
-        finishedAt,
-      },
-    },
+    appendRequest: buildMainAgentInitializationRequest({
+      taskContextPackage,
+      session,
+      startedAt,
+      finishedAt,
+    }),
     error: null,
   };
 }
