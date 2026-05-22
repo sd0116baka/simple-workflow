@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -61,4 +61,51 @@ test("loading packages from a missing store returns an empty list", async () => 
   });
 
   assert.deepEqual(loadedPackages, []);
+});
+
+test("loading packages skips files that disappear during fixture cleanup", async (t) => {
+  const storeDir = await mkdtemp(join(tmpdir(), "simple-workflow-package-store-disappearing-"));
+  t.after(() => rm(storeDir, { recursive: true, force: true }));
+  const packagePath = join(storeDir, packageFileName("task-context-package:tasks/stub-closed.yaml"));
+  await writeFile(packagePath, "{}", "utf8");
+
+  const loadedPackages = await loadTaskContextPackages({
+    storeDir,
+    async readFileImpl() {
+      const error = new Error("removed by concurrent cleanup");
+      error.code = "ENOENT";
+      throw error;
+    },
+  });
+
+  assert.deepEqual(loadedPackages, []);
+});
+
+test("loading packages retries transient file lock errors", async (t) => {
+  const storeDir = await mkdtemp(join(tmpdir(), "simple-workflow-package-store-locked-"));
+  t.after(() => rm(storeDir, { recursive: true, force: true }));
+  const taskContextPackage = {
+    packageId: "task-context-package:tasks/stub-closed.yaml",
+    currentWorkStage: "closed",
+  };
+  const packagePath = join(storeDir, packageFileName(taskContextPackage.packageId));
+  await writeFile(packagePath, `${JSON.stringify(taskContextPackage)}\n`, "utf8");
+  let attempts = 0;
+
+  const loadedPackages = await loadTaskContextPackages({
+    storeDir,
+    retryDelayMs: 0,
+    async readFileImpl(path, encoding) {
+      attempts += 1;
+      if (attempts === 1) {
+        const error = new Error("temporarily locked");
+        error.code = "EPERM";
+        throw error;
+      }
+      return readFile(path, encoding);
+    },
+  });
+
+  assert.equal(attempts, 2);
+  assert.deepEqual(loadedPackages, [taskContextPackage]);
 });

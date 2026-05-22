@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -39,5 +39,17 @@ test("gitignore setup is a no-op outside git and commits managed fixture ignores
 
   assert.equal(await readFile(join(repositoryDir, ".gitignore"), "utf8"), TEST_ENV_GITIGNORE);
   assert.notEqual(runFixtureGit(["rev-parse", "HEAD"], repositoryDir), previousHead);
+  assert.equal(runFixtureGit(["status", "--porcelain"], repositoryDir), "");
+});
+
+test("gitignore setup removes stale managed test repository index locks", async (t) => {
+  const repositoryDir = await createManagedTestRepository(t);
+  const lockPath = join(repositoryDir, ".git", "index.lock");
+  await writeFile(lockPath, "stale lock from interrupted fixture setup\n", "utf8");
+
+  await ensureTestEnvironmentGitignore(repositoryDir);
+
+  assert.equal(existsSync(lockPath), false);
+  assert.equal(await readFile(join(repositoryDir, ".gitignore"), "utf8"), TEST_ENV_GITIGNORE);
   assert.equal(runFixtureGit(["status", "--porcelain"], repositoryDir), "");
 });

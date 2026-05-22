@@ -15,6 +15,8 @@ export function createWorkflowTestFixtureService({
   seedTestStateFixtures = seedStateFixtures,
   cleanupTestStateFixtures = cleanupStateFixtures,
 }) {
+  let fixtureOperationQueue = Promise.resolve();
+
   function clearLatestRecommendationRun() {
     recommendationRunLifecycle.setLatestRecommendationRun(null);
   }
@@ -27,28 +29,38 @@ export function createWorkflowTestFixtureService({
     });
   }
 
+  function runFixtureOperation(operation) {
+    const queuedOperation = fixtureOperationQueue.then(operation, operation);
+    fixtureOperationQueue = queuedOperation.catch(() => {});
+    return queuedOperation;
+  }
+
   return {
     async seedTestStateFixtures({ fixtureKey = "task-pool" } = {}) {
-      const result = await seedTestStateFixtures({
-        repositoryDir,
-        tasksDir,
-        storeDir,
-        fixtureKey,
+      return runFixtureOperation(async () => {
+        const result = await seedTestStateFixtures({
+          repositoryDir,
+          tasksDir,
+          storeDir,
+          fixtureKey,
+        });
+        clearLatestRecommendationRun();
+        emitFixtureChange("seed-test-state-fixtures");
+        return result;
       });
-      clearLatestRecommendationRun();
-      emitFixtureChange("seed-test-state-fixtures");
-      return result;
     },
 
     async cleanupTestStateFixtures() {
-      const result = await cleanupTestStateFixtures({
-        repositoryDir,
-        tasksDir,
-        storeDir,
+      return runFixtureOperation(async () => {
+        const result = await cleanupTestStateFixtures({
+          repositoryDir,
+          tasksDir,
+          storeDir,
+        });
+        clearLatestRecommendationRun();
+        emitFixtureChange("cleanup-test-state-fixtures");
+        return result;
       });
-      clearLatestRecommendationRun();
-      emitFixtureChange("cleanup-test-state-fixtures");
-      return result;
     },
   };
 }

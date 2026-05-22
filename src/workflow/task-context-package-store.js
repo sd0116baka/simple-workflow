@@ -11,7 +11,38 @@ export function packageFileName(packageId) {
   return `${safePackageId || "unknown-package"}.json`;
 }
 
-export async function loadTaskContextPackages({ storeDir }) {
+function isTransientReadError(error) {
+  return error?.code === "EPERM" || error?.code === "EBUSY";
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function readPackageFile(path, {
+  readFileImpl = readFile,
+  retryDelayMs = 25,
+  maxTransientAttempts = 3,
+} = {}) {
+  for (let attempt = 1; attempt <= maxTransientAttempts; attempt += 1) {
+    try {
+      return await readFileImpl(path, "utf8");
+    } catch (error) {
+      if (error?.code === "ENOENT") return null;
+      if (!isTransientReadError(error) || attempt === maxTransientAttempts) {
+        throw error;
+      }
+      await wait(retryDelayMs);
+    }
+  }
+  return null;
+}
+
+export async function loadTaskContextPackages({
+  storeDir,
+  readFileImpl = readFile,
+  retryDelayMs,
+} = {}) {
   let entries;
   try {
     entries = await readdir(storeDir, { withFileTypes: true });
@@ -23,7 +54,11 @@ export async function loadTaskContextPackages({ storeDir }) {
   const packages = [];
   for (const entry of entries) {
     if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
-    const rawText = await readFile(join(storeDir, entry.name), "utf8");
+    const rawText = await readPackageFile(join(storeDir, entry.name), {
+      readFileImpl,
+      retryDelayMs,
+    });
+    if (rawText === null) continue;
     const taskContextPackage = JSON.parse(rawText);
     if (taskContextPackage?.packageId) {
       packages.push(taskContextPackage);

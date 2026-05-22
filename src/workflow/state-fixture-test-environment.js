@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { unlink, writeFile } from "node:fs/promises";
 import { join, normalize, resolve } from "node:path";
 import { gitSucceeds, runGit } from "./git-worktree-state.js";
 
@@ -15,9 +15,18 @@ export function assertTestEnvironment(repositoryDir) {
   }
 }
 
+export async function removeStaleGitIndexLock(repositoryDir) {
+  try {
+    await unlink(join(repositoryDir, ".git", "index.lock"));
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+}
+
 export async function ensureTestEnvironmentGitignore(repositoryDir) {
   if (!gitSucceeds(["rev-parse", "--git-dir"], { cwd: repositoryDir })) return;
 
+  await removeStaleGitIndexLock(repositoryDir);
   await writeFile(join(repositoryDir, ".gitignore"), TEST_ENV_GITIGNORE, "utf8");
   runGit(["add", ".gitignore"], { cwd: repositoryDir });
   if (gitSucceeds(["diff", "--cached", "--quiet", "--", ".gitignore"], { cwd: repositoryDir })) {
