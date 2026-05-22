@@ -7,6 +7,7 @@ import { decideRecommendationRunStart } from "./recommendation-run-start-decisio
 export async function startRecommendationFlow({
   id,
   mode = "workflow",
+  stageSwitches,
   tasks,
   startupCheck,
   recommendationPromptPath,
@@ -16,6 +17,7 @@ export async function startRecommendationFlow({
   return decideRecommendationRunStart({
     id,
     mode,
+    stageSwitches,
     tasks,
     startupCheck,
     recommendationPromptPath,
@@ -27,6 +29,7 @@ export async function startRecommendationFlow({
 export async function completeRecommendationFlow({
   run,
   mode = run?.mode ?? "workflow",
+  stageSwitches = run?.stageSwitches,
   commandResult,
   tasks,
   startupCheck,
@@ -48,6 +51,7 @@ export async function completeRecommendationFlow({
     projectProfile,
     existingTaskContextPackages,
     runMainAgentSession,
+    stageSwitches,
     repositoryDir,
     now,
     prepareDownstream: mode !== "probe",
@@ -60,6 +64,7 @@ export async function completeRecommendationFlow({
         runExecutionAgentSession,
         runReviewAgentSession,
         runConvergenceSession,
+        stageSwitches,
         repositoryDir,
         now,
         onProgress,

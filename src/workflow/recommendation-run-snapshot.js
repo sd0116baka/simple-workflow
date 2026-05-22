@@ -26,6 +26,7 @@ export function toRecommendationSnapshot(run) {
     ...defaults,
     ...run,
     args: run.args ? [...run.args] : [],
+    stageSwitches: run.stageSwitches ? cloneJsonValue(run.stageSwitches) : defaults.stageSwitches,
     startupCheck: cloneJsonOrNull(run.startupCheck),
     progress: run.progress ? run.progress.map((entry) => ({ ...entry })) : defaults.progress,
   };

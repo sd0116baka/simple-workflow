@@ -1047,6 +1047,30 @@ h2 {
   font-size: 12px;
 }
 
+.workflow-stage-switches {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #e4e9f2;
+  background: #ffffff;
+}
+
+.workflow-stage-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  color: #172033;
+  font-size: 12px;
+}
+
+.workflow-stage-switch input {
+  width: 15px;
+  height: 15px;
+  accent-color: #2f6fbd;
+}
+
 .inline-button {
   width: auto;
   min-height: 30px;

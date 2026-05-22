@@ -5,6 +5,7 @@ import { listRawTasks } from "./task-source.js";
 
 export async function createRecommendationRunTransaction({
   mode = "workflow",
+  stageSwitches,
   tasksDir,
   recommendationPromptPath,
   taskContextWorkspace,
@@ -28,6 +29,7 @@ export async function createRecommendationRunTransaction({
   const { run } = await startFlow({
     id: recommendationRunLifecycleState.nextRunId(),
     mode,
+    stageSwitches,
     tasks: await listTasks(tasksDir),
     startupCheck,
     recommendationPromptPath,

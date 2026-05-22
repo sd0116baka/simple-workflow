@@ -3,6 +3,24 @@ import {
   startRecommendationRunAction,
 } from "./workflow-page-recommendation-run-actions.js";
 
+const STAGE_SWITCH_ELEMENT_MAP = Object.freeze({
+  executionAdmission: "stageSwitchExecutionAdmission",
+  isolatedWorkspace: "stageSwitchIsolatedWorkspace",
+  mainAgent: "stageSwitchMainAgent",
+  executionAgent: "stageSwitchExecutionAgent",
+  reviewAgent: "stageSwitchReviewAgent",
+  convergence: "stageSwitchConvergence",
+});
+
+function readStageSwitches(elements = {}) {
+  return Object.fromEntries(
+    Object.entries(STAGE_SWITCH_ELEMENT_MAP).map(([stageKey, elementKey]) => [
+      stageKey,
+      Boolean(elements[elementKey]?.checked),
+    ]),
+  );
+}
+
 export function createWorkflowPageRecommendationRunCommands({
   workflowApi,
   setRecommendationRun,
@@ -15,6 +33,7 @@ export function createWorkflowPageRecommendationRunCommands({
     return startRecommendationRunAction({
       workflowApi,
       mode,
+      stageSwitches: readStageSwitches(elements),
       pendingText: isProbe ? "正在启动推荐探针..." : "正在启动完整 Agent 流程...",
       setRecommendationRun,
       renderRecommendationRun,

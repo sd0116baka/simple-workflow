@@ -163,6 +163,77 @@ test("recommendation execution preparation skips downstream work for failed comm
   assert.equal(result.taskContextPackage, null);
 });
 
+test("recommendation execution preparation stops after intent when admission is disabled", async (t) => {
+  const repositoryDir = await createGitRepository(t);
+  let mainAgentCalled = false;
+
+  const result = await prepareRecommendationExecution({
+    commandResult: commandResult(),
+    tasks: taskSource(),
+    startupCheck: startupCheck(),
+    projectProfile: {
+      defaults: {
+        maxIterations: 3,
+      },
+    },
+    stageSwitches: {
+      executionAdmission: false,
+      isolatedWorkspace: true,
+      mainAgent: true,
+      executionAgent: true,
+      reviewAgent: true,
+      convergence: true,
+    },
+    runMainAgentSession: () => {
+      mainAgentCalled = true;
+      return { status: "succeeded" };
+    },
+    repositoryDir,
+  });
+
+  assert.equal(result.executionAdmission, null);
+  assert.equal(result.isolatedWorkspaceAllocation, null);
+  assert.equal(result.mainAgentInitialization, null);
+  assert.equal(result.taskContextPackage.currentWorkStage, "task-recommender");
+  assert.equal(result.taskContextPackage.artifacts.executionIntent.body.confidence, "high");
+  assert.equal(mainAgentCalled, false);
+});
+
+test("recommendation execution preparation stops before main agent when main switch is disabled", async (t) => {
+  const repositoryDir = await createGitRepository(t);
+  let mainAgentCalled = false;
+
+  const result = await prepareRecommendationExecution({
+    commandResult: commandResult(),
+    tasks: taskSource(),
+    startupCheck: startupCheck(),
+    projectProfile: {
+      defaults: {
+        maxIterations: 3,
+      },
+    },
+    stageSwitches: {
+      executionAdmission: true,
+      isolatedWorkspace: true,
+      mainAgent: false,
+      executionAgent: true,
+      reviewAgent: true,
+      convergence: true,
+    },
+    runMainAgentSession: () => {
+      mainAgentCalled = true;
+      return { status: "succeeded" };
+    },
+    repositoryDir,
+  });
+
+  assert.equal(result.executionAdmission.appendRequest.artifactType, "executionAuthorization");
+  assert.equal(result.isolatedWorkspaceAllocation.appendRequest.artifactType, "isolatedWorkspace");
+  assert.equal(result.mainAgentInitialization, null);
+  assert.equal(result.taskContextPackage.currentWorkStage, "isolated-workspace");
+  assert.equal(mainAgentCalled, false);
+});
+
 test("recommendation execution preparation keeps task pool when intent parsing fails", async () => {
   const result = await prepareRecommendationExecution({
     commandResult: {

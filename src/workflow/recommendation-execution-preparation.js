@@ -3,6 +3,28 @@ import { allocateIsolatedWorkspace } from "./isolated-workspace-flow.js";
 import { parseRecommendationIntent } from "./execution-intent-contract.js";
 import { initializeMainAgent } from "./main-agent-flow.js";
 import { applyAppendRequest, buildTaskPool, findTaskContextPackage } from "./task-pool.js";
+import { isWorkflowStageEnabled } from "./workflow-stage-switches.js";
+
+function createPreparationResult({
+  commandFailed,
+  parsed,
+  taskPool,
+  packageId = null,
+  executionAdmission = null,
+  isolatedWorkspaceAllocation = null,
+  mainAgentInitialization = null,
+}) {
+  return {
+    commandFailed,
+    parsed,
+    taskPool,
+    packageId,
+    executionAdmission,
+    isolatedWorkspaceAllocation,
+    mainAgentInitialization,
+    taskContextPackage: taskPool && packageId ? findTaskContextPackage(taskPool, packageId) : null,
+  };
+}
 
 export async function prepareRecommendationExecution({
   commandResult,
@@ -11,6 +33,7 @@ export async function prepareRecommendationExecution({
   projectProfile,
   existingTaskContextPackages = [],
   runMainAgentSession,
+  stageSwitches,
   repositoryDir,
   now = () => new Date().toISOString(),
   prepareDownstream = true,
@@ -37,16 +60,11 @@ export async function prepareRecommendationExecution({
   }
 
   if (commandFailed || !parsed.appendRequest) {
-    return {
+    return createPreparationResult({
       commandFailed,
       parsed,
       taskPool,
-      packageId: null,
-      executionAdmission: null,
-      isolatedWorkspaceAllocation: null,
-      mainAgentInitialization: null,
-      taskContextPackage: null,
-    };
+    });
   }
 
   const packageId = parsed.appendRequest.packageId;
@@ -54,6 +72,15 @@ export async function prepareRecommendationExecution({
   taskPool = applyAppendRequest(taskPool, parsed.appendRequest, {
     currentWorkStage: "task-recommender",
   });
+
+  if (!isWorkflowStageEnabled(stageSwitches, "executionAdmission")) {
+    return createPreparationResult({
+      commandFailed,
+      parsed,
+      taskPool,
+      packageId,
+    });
+  }
 
   const intentPackage = findTaskContextPackage(taskPool, packageId);
   const executionAdmission = evaluateExecutionAdmission({
@@ -68,37 +95,55 @@ export async function prepareRecommendationExecution({
         currentWorkStage: "execution-admission",
       });
 
-  const authorizedPackage = findTaskContextPackage(taskPool, packageId);
-  const isolatedWorkspaceAllocation =
+  if (
     executionAdmission?.appendRequest?.artifactType !== "executionAuthorization"
-      ? null
-      : allocateIsolatedWorkspace({
-          taskContextPackage: authorizedPackage,
-          repositoryDir,
-        });
+    || !isWorkflowStageEnabled(stageSwitches, "isolatedWorkspace")
+  ) {
+    return createPreparationResult({
+      commandFailed,
+      parsed,
+      taskPool,
+      packageId,
+      executionAdmission,
+    });
+  }
+
+  const authorizedPackage = findTaskContextPackage(taskPool, packageId);
+  const isolatedWorkspaceAllocation = allocateIsolatedWorkspace({
+    taskContextPackage: authorizedPackage,
+    repositoryDir,
+  });
   taskPool = !isolatedWorkspaceAllocation?.appendRequest
     ? taskPool
     : applyAppendRequest(taskPool, isolatedWorkspaceAllocation.appendRequest, {
         currentWorkStage: "isolated-workspace",
       });
 
+  if (!isolatedWorkspaceAllocation?.appendRequest || !isWorkflowStageEnabled(stageSwitches, "mainAgent")) {
+    return createPreparationResult({
+      commandFailed,
+      parsed,
+      taskPool,
+      packageId,
+      executionAdmission,
+      isolatedWorkspaceAllocation,
+    });
+  }
+
   const workspaceReadyPackage = findTaskContextPackage(taskPool, packageId);
-  const mainAgentInitialization =
-    !isolatedWorkspaceAllocation?.appendRequest
-      ? null
-      : await initializeMainAgent({
-          taskContextPackage: workspaceReadyPackage,
-          runAgentSession: runMainAgentSession,
-          repositoryDir,
-          now,
-        });
+  const mainAgentInitialization = await initializeMainAgent({
+    taskContextPackage: workspaceReadyPackage,
+    runAgentSession: runMainAgentSession,
+    repositoryDir,
+    now,
+  });
   taskPool = !mainAgentInitialization?.appendRequest
     ? taskPool
     : applyAppendRequest(taskPool, mainAgentInitialization.appendRequest, {
         currentWorkStage: "main-agent",
       });
 
-  return {
+  return createPreparationResult({
     commandFailed,
     parsed,
     taskPool,
@@ -106,6 +151,5 @@ export async function prepareRecommendationExecution({
     executionAdmission,
     isolatedWorkspaceAllocation,
     mainAgentInitialization,
-    taskContextPackage: findTaskContextPackage(taskPool, packageId),
-  };
+  });
 }

@@ -11,6 +11,7 @@ export async function runRecommendationCompletionSequence({
   now = () => new Date().toISOString(),
   onProgress,
   signal,
+  stageSwitches,
   runRecommendationAgentSequence = runAgentSequence,
 }) {
   if (preparation.commandFailed || !preparation.parsed.appendRequest) {
@@ -29,5 +30,6 @@ export async function runRecommendationCompletionSequence({
     now,
     onProgress,
     signal,
+    stageSwitches,
   });
 }

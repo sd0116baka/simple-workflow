@@ -8,6 +8,7 @@ import { buildTaskPool } from "./task-pool.js";
 export async function decideRecommendationRunStart({
   id,
   mode = "workflow",
+  stageSwitches,
   tasks,
   startupCheck,
   recommendationPromptPath,
@@ -20,7 +21,7 @@ export async function decideRecommendationRunStart({
   });
   if (!startupCheck.canStartWork) {
     return {
-      run: createBlockedRecommendationRun({ id, mode, startupCheck, now }),
+      run: createBlockedRecommendationRun({ id, mode, stageSwitches, startupCheck, now }),
       taskPool,
     };
   }
@@ -30,6 +31,7 @@ export async function decideRecommendationRunStart({
       run: createBlockedRecommendationRun({
         id,
         mode,
+        stageSwitches,
         startupCheck: buildNoCandidateStartupCheck(startupCheck),
         now,
       }),
@@ -41,6 +43,7 @@ export async function decideRecommendationRunStart({
   const run = createRunningRecommendationRun({
     id,
     mode,
+    stageSwitches,
     basePrompt,
     taskPool,
     startupCheck,

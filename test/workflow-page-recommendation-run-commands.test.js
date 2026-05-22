@@ -12,12 +12,27 @@ function createButton({ textContent = "" } = {}) {
   };
 }
 
+const DEFAULT_STAGE_SWITCHES = {
+  executionAdmission: false,
+  isolatedWorkspace: false,
+  mainAgent: false,
+  executionAgent: false,
+  reviewAgent: false,
+  convergence: false,
+};
+
 function createHarness() {
   const calls = [];
   const elements = {
     runRecommendationButton: createButton({ textContent: "只运行推荐探针" }),
     runWorkflowButton: createButton({ textContent: "运行完整 Agent 流程" }),
     cancelRecommendationButton: createButton({ textContent: "取消运行" }),
+    stageSwitchExecutionAdmission: { checked: false },
+    stageSwitchIsolatedWorkspace: { checked: false },
+    stageSwitchMainAgent: { checked: false },
+    stageSwitchExecutionAgent: { checked: false },
+    stageSwitchReviewAgent: { checked: false },
+    stageSwitchConvergence: { checked: false },
   };
   const workflowApi = {
     async startRecommendationRun(input) {
@@ -59,7 +74,7 @@ test("workflow page recommendation run commands start a recommendation run", asy
   assert.deepEqual(harness.calls, [
     ["setRecommendationStatus", "启动中"],
     ["setRecommendationResultText", "正在启动完整 Agent 流程..."],
-    ["startRecommendationRun", { mode: "workflow" }],
+    ["startRecommendationRun", { mode: "workflow", stageSwitches: DEFAULT_STAGE_SWITCHES }],
     ["setRecommendationRun", { id: "recommendation-run:001" }],
     ["renderRecommendationRun"],
   ]);
@@ -76,7 +91,7 @@ test("workflow page recommendation run commands start a probe run", async () => 
   assert.deepEqual(harness.calls, [
     ["setRecommendationStatus", "启动中"],
     ["setRecommendationResultText", "正在启动推荐探针..."],
-    ["startRecommendationRun", { mode: "probe" }],
+    ["startRecommendationRun", { mode: "probe", stageSwitches: DEFAULT_STAGE_SWITCHES }],
     ["setRecommendationRun", { id: "recommendation-run:001" }],
     ["renderRecommendationRun"],
   ]);
@@ -100,7 +115,7 @@ test("workflow page recommendation run commands render conflict runs", async () 
   assert.deepEqual(harness.calls, [
     ["setRecommendationStatus", "启动中"],
     ["setRecommendationResultText", "正在启动完整 Agent 流程..."],
-    ["startRecommendationRun", { mode: "workflow" }],
+    ["startRecommendationRun", { mode: "workflow", stageSwitches: DEFAULT_STAGE_SWITCHES }],
     ["setRecommendationRun", conflictRun],
     ["renderRecommendationRun"],
   ]);

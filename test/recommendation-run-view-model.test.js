@@ -88,6 +88,26 @@ test("recommendation run view model labels probe mode as recommendation only", (
   });
 });
 
+test("recommendation run view model summarizes stage switches", () => {
+  const viewModel = buildRecommendationRunViewModel({
+    recommendationRun: createSucceededRecommendationRunFixture({
+      stageSwitches: {
+        executionAdmission: true,
+        isolatedWorkspace: false,
+        mainAgent: true,
+        executionAgent: false,
+        reviewAgent: false,
+        convergence: false,
+      },
+    }),
+  });
+
+  assert.deepEqual(viewModel.recommendationInputs[1], {
+    label: "流程开关",
+    value: "执行准入、main agent",
+  });
+});
+
 test("recommendation run view model renders terminal states and output", () => {
   const blocked = buildRecommendationRunViewModel({
     recommendationRun: createRecommendationRunFixture({

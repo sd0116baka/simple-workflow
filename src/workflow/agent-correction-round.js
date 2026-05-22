@@ -1,6 +1,7 @@
 import { runConvergence } from "./convergence-flow.js";
 import { runExecutionAgent } from "./execution-agent-flow.js";
 import { runReviewAgent } from "./review-agent-flow.js";
+import { isWorkflowStageEnabled } from "./workflow-stage-switches.js";
 
 async function applyRoundAppend({
   appendRequest,
@@ -27,8 +28,18 @@ export async function runAgentCorrectionRound({
   runExecution = runExecutionAgent,
   runReview = runReviewAgent,
   runConverge = runConvergence,
+  stageSwitches,
 } = {}) {
   let currentPackage = taskContextPackage;
+
+  if (!currentPackage || !isWorkflowStageEnabled(stageSwitches, "executionAgent")) {
+    return {
+      taskContextPackage: currentPackage,
+      executionAgentRun: null,
+      reviewAgentRun: null,
+      convergenceRun: null,
+    };
+  }
 
   const executionAgentRun = !currentPackage
     ? null
@@ -55,6 +66,15 @@ export async function runAgentCorrectionRound({
     };
   }
 
+  if (!isWorkflowStageEnabled(stageSwitches, "reviewAgent")) {
+    return {
+      taskContextPackage: currentPackage,
+      executionAgentRun,
+      reviewAgentRun: null,
+      convergenceRun: null,
+    };
+  }
+
   const reviewAgentRun = !currentPackage
     ? null
     : await runReview({
@@ -70,6 +90,15 @@ export async function runAgentCorrectionRound({
     applyAppendRequest,
   });
   if (!reviewAgentRun?.appendRequest) {
+    return {
+      taskContextPackage: currentPackage,
+      executionAgentRun,
+      reviewAgentRun,
+      convergenceRun: null,
+    };
+  }
+
+  if (!isWorkflowStageEnabled(stageSwitches, "convergence")) {
     return {
       taskContextPackage: currentPackage,
       executionAgentRun,

@@ -27,6 +27,7 @@ export async function loadRecommendationRunCompletionInput({
 
   return {
     run,
+    stageSwitches: run.stageSwitches,
     commandResult,
     tasks,
     startupCheck,

@@ -1,3 +1,5 @@
+import { normalizeWorkflowStageSwitches } from "../workflow/workflow-stage-switches.js";
+
 export function createWorkflowRecommendationRunRouteDefinitions({
   workflowService,
   httpAdapter,
@@ -26,8 +28,9 @@ export function createWorkflowRecommendationRunRouteDefinitions({
 
         const body = request ? await httpAdapter.readJsonBody(request) : {};
         const mode = body.mode === "probe" ? "probe" : "workflow";
+        const stageSwitches = normalizeWorkflowStageSwitches(body.stageSwitches);
         httpAdapter.sendJson(response, 201, {
-          recommendationRun: await workflowService.createRecommendationRun({ mode }),
+          recommendationRun: await workflowService.createRecommendationRun({ mode, stageSwitches }),
         });
       },
     },

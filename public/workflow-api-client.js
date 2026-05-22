@@ -61,10 +61,10 @@ export function createWorkflowApiClient({
       });
     },
 
-    startRecommendationRun({ mode = "workflow" } = {}) {
+    startRecommendationRun({ mode = "workflow", stageSwitches } = {}) {
       return requestJson("/api/recommendation-runs", {
         method: "POST",
-        body: { mode },
+        body: stageSwitches ? { mode, stageSwitches } : { mode },
         errorMessage: "启动推荐器失败",
       });
     },

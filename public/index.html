@@ -117,6 +117,32 @@
                   </div>
                 </div>
                 <div id="recommendationInputs" class="stage-inputs">等待输入。</div>
+                <div class="workflow-stage-switches" aria-label="流程执行开关">
+                  <label class="workflow-stage-switch">
+                    <input id="stageSwitchExecutionAdmission" type="checkbox">
+                    <span>执行准入</span>
+                  </label>
+                  <label class="workflow-stage-switch">
+                    <input id="stageSwitchIsolatedWorkspace" type="checkbox">
+                    <span>隔离工作区</span>
+                  </label>
+                  <label class="workflow-stage-switch">
+                    <input id="stageSwitchMainAgent" type="checkbox">
+                    <span>main agent</span>
+                  </label>
+                  <label class="workflow-stage-switch">
+                    <input id="stageSwitchExecutionAgent" type="checkbox">
+                    <span>execution agent</span>
+                  </label>
+                  <label class="workflow-stage-switch">
+                    <input id="stageSwitchReviewAgent" type="checkbox">
+                    <span>review agent</span>
+                  </label>
+                  <label class="workflow-stage-switch">
+                    <input id="stageSwitchConvergence" type="checkbox">
+                    <span>convergence</span>
+                  </label>
+                </div>
                 <pre id="recommendationTerminal" class="terminal-output">尚未启动进程。</pre>
                 <pre id="recommendationRaw" class="code-block">尚未触发推荐器。</pre>
               </div>

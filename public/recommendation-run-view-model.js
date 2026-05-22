@@ -4,6 +4,23 @@ import {
   stripAnsi,
 } from "./workflow-formatters.js";
 
+const STAGE_SWITCH_LABELS = Object.freeze({
+  executionAdmission: "执行准入",
+  isolatedWorkspace: "隔离工作区",
+  mainAgent: "main agent",
+  executionAgent: "execution agent",
+  reviewAgent: "review agent",
+  convergence: "convergence",
+});
+
+function describeStageSwitches(stageSwitches) {
+  if (!stageSwitches) return "默认全开";
+  const enabledLabels = Object.entries(STAGE_SWITCH_LABELS)
+    .filter(([key]) => stageSwitches[key] === true)
+    .map(([, label]) => label);
+  return enabledLabels.length > 0 ? enabledLabels.join("、") : "未开启";
+}
+
 export function buildRecommendationRaw(run) {
   if (!run) return "尚未触发推荐器。";
   const chunks = [];
@@ -30,6 +47,7 @@ export function buildRecommendationRunViewModel({
         ? "推荐探针（不启动后续 Agent）"
         : "完整 Agent 流程",
     },
+    { label: "流程开关", value: describeStageSwitches(recommendationRun?.stageSwitches) },
     { label: "prompt", value: "project_profiles/recommender-agent.prompt.md" },
     { label: "命令", value: "opencode run --format json" },
     { label: "工作目录", value: "仓库根目录" },

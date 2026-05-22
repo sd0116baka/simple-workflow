@@ -93,3 +93,107 @@ test("agent correction round stops before review when execution fails", async ()
   assert.equal(result.reviewAgentRun, null);
   assert.equal(result.convergenceRun, null);
 });
+
+test("agent correction round does not start execution when the execution switch is disabled", async () => {
+  const basePackage = createTaskContextPackageFixture({
+    currentWorkStage: "main-agent",
+  });
+
+  const result = await runAgentCorrectionRound({
+    taskContextPackage: basePackage,
+    stageSwitches: {
+      executionAgent: false,
+      reviewAgent: true,
+      convergence: true,
+    },
+    runExecution: async () => {
+      throw new Error("execution should not run");
+    },
+    applyAppendRequest: async () => {
+      throw new Error("append should not run");
+    },
+  });
+
+  assert.equal(result.taskContextPackage, basePackage);
+  assert.equal(result.executionAgentRun, null);
+  assert.equal(result.reviewAgentRun, null);
+  assert.equal(result.convergenceRun, null);
+});
+
+test("agent correction round stops before review when the review switch is disabled", async () => {
+  const applied = [];
+  const result = await runAgentCorrectionRound({
+    taskContextPackage: createTaskContextPackageFixture({
+      currentWorkStage: "execution-agent",
+    }),
+    stageSwitches: {
+      executionAgent: true,
+      reviewAgent: false,
+      convergence: true,
+    },
+    runExecution: async () => ({
+      appendRequest: appendRequest("executionReport"),
+      error: null,
+    }),
+    runReview: async () => {
+      throw new Error("review should not run");
+    },
+    runConverge: async () => {
+      throw new Error("convergence should not run");
+    },
+    applyAppendRequest: async (request, { currentWorkStage }) => {
+      applied.push([request.artifactType, currentWorkStage]);
+      return {
+        packageId: request.packageId,
+        currentWorkStage,
+      };
+    },
+  });
+
+  assert.deepEqual(applied, [["executionReport", "execution-agent"]]);
+  assert.equal(result.executionAgentRun.appendRequest.artifactType, "executionReport");
+  assert.equal(result.reviewAgentRun, null);
+  assert.equal(result.convergenceRun, null);
+  assert.equal(result.taskContextPackage.currentWorkStage, "execution-agent");
+});
+
+test("agent correction round stops before convergence when the convergence switch is disabled", async () => {
+  const applied = [];
+  const result = await runAgentCorrectionRound({
+    taskContextPackage: createTaskContextPackageFixture({
+      currentWorkStage: "execution-agent",
+    }),
+    stageSwitches: {
+      executionAgent: true,
+      reviewAgent: true,
+      convergence: false,
+    },
+    runExecution: async () => ({
+      appendRequest: appendRequest("executionReport"),
+      error: null,
+    }),
+    runReview: async () => ({
+      appendRequest: appendRequest("reviewReport"),
+      error: null,
+    }),
+    runConverge: async () => {
+      throw new Error("convergence should not run");
+    },
+    applyAppendRequest: async (request, { currentWorkStage }) => {
+      applied.push([request.artifactType, currentWorkStage]);
+      return {
+        packageId: request.packageId,
+        currentWorkStage,
+      };
+    },
+  });
+
+  assert.deepEqual(applied, [
+    ["executionReport", "execution-agent"],
+    ["reviewReport", "review-agent"],
+  ]);
+  assert.equal(result.executionAgentRun.appendRequest.artifactType, "executionReport");
+  assert.equal(result.reviewAgentRun.appendRequest.artifactType, "reviewReport");
+  assert.equal(result.convergenceRun, null);
+  assert.equal(result.taskContextPackage.currentWorkStage, "review-agent");
+});

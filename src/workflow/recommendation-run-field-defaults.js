@@ -1,5 +1,8 @@
+import { normalizeWorkflowStageSwitches } from "./workflow-stage-switches.js";
+
 export const RECOMMENDATION_RUN_FIELD_CLONE_GROUPS = Object.freeze({
   jsonOrNull: Object.freeze([
+    "stageSwitches",
     "executionIntent",
     "executionIntentAppendRequest",
     "executionAdmission",

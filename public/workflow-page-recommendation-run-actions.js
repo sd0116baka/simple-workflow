@@ -7,6 +7,7 @@ import {
 export async function startRecommendationRunAction({
   workflowApi,
   mode = "workflow",
+  stageSwitches,
   pendingText = "正在启动推荐器...",
   setRecommendationRun,
   renderRecommendationRun,
@@ -24,7 +25,9 @@ export async function startRecommendationRunAction({
   setRecommendationStatus("启动中");
   setRecommendationResultText(pendingText);
   try {
-    const payload = await workflowApi.startRecommendationRun({ mode });
+    const payload = await workflowApi.startRecommendationRun(
+      stageSwitches ? { mode, stageSwitches } : { mode },
+    );
     setRecommendationRun(payload.recommendationRun);
   } catch (error) {
     if (

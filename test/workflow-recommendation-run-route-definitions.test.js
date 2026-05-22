@@ -2,6 +2,15 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createWorkflowRecommendationRunRouteDefinitions } from "../src/server/workflow-recommendation-run-route-definitions.js";
 
+const DEFAULT_STAGE_SWITCHES = {
+  executionAdmission: true,
+  isolatedWorkspace: true,
+  mainAgent: true,
+  executionAgent: true,
+  reviewAgent: true,
+  convergence: true,
+};
+
 function createHttpAdapterProbe() {
   const calls = [];
   return {
@@ -86,7 +95,7 @@ test("recommendation run route passes probe mode to the workflow service", async
     path: "/api/recommendation-runs",
   }).handle({ request, response });
 
-  assert.deepEqual(calls, [{ mode: "probe" }]);
+  assert.deepEqual(calls, [{ mode: "probe", stageSwitches: DEFAULT_STAGE_SWITCHES }]);
   assert.equal(response.sent.status, 201);
   assert.deepEqual(response.sent.payload, { recommendationRun: createdRun });
 });
@@ -113,8 +122,53 @@ test("recommendation run route defaults to workflow mode", async () => {
     path: "/api/recommendation-runs",
   }).handle({ response });
 
-  assert.deepEqual(calls, [{ mode: "workflow" }]);
+  assert.deepEqual(calls, [{ mode: "workflow", stageSwitches: DEFAULT_STAGE_SWITCHES }]);
   assert.equal(response.sent.payload.recommendationRun.mode, "workflow");
+});
+
+test("recommendation run route passes normalized stage switches", async () => {
+  const httpAdapter = createHttpAdapterProbe();
+  const calls = [];
+  const definitions = createWorkflowRecommendationRunRouteDefinitions({
+    httpAdapter,
+    workflowService: {
+      getLatestRecommendationRun() {
+        return null;
+      },
+      async createRecommendationRun(input) {
+        calls.push(input);
+        return { id: "recommendation-run:001", mode: input.mode };
+      },
+    },
+  });
+  const request = {
+    body: {
+      stageSwitches: {
+        executionAdmission: false,
+        mainAgent: false,
+        reviewAgent: true,
+      },
+    },
+  };
+  const response = {};
+
+  await findRoute(definitions, {
+    method: "POST",
+    path: "/api/recommendation-runs",
+  }).handle({ request, response });
+
+  assert.deepEqual(calls, [{
+    mode: "workflow",
+    stageSwitches: {
+      executionAdmission: false,
+      isolatedWorkspace: true,
+      mainAgent: false,
+      executionAgent: true,
+      reviewAgent: true,
+      convergence: true,
+    },
+  }]);
+  assert.equal(response.sent.status, 201);
 });
 
 test("recommendation run route rejects start while a run is active", async () => {

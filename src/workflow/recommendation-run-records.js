@@ -1,9 +1,11 @@
 import { createEmptyRecommendationRunFields } from "./recommendation-run-field-defaults.js";
 import { OPENCODE_RECOMMENDATION_ARGS } from "./recommendation-runner.js";
+import { normalizeWorkflowStageSwitches } from "./workflow-stage-switches.js";
 
 export function createBlockedRecommendationRun({
   id,
   mode = "workflow",
+  stageSwitches = normalizeWorkflowStageSwitches(),
   startupCheck,
   now = () => new Date().toISOString(),
 }) {
@@ -11,6 +13,7 @@ export function createBlockedRecommendationRun({
   return {
     id,
     mode,
+    stageSwitches: normalizeWorkflowStageSwitches(stageSwitches),
     status: "blocked",
     startedAt: timestamp,
     finishedAt: timestamp,
@@ -25,6 +28,7 @@ export function createBlockedRecommendationRun({
 export function createRunningRecommendationRun({
   id,
   mode = "workflow",
+  stageSwitches = normalizeWorkflowStageSwitches(),
   basePrompt,
   taskPool,
   startupCheck,
@@ -33,6 +37,7 @@ export function createRunningRecommendationRun({
   return {
     id,
     mode,
+    stageSwitches: normalizeWorkflowStageSwitches(stageSwitches),
     status: "running",
     startedAt: now(),
     finishedAt: null,
