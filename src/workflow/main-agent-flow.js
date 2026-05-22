@@ -1,22 +1,32 @@
+import { existsSync } from "node:fs";
 import {
   createAgentSessionRequest,
   createStubAgentSession,
 } from "./agent-session-contract.js";
+import { resolveWorktreePath } from "./git-worktree-state.js";
 import {
   buildMainAgentInitializationRequest,
   MAIN_AGENT_INITIALIZATION_INPUT_REFS,
   MAIN_AGENT_INITIALIZATION_RUN_ID,
 } from "./main-agent-contract.js";
-import { hasArtifactBody } from "./task-package-artifacts.js";
+import { artifactBody, hasArtifactBody } from "./task-package-artifacts.js";
 
 function hasExecutionAuthorization(taskContextPackage) {
   return hasArtifactBody(taskContextPackage, "executionAuthorization");
 }
 
+function isolatedWorkspacePath(taskContextPackage, repositoryDir) {
+  const worktreePath = artifactBody(taskContextPackage, "isolatedWorkspace")?.worktreePath;
+  return resolveWorktreePath(worktreePath, repositoryDir);
+}
+
 export async function initializeMainAgent({
   taskContextPackage,
   runAgentSession = createStubAgentSession,
+  repositoryDir = process.cwd(),
   now = () => new Date().toISOString(),
+  onProgress,
+  signal,
 } = {}) {
   if (!taskContextPackage?.packageId) {
     throw new Error("taskContextPackage.packageId is required");
@@ -28,13 +38,25 @@ export async function initializeMainAgent({
     };
   }
 
+  const cwd = isolatedWorkspacePath(taskContextPackage, repositoryDir);
+  if (cwd && !existsSync(cwd)) {
+    const worktreePath = artifactBody(taskContextPackage, "isolatedWorkspace")?.worktreePath;
+    return {
+      appendRequest: null,
+      error: `隔离工作树路径不存在，不能初始化 main agent：${worktreePath}`,
+    };
+  }
+
   const startedAt = now();
   const session = await runAgentSession(createAgentSessionRequest({
     role: "main",
     packageId: taskContextPackage.packageId,
+    cwd,
     runId: MAIN_AGENT_INITIALIZATION_RUN_ID,
     inputArtifactRefs: MAIN_AGENT_INITIALIZATION_INPUT_REFS,
     taskContextPackage,
+    onProgress,
+    signal,
   }));
   const finishedAt = now();
 

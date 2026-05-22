@@ -89,6 +89,7 @@ export async function prepareRecommendationExecution({
       : await initializeMainAgent({
           taskContextPackage: workspaceReadyPackage,
           runAgentSession: runMainAgentSession,
+          repositoryDir,
           now,
         });
   taskPool = !mainAgentInitialization?.appendRequest

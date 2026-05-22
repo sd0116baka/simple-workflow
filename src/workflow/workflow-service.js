@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { getRepositoryStatus as readRepositoryStatus } from "./repository-status.js";
 import { runOpencodeExecutionAgentSession } from "./execution-agent-session-runner.js";
+import { runOpencodeMainAgentSession } from "./main-agent-session-runner.js";
 import { runOpencodeReviewAgentSession } from "./review-agent-session-runner.js";
 import { runOpencodeRecommendation } from "./recommendation-runner.js";
 import { createTaskContextPackageWorkspace } from "./task-context-package-workspace.js";
@@ -22,10 +23,10 @@ export function createWorkflowService({
   recommendationPromptPath = join(repositoryDir, "project_profiles", "recommender-agent.prompt.md"),
   taskContextPackageStoreDir = join(repositoryDir, ".workflow", "task-context-packages"),
   runRecommendationCommand = null,
-  runMainAgentSession,
+  runMainAgentSession = runOpencodeMainAgentSession,
   runExecutionAgentSession = runOpencodeExecutionAgentSession,
   runReviewAgentSession = runOpencodeReviewAgentSession,
-  runConvergenceSession,
+  runConvergenceSession = runOpencodeMainAgentSession,
   watchDebounceMs = 100,
 }) {
   const workflowEventBus = createWorkflowEventBus();

@@ -68,8 +68,10 @@ test("workflow service does not expose invalid tasks to the recommender prompt",
         error: null,
       };
     },
+    runMainAgentSession: createStubAgentSession,
     runExecutionAgentSession: runStubExecutionAgentSession,
     runReviewAgentSession: createStubAgentSession,
+    runConvergenceSession: createStubAgentSession,
   });
 
   const completed = new Promise((resolve) => {

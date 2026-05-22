@@ -31,8 +31,8 @@ export function buildConvergenceAdviceRequest({
   inputArtifactRefs,
   executionReport,
   reviewReport,
-  summary = "stub convergence advice",
-  nextAction = "等待真实 main agent 根据执行和审查结果给出下一轮执行意见。",
+  summary,
+  nextAction,
   startedAt,
   finishedAt,
 }) {
@@ -40,8 +40,8 @@ export function buildConvergenceAdviceRequest({
     packageId: taskContextPackage.packageId,
     artifactType: "convergenceAdvice",
     artifact: {
-      summary,
-      nextAction,
+      summary: summary ?? session.summary ?? "stub convergence advice",
+      nextAction: nextAction ?? session.nextAction ?? "等待真实 main agent 根据执行和审查结果给出下一轮执行意见。",
       basis: basisRefsFor(executionReport, reviewReport),
     },
     agentRun: agentRun({ runId, session, inputArtifactRefs, startedAt, finishedAt }),
@@ -55,7 +55,7 @@ export function buildConvergenceSuccessRequest({
   inputArtifactRefs,
   executionReport,
   reviewReport,
-  summary = "stub task completed",
+  summary,
   startedAt,
   finishedAt,
 }) {
@@ -63,7 +63,7 @@ export function buildConvergenceSuccessRequest({
     packageId: taskContextPackage.packageId,
     artifactType: "convergenceSuccess",
     artifact: {
-      summary,
+      summary: summary ?? session.summary ?? "stub task completed",
       basis: basisRefsFor(executionReport, reviewReport),
     },
     agentRun: agentRun({ runId, session, inputArtifactRefs, startedAt, finishedAt }),
@@ -80,9 +80,9 @@ export function buildConvergenceFailureRequest({
   attemptedFixRefs,
   maxIterations,
   completedIterations,
-  summary = "当前轮次无法自动收敛。",
-  reasonCode = "max-iterations-reached",
-  humanDecisionQuestion = "请提供人工收敛意见继续下一轮，或取消任务并恢复执行前状态。",
+  summary,
+  reasonCode,
+  humanDecisionQuestion,
   startedAt,
   finishedAt,
 }) {
@@ -90,12 +90,14 @@ export function buildConvergenceFailureRequest({
     packageId: taskContextPackage.packageId,
     artifactType: "convergenceFailure",
     artifact: {
-      summary,
-      reasonCode,
+      summary: summary ?? session.summary ?? "当前轮次无法自动收敛。",
+      reasonCode: reasonCode ?? session.reasonCode ?? "max-iterations-reached",
       basisRefs: basisRefsFor(executionReport, reviewReport),
       attemptedFixes: attemptedFixRefs,
       unresolvedIssues: reviewReport.body?.findings ?? [],
-      humanDecisionQuestion,
+      humanDecisionQuestion: humanDecisionQuestion
+        ?? session.humanDecisionQuestion
+        ?? "请提供人工收敛意见继续下一轮，或取消任务并恢复执行前状态。",
       maxIterations,
       completedIterations,
     },

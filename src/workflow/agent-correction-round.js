@@ -83,8 +83,11 @@ export async function runAgentCorrectionRound({
     : await runConverge({
         taskContextPackage: currentPackage,
         runAgentSession: runConvergenceSession,
+        repositoryDir,
         maxIterations,
         now,
+        onProgress,
+        signal,
       });
   currentPackage = await applyRoundAppend({
     appendRequest: convergenceRun?.appendRequest,

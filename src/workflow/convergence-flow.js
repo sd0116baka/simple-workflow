@@ -1,9 +1,11 @@
+import { existsSync } from "node:fs";
 import {
   createAgentSessionRequest,
   createStubAgentSession,
 } from "./agent-session-contract.js";
 import { inputArtifactRefsForConvergence } from "./agent-input-refs.js";
 import { nextConvergenceAgentRunId } from "./agent-run-ids.js";
+import { resolveWorktreePath } from "./git-worktree-state.js";
 import {
   buildConvergenceAdviceRequest,
   buildConvergenceFailureRequest,
@@ -11,17 +13,26 @@ import {
 } from "./convergence-contract.js";
 import { convergenceOutcome } from "./convergence-outcome-policy.js";
 import { latestReviewedExecutionArtifacts } from "./reviewed-execution-artifacts.js";
+import { artifactBody } from "./task-package-artifacts.js";
 
 function mainAgentSessionId(taskContextPackage) {
   const mainInitialization = taskContextPackage?.agentRuns?.[0];
   return mainInitialization?.role === "main" ? mainInitialization.sessionId : null;
 }
 
+function isolatedWorkspacePath(taskContextPackage, repositoryDir) {
+  const worktreePath = artifactBody(taskContextPackage, "isolatedWorkspace")?.worktreePath;
+  return resolveWorktreePath(worktreePath, repositoryDir);
+}
+
 export async function runConvergence({
   taskContextPackage,
   runAgentSession = createStubAgentSession,
+  repositoryDir = process.cwd(),
   maxIterations = null,
   now = () => new Date().toISOString(),
+  onProgress,
+  signal,
 } = {}) {
   if (!taskContextPackage?.packageId) {
     throw new Error("taskContextPackage.packageId is required");
@@ -53,6 +64,15 @@ export async function runConvergence({
   }
 
   const runId = nextConvergenceAgentRunId(taskContextPackage);
+  const cwd = isolatedWorkspacePath(taskContextPackage, repositoryDir);
+  if (cwd && !existsSync(cwd)) {
+    const worktreePath = artifactBody(taskContextPackage, "isolatedWorkspace")?.worktreePath;
+    return {
+      appendRequest: null,
+      error: `隔离工作树路径不存在，不能运行收敛环节：${worktreePath}`,
+    };
+  }
+
   const inputArtifactRefs = inputArtifactRefsForConvergence(
     taskContextPackage,
     executionReport,
@@ -63,9 +83,12 @@ export async function runConvergence({
     role: "main",
     packageId: taskContextPackage.packageId,
     sessionId,
+    cwd,
     taskContextPackage,
     runId,
     inputArtifactRefs,
+    onProgress,
+    signal,
   }));
   const finishedAt = now();
   const commonRequest = {

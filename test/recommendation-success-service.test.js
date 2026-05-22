@@ -44,8 +44,10 @@ test("workflow service captures a successful recommendation run", async (t) => {
         error: null,
       };
     },
+    runMainAgentSession: createStubAgentSession,
     runExecutionAgentSession: runStubExecutionAgentSession,
     runReviewAgentSession: createStubAgentSession,
+    runConvergenceSession: createStubAgentSession,
   });
 
   const completed = new Promise((resolve) => {
@@ -161,8 +163,10 @@ test("workflow service captures a successful recommendation run", async (t) => {
     runRecommendationCommand: async () => {
       throw new Error("should not run");
     },
+    runMainAgentSession: createStubAgentSession,
     runExecutionAgentSession: runStubExecutionAgentSession,
     runReviewAgentSession: createStubAgentSession,
+    runConvergenceSession: createStubAgentSession,
   });
   const accepted = await resumedHumanDecisionService.acceptConvergenceSuccess({
     packageId: "task-context-package:tasks/task-001.yaml",
@@ -248,8 +252,10 @@ test("workflow service captures a successful recommendation run", async (t) => {
     runRecommendationCommand: async () => {
       throw new Error("should not run");
     },
+    runMainAgentSession: createStubAgentSession,
     runExecutionAgentSession: runStubExecutionAgentSession,
     runReviewAgentSession: createStubAgentSession,
+    runConvergenceSession: createStubAgentSession,
   });
   const taskPoolAfterRestart = await restartedService.listTaskPool();
 
