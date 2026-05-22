@@ -20,6 +20,7 @@ const WORKFLOW_PAGE_SELECTORS = {
   recommendationStatus: "#recommendationStatus",
   recommendationResult: "#recommendationResult",
   runRecommendationButton: "#runRecommendationButton",
+  runWorkflowButton: "#runWorkflowButton",
   cancelRecommendationButton: "#cancelRecommendationButton",
   taskPoolRaw: "#taskPoolRaw",
   startupCheckRaw: "#startupCheckRaw",

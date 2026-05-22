@@ -1,10 +1,12 @@
 import { prepareRecommendationExecution } from "./recommendation-execution-preparation.js";
 import { runRecommendationCompletionSequence } from "./recommendation-completion-sequence.js";
+import { createSkippedRecommendationSequence } from "./recommendation-completion-sequence-shape.js";
 import { buildCompletedRecommendationRun } from "./recommendation-run-completion-projection.js";
 import { decideRecommendationRunStart } from "./recommendation-run-start-decision.js";
 
 export async function startRecommendationFlow({
   id,
+  mode = "workflow",
   tasks,
   startupCheck,
   recommendationPromptPath,
@@ -13,6 +15,7 @@ export async function startRecommendationFlow({
 }) {
   return decideRecommendationRunStart({
     id,
+    mode,
     tasks,
     startupCheck,
     recommendationPromptPath,
@@ -23,6 +26,7 @@ export async function startRecommendationFlow({
 
 export async function completeRecommendationFlow({
   run,
+  mode = run?.mode ?? "workflow",
   commandResult,
   tasks,
   startupCheck,
@@ -46,18 +50,21 @@ export async function completeRecommendationFlow({
     runMainAgentSession,
     repositoryDir,
     now,
+    prepareDownstream: mode !== "probe",
   });
-  const sequence = await runRecommendationCompletionSequence({
-    preparation,
-    projectProfile,
-    runExecutionAgentSession,
-    runReviewAgentSession,
-    runConvergenceSession,
-    repositoryDir,
-    now,
-    onProgress,
-    signal,
-  });
+  const sequence = mode === "probe"
+    ? createSkippedRecommendationSequence(preparation.taskPool)
+    : await runRecommendationCompletionSequence({
+        preparation,
+        projectProfile,
+        runExecutionAgentSession,
+        runReviewAgentSession,
+        runConvergenceSession,
+        repositoryDir,
+        now,
+        onProgress,
+        signal,
+      });
 
   return buildCompletedRecommendationRun({
     run,

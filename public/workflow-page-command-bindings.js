@@ -40,7 +40,10 @@ export function createWorkflowPageCommandBindings({
       commandActions.cleanupStateFixtures().catch(showError);
     });
     elements.runRecommendationButton.addEventListener("click", () => {
-      commandActions.createRecommendationRun().catch(showError);
+      commandActions.createRecommendationRun({ mode: "probe" }).catch(showError);
+    });
+    elements.runWorkflowButton?.addEventListener("click", () => {
+      commandActions.createWorkflowRun().catch(showError);
     });
     elements.cancelRecommendationButton?.addEventListener("click", () => {
       commandActions.cancelRecommendationRun().catch(showError);

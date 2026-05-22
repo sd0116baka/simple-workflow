@@ -67,6 +67,26 @@ test("workflow API client posts action payloads as JSON", async () => {
   });
 });
 
+test("workflow API client posts recommendation run mode as JSON", async () => {
+  const calls = [];
+  const client = createWorkflowApiClient({
+    fetchImpl: async (path, options = {}) => {
+      calls.push({ path, options });
+      return jsonResponse({ recommendationRun: { id: "recommendation-run:001" } });
+    },
+  });
+
+  await client.startRecommendationRun({ mode: "probe" });
+
+  assert.equal(calls[0].path, "/api/recommendation-runs");
+  assert.equal(calls[0].options.method, "POST");
+  assert.deepEqual(JSON.parse(calls[0].options.body), { mode: "probe" });
+  assert.deepEqual(calls[0].options.headers, {
+    "content-type": "application/json",
+  });
+});
+
+
 test("workflow API client posts terminal session actions as JSON", async () => {
   const calls = [];
   const client = createWorkflowApiClient({

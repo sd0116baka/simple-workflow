@@ -84,6 +84,9 @@ export function renderRecommendationRunLiveState({
   workflowOverviewRenderers.renderInputs(elements.admissionInputs, viewModel.admissionInputs);
 
   elements.runRecommendationButton.disabled = viewModel.controls.runDisabled;
+  if (elements.runWorkflowButton) {
+    elements.runWorkflowButton.disabled = viewModel.controls.runDisabled;
+  }
   if (elements.cancelRecommendationButton) {
     elements.cancelRecommendationButton.hidden = viewModel.controls.cancelHidden;
     elements.cancelRecommendationButton.disabled = viewModel.controls.cancelDisabled;

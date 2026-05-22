@@ -44,6 +44,7 @@ export function createRecommendationRunRenderTargets(elements) {
     recommendationInputs: elements.recommendationInputs,
     admissionInputs: elements.admissionInputs,
     runRecommendationButton: elements.runRecommendationButton,
+    runWorkflowButton: elements.runWorkflowButton,
     cancelRecommendationButton: elements.cancelRecommendationButton,
     recommendationStatus: elements.recommendationStatus,
     admissionStatus: elements.admissionStatus,

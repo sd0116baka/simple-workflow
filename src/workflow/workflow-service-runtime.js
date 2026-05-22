@@ -31,8 +31,8 @@ export function createWorkflowServiceRuntime({
       return workflowTestFixtureService.cleanupTestStateFixtures();
     },
 
-    async createRecommendationRun() {
-      return recommendationRunLifecycle.createRecommendationRun();
+    async createRecommendationRun(input = {}) {
+      return recommendationRunLifecycle.createRecommendationRun(input);
     },
 
     cancelRecommendationRun() {

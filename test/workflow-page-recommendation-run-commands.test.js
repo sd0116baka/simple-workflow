@@ -15,12 +15,13 @@ function createButton({ textContent = "" } = {}) {
 function createHarness() {
   const calls = [];
   const elements = {
-    runRecommendationButton: createButton({ textContent: "运行推荐器" }),
+    runRecommendationButton: createButton({ textContent: "运行推荐探针" }),
+    runWorkflowButton: createButton({ textContent: "运行完整流程" }),
     cancelRecommendationButton: createButton({ textContent: "取消运行" }),
   };
   const workflowApi = {
-    async startRecommendationRun() {
-      calls.push(["startRecommendationRun"]);
+    async startRecommendationRun(input) {
+      calls.push(["startRecommendationRun", input]);
       return { recommendationRun: { id: "recommendation-run:001" } };
     },
     async cancelRecommendationRun() {
@@ -53,12 +54,29 @@ test("workflow page recommendation run commands start a recommendation run", asy
   const result = await harness.commands.createRecommendationRun();
 
   assert.equal(result.ok, true);
-  assert.equal(harness.elements.runRecommendationButton.disabled, true);
+  assert.equal(harness.elements.runWorkflowButton.disabled, true);
   assert.equal(harness.elements.cancelRecommendationButton.hidden, true);
   assert.deepEqual(harness.calls, [
     ["setRecommendationStatus", "启动中"],
-    ["setRecommendationResultText", "正在启动推荐器..."],
-    ["startRecommendationRun"],
+    ["setRecommendationResultText", "正在启动完整流程..."],
+    ["startRecommendationRun", { mode: "workflow" }],
+    ["setRecommendationRun", { id: "recommendation-run:001" }],
+    ["renderRecommendationRun"],
+  ]);
+});
+
+test("workflow page recommendation run commands start a probe run", async () => {
+  const harness = createHarness();
+
+  const result = await harness.commands.createRecommendationRun({ mode: "probe" });
+
+  assert.equal(result.ok, true);
+  assert.equal(harness.elements.runRecommendationButton.disabled, true);
+  assert.equal(harness.elements.runWorkflowButton.disabled, true);
+  assert.deepEqual(harness.calls, [
+    ["setRecommendationStatus", "启动中"],
+    ["setRecommendationResultText", "正在启动推荐探针..."],
+    ["startRecommendationRun", { mode: "probe" }],
     ["setRecommendationRun", { id: "recommendation-run:001" }],
     ["renderRecommendationRun"],
   ]);
@@ -67,8 +85,8 @@ test("workflow page recommendation run commands start a recommendation run", asy
 test("workflow page recommendation run commands render conflict runs", async () => {
   const harness = createHarness();
   const conflictRun = { id: "recommendation-run:running" };
-  harness.workflowApi.startRecommendationRun = async () => {
-    harness.calls.push(["startRecommendationRun"]);
+  harness.workflowApi.startRecommendationRun = async (input) => {
+    harness.calls.push(["startRecommendationRun", input]);
     throw new WorkflowApiError("already running", {
       status: 409,
       payload: { recommendationRun: conflictRun },
@@ -81,8 +99,8 @@ test("workflow page recommendation run commands render conflict runs", async () 
   assert.equal(result.conflict, true);
   assert.deepEqual(harness.calls, [
     ["setRecommendationStatus", "启动中"],
-    ["setRecommendationResultText", "正在启动推荐器..."],
-    ["startRecommendationRun"],
+    ["setRecommendationResultText", "正在启动完整流程..."],
+    ["startRecommendationRun", { mode: "workflow" }],
     ["setRecommendationRun", conflictRun],
     ["renderRecommendationRun"],
   ]);

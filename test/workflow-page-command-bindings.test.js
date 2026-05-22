@@ -40,6 +40,7 @@ function createHarness() {
     seedStateFixturesButton: new FakeButton(),
     cleanupStateFixturesButton: new FakeButton(),
     runRecommendationButton: new FakeButton(),
+    runWorkflowButton: new FakeButton(),
     cancelRecommendationButton: new FakeButton(),
     terminalStartButton: new FakeButton(),
     terminalCancelButton: new FakeButton(),
@@ -51,7 +52,8 @@ function createHarness() {
     restartServer: async () => calls.push(["restartServer"]),
     seedStateFixtures: async () => calls.push(["seedStateFixtures"]),
     cleanupStateFixtures: async () => calls.push(["cleanupStateFixtures"]),
-    createRecommendationRun: async () => calls.push(["createRecommendationRun"]),
+    createRecommendationRun: async (input) => calls.push(["createRecommendationRun", input]),
+    createWorkflowRun: async () => calls.push(["createWorkflowRun"]),
     cancelRecommendationRun: async () => calls.push(["cancelRecommendationRun"]),
     startTerminalSession: async () => calls.push(["startTerminalSession"]),
     sendTerminalInput: async () => calls.push(["sendTerminalInput"]),
@@ -83,6 +85,7 @@ test("workflow page command bindings route page control events to command action
   harness.elements.seedStateFixturesButton.click();
   harness.elements.cleanupStateFixturesButton.click();
   harness.elements.runRecommendationButton.click();
+  harness.elements.runWorkflowButton.click();
   harness.elements.cancelRecommendationButton.click();
   harness.elements.terminalStartButton.click();
   harness.elements.terminalSendButton.click();
@@ -93,7 +96,8 @@ test("workflow page command bindings route page control events to command action
     ["refreshPage"],
     ["seedStateFixtures"],
     ["cleanupStateFixtures"],
-    ["createRecommendationRun"],
+    ["createRecommendationRun", { mode: "probe" }],
+    ["createWorkflowRun"],
     ["cancelRecommendationRun"],
     ["startTerminalSession"],
     ["sendTerminalInput"],

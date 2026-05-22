@@ -24,6 +24,10 @@ export function buildRecommendationRunViewModel({
 } = {}) {
   const rawText = buildRecommendationRaw(recommendationRun);
   const recommendationInputs = [
+    {
+      label: "模式",
+      value: recommendationRun?.mode === "probe" ? "推荐探针" : "工作流流程",
+    },
     { label: "prompt", value: "project_profiles/recommender-agent.prompt.md" },
     { label: "命令", value: "opencode run --format json" },
     { label: "工作目录", value: "仓库根目录" },

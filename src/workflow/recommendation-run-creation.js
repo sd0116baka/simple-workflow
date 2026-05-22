@@ -4,6 +4,7 @@ import { toRecommendationSnapshot } from "./recommendation-run-snapshot.js";
 import { listRawTasks } from "./task-source.js";
 
 export async function createRecommendationRunTransaction({
+  mode = "workflow",
   tasksDir,
   recommendationPromptPath,
   taskContextWorkspace,
@@ -26,6 +27,7 @@ export async function createRecommendationRunTransaction({
   const startupCheck = await getStartupCheck();
   const { run } = await startFlow({
     id: recommendationRunLifecycleState.nextRunId(),
+    mode,
     tasks: await listTasks(tasksDir),
     startupCheck,
     recommendationPromptPath,

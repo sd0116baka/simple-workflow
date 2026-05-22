@@ -1,10 +1,16 @@
 import { createEmptyRecommendationRunFields } from "./recommendation-run-field-defaults.js";
 import { OPENCODE_RECOMMENDATION_ARGS } from "./recommendation-runner.js";
 
-export function createBlockedRecommendationRun({ id, startupCheck, now = () => new Date().toISOString() }) {
+export function createBlockedRecommendationRun({
+  id,
+  mode = "workflow",
+  startupCheck,
+  now = () => new Date().toISOString(),
+}) {
   const timestamp = now();
   return {
     id,
+    mode,
     status: "blocked",
     startedAt: timestamp,
     finishedAt: timestamp,
@@ -18,6 +24,7 @@ export function createBlockedRecommendationRun({ id, startupCheck, now = () => n
 
 export function createRunningRecommendationRun({
   id,
+  mode = "workflow",
   basePrompt,
   taskPool,
   startupCheck,
@@ -25,6 +32,7 @@ export function createRunningRecommendationRun({
 }) {
   return {
     id,
+    mode,
     status: "running",
     startedAt: now(),
     finishedAt: null,

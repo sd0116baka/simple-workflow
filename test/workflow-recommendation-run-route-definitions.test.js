@@ -10,6 +10,10 @@ function createHttpAdapterProbe() {
       calls.push({ type: "json", status, payload });
       response.sent = { status, payload };
     },
+    async readJsonBody(request) {
+      calls.push({ type: "readJsonBody", request });
+      return request.body ?? {};
+    },
   };
 }
 
@@ -56,6 +60,61 @@ test("recommendation run route starts a run when no run is active", async () => 
 
   assert.equal(response.sent.status, 201);
   assert.deepEqual(response.sent.payload, { recommendationRun: createdRun });
+});
+
+test("recommendation run route passes probe mode to the workflow service", async () => {
+  const httpAdapter = createHttpAdapterProbe();
+  const createdRun = { id: "recommendation-run:001", mode: "probe", status: "running" };
+  const calls = [];
+  const definitions = createWorkflowRecommendationRunRouteDefinitions({
+    httpAdapter,
+    workflowService: {
+      getLatestRecommendationRun() {
+        return null;
+      },
+      async createRecommendationRun(input) {
+        calls.push(input);
+        return createdRun;
+      },
+    },
+  });
+  const request = { body: { mode: "probe" } };
+  const response = {};
+
+  await findRoute(definitions, {
+    method: "POST",
+    path: "/api/recommendation-runs",
+  }).handle({ request, response });
+
+  assert.deepEqual(calls, [{ mode: "probe" }]);
+  assert.equal(response.sent.status, 201);
+  assert.deepEqual(response.sent.payload, { recommendationRun: createdRun });
+});
+
+test("recommendation run route defaults to workflow mode", async () => {
+  const httpAdapter = createHttpAdapterProbe();
+  const calls = [];
+  const definitions = createWorkflowRecommendationRunRouteDefinitions({
+    httpAdapter,
+    workflowService: {
+      getLatestRecommendationRun() {
+        return null;
+      },
+      async createRecommendationRun(input) {
+        calls.push(input);
+        return { id: "recommendation-run:001", mode: input.mode };
+      },
+    },
+  });
+  const response = {};
+
+  await findRoute(definitions, {
+    method: "POST",
+    path: "/api/recommendation-runs",
+  }).handle({ response });
+
+  assert.deepEqual(calls, [{ mode: "workflow" }]);
+  assert.equal(response.sent.payload.recommendationRun.mode, "workflow");
 });
 
 test("recommendation run route rejects start while a run is active", async () => {

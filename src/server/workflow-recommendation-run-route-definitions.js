@@ -14,7 +14,7 @@ export function createWorkflowRecommendationRunRouteDefinitions({
     {
       method: "POST",
       path: "/api/recommendation-runs",
-      async handle({ response }) {
+      async handle({ request, response }) {
         const currentRun = workflowService.getLatestRecommendationRun?.();
         if (currentRun?.status === "running") {
           httpAdapter.sendJson(response, 409, {
@@ -24,8 +24,10 @@ export function createWorkflowRecommendationRunRouteDefinitions({
           return;
         }
 
+        const body = request ? await httpAdapter.readJsonBody(request) : {};
+        const mode = body.mode === "probe" ? "probe" : "workflow";
         httpAdapter.sendJson(response, 201, {
-          recommendationRun: await workflowService.createRecommendationRun(),
+          recommendationRun: await workflowService.createRecommendationRun({ mode }),
         });
       },
     },

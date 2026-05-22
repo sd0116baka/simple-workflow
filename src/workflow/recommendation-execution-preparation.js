@@ -13,6 +13,7 @@ export async function prepareRecommendationExecution({
   runMainAgentSession,
   repositoryDir,
   now = () => new Date().toISOString(),
+  prepareDownstream = true,
 }) {
   const commandFailed = Boolean(commandResult.error || commandResult.exitCode !== 0);
   const parsed = commandFailed
@@ -21,6 +22,19 @@ export async function prepareRecommendationExecution({
   let taskPool = commandFailed ? null : buildTaskPool(tasks, {
     taskContextPackages: existingTaskContextPackages,
   });
+
+  if (!prepareDownstream) {
+    return {
+      commandFailed,
+      parsed,
+      taskPool,
+      packageId: parsed.appendRequest?.packageId ?? null,
+      executionAdmission: null,
+      isolatedWorkspaceAllocation: null,
+      mainAgentInitialization: null,
+      taskContextPackage: null,
+    };
+  }
 
   if (commandFailed || !parsed.appendRequest) {
     return {

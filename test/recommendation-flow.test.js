@@ -284,6 +284,48 @@ test("recommendation flow applies module append requests through the task pool",
   assert.equal(completed.taskContextPackage.timeline.at(-1).artifactId, "humanDecisionRequest");
 });
 
+test("recommendation flow probe mode stops after parsing execution intent", async (t) => {
+  const repositoryDir = await createGitRepository(t);
+  let executionAgentCalled = false;
+  const completed = await completeRecommendationFlow({
+    mode: "probe",
+    run: {
+      id: "recommendation-run-flow",
+      mode: "probe",
+      status: "running",
+      startedAt: "2026-05-18T10:00:00.000Z",
+      command: "opencode",
+      args: ["run", "--format", "json"],
+      startupCheck,
+      progress: [],
+    },
+    commandResult: commandResult(),
+    tasks: taskSource(),
+    startupCheck,
+    projectProfile: {
+      defaults: {
+        maxIterations: 3,
+      },
+    },
+    runExecutionAgentSession: () => {
+      executionAgentCalled = true;
+      return { status: "succeeded" };
+    },
+    repositoryDir,
+    now: () => "2026-05-18T10:00:01.000Z",
+  });
+
+  assert.equal(completed.status, "succeeded");
+  assert.equal(completed.mode, "probe");
+  assert.equal(completed.executionIntentAppendRequest.artifactType, "executionIntent");
+  assert.equal(completed.executionAdmission, null);
+  assert.equal(completed.isolatedWorkspaceAllocation, null);
+  assert.equal(completed.mainAgentInitialization, null);
+  assert.deepEqual(completed.executionAgentRuns, []);
+  assert.equal(completed.taskContextPackage, null);
+  assert.equal(executionAgentCalled, false);
+});
+
 test("recommendation flow stops before review when execution agent fails", async (t) => {
   const repositoryDir = await createGitRepository(t);
   const completed = await completeRecommendationFlow({

@@ -6,19 +6,25 @@ import {
 
 export async function startRecommendationRunAction({
   workflowApi,
+  mode = "workflow",
+  pendingText = "正在启动推荐器...",
   setRecommendationRun,
   renderRecommendationRun,
   setRecommendationStatus,
   setRecommendationResultText,
   runRecommendationButton,
+  runWorkflowButton = null,
   cancelRecommendationButton = null,
 } = {}) {
   beginActionFeedback(runRecommendationButton);
+  if (runWorkflowButton && runWorkflowButton !== runRecommendationButton) {
+    runWorkflowButton.disabled = true;
+  }
   updateActionFeedback(cancelRecommendationButton, { hidden: true });
   setRecommendationStatus("启动中");
-  setRecommendationResultText("正在启动推荐器...");
+  setRecommendationResultText(pendingText);
   try {
-    const payload = await workflowApi.startRecommendationRun();
+    const payload = await workflowApi.startRecommendationRun({ mode });
     setRecommendationRun(payload.recommendationRun);
   } catch (error) {
     if (

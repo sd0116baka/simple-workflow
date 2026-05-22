@@ -43,8 +43,9 @@ export function createRecommendationRunLifecycle({
     return recommendationRunLifecycleState.getLatestRun();
   }
 
-  async function createRecommendationRun() {
+  async function createRecommendationRun({ mode = "workflow" } = {}) {
     return createRecommendationRunTransaction({
+      mode,
       tasksDir,
       recommendationPromptPath,
       taskContextWorkspace,

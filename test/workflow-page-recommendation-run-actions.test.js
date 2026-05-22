@@ -13,8 +13,8 @@ function createHarness({
   return {
     calls,
     workflowApi: {
-      async startRecommendationRun() {
-        calls.push(["startRecommendationRun"]);
+      async startRecommendationRun(input) {
+        calls.push(["startRecommendationRun", input]);
         return { recommendationRun };
       },
       async cancelRecommendationRun() {
@@ -63,7 +63,7 @@ test("recommendation run actions start a run and render the latest snapshot", as
   assert.deepEqual(harness.calls, [
     ["recommendationStatus", "启动中"],
     ["recommendationResult", "正在启动推荐器..."],
-    ["startRecommendationRun"],
+    ["startRecommendationRun", { mode: "workflow" }],
     ["setRecommendationRun", { id: "recommendation-run:001" }, undefined],
     ["renderRecommendationRun"],
   ]);

@@ -16,6 +16,7 @@ test("workflow page command surface exposes page commands and document actions",
   };
   const recommendationRunCommands = {
     createRecommendationRun: async () => calls.push(["createRecommendationRun"]),
+    createWorkflowRun: async () => calls.push(["createWorkflowRun"]),
     cancelRecommendationRun: async () => calls.push(["cancelRecommendationRun"]),
   };
   const fixtureCommands = {
@@ -46,6 +47,7 @@ test("workflow page command surface exposes page commands and document actions",
   await surface.pageCommands.cancelTask();
   await surface.pageCommands.replanAutoMerge();
   await surface.pageCommands.createRecommendationRun();
+  await surface.pageCommands.createWorkflowRun();
   await surface.pageCommands.cancelRecommendationRun();
   await surface.pageCommands.startTerminalSession();
   await surface.pageCommands.sendTerminalInput();
@@ -56,6 +58,7 @@ test("workflow page command surface exposes page commands and document actions",
   await surface.pageCommands.refreshPage();
   await surface.commandActions.replanAutoMerge();
   await surface.commandActions.createRecommendationRun();
+  await surface.commandActions.createWorkflowRun();
   await surface.commandActions.cancelRecommendationRun();
   await surface.commandActions.startTerminalSession();
   await surface.commandActions.sendTerminalInput();
@@ -71,6 +74,7 @@ test("workflow page command surface exposes page commands and document actions",
     ["cancelTask"],
     ["replanAutoMerge"],
     ["createRecommendationRun"],
+    ["createWorkflowRun"],
     ["cancelRecommendationRun"],
     ["startTerminalSession"],
     ["sendTerminalInput"],
@@ -81,6 +85,7 @@ test("workflow page command surface exposes page commands and document actions",
     ["refreshPage"],
     ["replanAutoMerge"],
     ["createRecommendationRun"],
+    ["createWorkflowRun"],
     ["cancelRecommendationRun"],
     ["startTerminalSession"],
     ["sendTerminalInput"],
