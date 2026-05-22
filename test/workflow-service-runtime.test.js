@@ -64,6 +64,24 @@ function createRuntimeHarness() {
         return { cancelled: true };
       },
     },
+    terminalSessionService: {
+      createTerminalSession(input) {
+        calls.push(["createTerminalSession", input]);
+        return { id: "terminal-session-1" };
+      },
+      writeTerminalSessionInput(input) {
+        calls.push(["writeTerminalSessionInput", input]);
+        return { id: "terminal-session-1", output: [] };
+      },
+      cancelTerminalSession(input) {
+        calls.push(["cancelTerminalSession", input]);
+        return { id: "terminal-session-1", status: "cancelled" };
+      },
+      getLatestTerminalSession() {
+        calls.push(["getLatestTerminalSession"]);
+        return { id: "terminal-session-1", status: "running" };
+      },
+    },
     workflowEventBus: {
       onEvent(observedListener) {
         calls.push(["onEvent", observedListener]);
@@ -185,5 +203,30 @@ test("workflow service runtime delegates event subscription and watcher lifecycl
     ["start"],
     ["stop"],
     ["clear"],
+  ]);
+});
+
+test("workflow service runtime delegates terminal session operations", () => {
+  const { calls, runtime } = createRuntimeHarness();
+
+  assert.deepEqual(runtime.createTerminalSession({ command: "node" }), { id: "terminal-session-1" });
+  assert.deepEqual(runtime.writeTerminalSessionInput({
+    sessionId: "terminal-session-1",
+    input: "1 + 1\n",
+  }), { id: "terminal-session-1", output: [] });
+  assert.deepEqual(runtime.cancelTerminalSession({ sessionId: "terminal-session-1" }), {
+    id: "terminal-session-1",
+    status: "cancelled",
+  });
+  assert.deepEqual(runtime.getLatestTerminalSession(), {
+    id: "terminal-session-1",
+    status: "running",
+  });
+
+  assert.deepEqual(calls, [
+    ["createTerminalSession", { command: "node" }],
+    ["writeTerminalSessionInput", { sessionId: "terminal-session-1", input: "1 + 1\n" }],
+    ["cancelTerminalSession", { sessionId: "terminal-session-1" }],
+    ["getLatestTerminalSession"],
   ]);
 });

@@ -35,6 +35,10 @@ function createHarness() {
       calls.push(["createSectionRenderer", options]);
       return { type: "section-renderer" };
     },
+    createTerminalRenderer() {
+      calls.push(["createTerminalRenderer"]);
+      return { type: "terminal-renderer" };
+    },
   });
 
   return {
@@ -53,11 +57,13 @@ test("workflow page shell renderer graph creates renderer modules in dependency 
   assert.equal(graph.workflowOverviewRenderers.type, "overview-renderers");
   assert.equal(graph.workflowSectionRenderer.type, "section-renderer");
   assert.equal(graph.workflowRecommendationRunRenderer.type, "recommendation-renderer");
+  assert.equal(graph.workflowTerminalRenderer.type, "terminal-renderer");
   assert.deepEqual(calls.map((call) => call[0]), [
     "createPanelRenderers",
     "createOverviewRenderers",
     "createSectionRenderer",
     "createRecommendationRunRenderer",
+    "createTerminalRenderer",
   ]);
 
   const sectionOptions = calls.find((call) => call[0] === "createSectionRenderer")[1];

@@ -36,6 +36,9 @@ export function createWorkflowPageCommandGroups({
   loadRecommendationRun,
   getSelectedFileName,
   setSelectedFileName,
+  startTerminalSession,
+  sendTerminalInput,
+  cancelTerminalSession,
   elements,
   sleepFn = sleep,
   setTimeoutFn = setTimeout,
@@ -95,5 +98,10 @@ export function createWorkflowPageCommandGroups({
     recommendationRunCommands,
     refreshPage,
     restartCommand,
+    terminalCommands: {
+      startTerminalSession,
+      sendTerminalInput,
+      cancelTerminalSession,
+    },
   });
 }

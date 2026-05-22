@@ -128,6 +128,26 @@
 
           <section class="stage-row">
             <div class="stage-heading">
+              <h3>交互终端</h3>
+              <span id="terminalStatus">未连接</span>
+            </div>
+            <div class="terminal-panel">
+              <div class="terminal-toolbar">
+                <input id="terminalCommandInput" class="terminal-command-input" type="text" value="powershell.exe" aria-label="命令">
+                <input id="terminalArgsInput" class="terminal-args-input" type="text" value="-NoLogo -NoProfile" aria-label="参数">
+                <button id="terminalStartButton" class="primary-button inline-button" type="button">启动</button>
+                <button id="terminalCancelButton" class="secondary-button danger-button inline-button" type="button" disabled>停止</button>
+              </div>
+              <pre id="terminalOutput" class="terminal-output terminal-session-output">尚未启动终端。</pre>
+              <div class="terminal-input-row">
+                <textarea id="terminalInput" class="terminal-input" rows="2" aria-label="终端输入"></textarea>
+                <button id="terminalSendButton" class="secondary-button inline-button" type="button" disabled>发送</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="stage-row">
+            <div class="stage-heading">
               <h3>执行准入器</h3>
               <span id="admissionStatus">等待输入</span>
             </div>

@@ -5,6 +5,7 @@ import { createWorkflowPageShell } from "../public/workflow-page-shell.js";
 function createHarness({
   loadTasks = async () => {},
   loadRecommendationRun = async () => {},
+  loadTerminalSession = async () => {},
 } = {}) {
   const calls = [];
   const elements = {
@@ -36,6 +37,10 @@ function createHarness({
     loadTasks: async () => {
       calls.push(["loadTasks"]);
       await loadTasks();
+    },
+    loadTerminalSession: async () => {
+      calls.push(["loadTerminalSession"]);
+      await loadTerminalSession();
     },
     markRecommendationConnectionInterrupted: () => {
       calls.push(["markRecommendationConnectionInterrupted"]);
@@ -99,6 +104,7 @@ test("workflow page shell creates module graph and starts page lifecycle", async
     "bindPageControls",
     "loadTasks",
     "loadRecommendationRun",
+    "loadTerminalSession",
     "connectEventStream",
     "startRefreshLoop",
   ]);

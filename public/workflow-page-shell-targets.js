@@ -16,6 +16,7 @@ export function createWorkflowPageErrorTargets(elements) {
     seedStateFixturesButton: elements.seedStateFixturesButton,
     cleanupStateFixturesButton: elements.cleanupStateFixturesButton,
     cancelRecommendationButton: elements.cancelRecommendationButton,
+    terminalStatus: elements.terminalStatus,
   };
 }
 
@@ -32,5 +33,24 @@ export function createWorkflowPageCommandTargets(elements) {
     recommendationResult: elements.recommendationResult,
     humanDecisionStatus: elements.humanDecisionStatus,
     autoMergeStatus: elements.autoMergeStatus,
+    terminalCommandInput: elements.terminalCommandInput,
+    terminalArgsInput: elements.terminalArgsInput,
+    terminalStartButton: elements.terminalStartButton,
+    terminalCancelButton: elements.terminalCancelButton,
+    terminalInput: elements.terminalInput,
+    terminalSendButton: elements.terminalSendButton,
+  };
+}
+
+export function createWorkflowPageTerminalTargets(elements) {
+  return {
+    terminalStatus: elements.terminalStatus,
+    terminalCommandInput: elements.terminalCommandInput,
+    terminalArgsInput: elements.terminalArgsInput,
+    terminalStartButton: elements.terminalStartButton,
+    terminalCancelButton: elements.terminalCancelButton,
+    terminalOutput: elements.terminalOutput,
+    terminalInput: elements.terminalInput,
+    terminalSendButton: elements.terminalSendButton,
   };
 }

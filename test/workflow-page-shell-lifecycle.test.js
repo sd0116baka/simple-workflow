@@ -9,11 +9,13 @@ import {
 function createDataController(calls, {
   loadTasks = async () => calls.push(["loadTasks"]),
   loadRecommendationRun = async () => calls.push(["loadRecommendationRun"]),
+  loadTerminalSession = async () => calls.push(["loadTerminalSession"]),
 } = {}) {
   return {
     isRecommendationRunRunning: () => true,
     latestRecommendationSyncAt: () => 123,
     loadRecommendationRun,
+    loadTerminalSession,
     loadTasks,
     markRecommendationConnectionInterrupted: () => {
       calls.push(["markRecommendationConnectionInterrupted"]);
@@ -36,6 +38,7 @@ test("workflow page shell lifecycle starts the initial page load", async () => {
   assert.deepEqual(calls, [
     ["loadTasks"],
     ["loadRecommendationRun"],
+    ["loadTerminalSession"],
   ]);
 });
 
@@ -56,6 +59,7 @@ test("workflow page shell lifecycle routes initial load failures to showError", 
   assert.deepEqual(calls, [
     ["loadTasks"],
     ["loadRecommendationRun"],
+    ["loadTerminalSession"],
     ["showError", "snapshot failed"],
   ]);
 });
@@ -70,6 +74,7 @@ test("workflow page shell lifecycle connects event stream with controller callba
       calls.push(["connectEventStream", options.EventSourceCtor]);
       options.loadTasks();
       options.loadRecommendationRun();
+      options.loadTerminalSession();
       options.syncRecommendationRunSilently();
       options.onConnectionError();
       options.showError(new Error("stream failed"));
@@ -84,6 +89,7 @@ test("workflow page shell lifecycle connects event stream with controller callba
     ["connectEventStream", "event-source"],
     ["loadTasks"],
     ["loadRecommendationRun"],
+    ["loadTerminalSession"],
     ["syncRecommendationRunSilently"],
     ["markRecommendationConnectionInterrupted"],
     ["showError", "stream failed"],

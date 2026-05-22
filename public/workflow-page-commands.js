@@ -10,6 +10,9 @@ export function createWorkflowPageCommands({
   loadRecommendationRun,
   getSelectedFileName,
   setSelectedFileName,
+  startTerminalSession,
+  sendTerminalInput,
+  cancelTerminalSession,
   elements,
   showError,
   documentRef = document,
@@ -25,6 +28,9 @@ export function createWorkflowPageCommands({
     loadRecommendationRun,
     getSelectedFileName,
     setSelectedFileName,
+    startTerminalSession,
+    sendTerminalInput,
+    cancelTerminalSession,
     elements,
   });
 

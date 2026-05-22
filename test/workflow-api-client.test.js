@@ -67,6 +67,32 @@ test("workflow API client posts action payloads as JSON", async () => {
   });
 });
 
+test("workflow API client posts terminal session actions as JSON", async () => {
+  const calls = [];
+  const client = createWorkflowApiClient({
+    fetchImpl: async (path, options = {}) => {
+      calls.push({ path, options });
+      return jsonResponse({ terminalSession: { id: "terminal-session-1" } });
+    },
+  });
+
+  await client.startTerminalSession({ command: "node", args: ["-i"] });
+  await client.writeTerminalSessionInput({
+    sessionId: "terminal-session-1",
+    input: "1 + 1\n",
+  });
+  await client.cancelTerminalSession({ sessionId: "terminal-session-1" });
+
+  assert.deepEqual(calls.map((call) => [call.path, JSON.parse(call.options.body)]), [
+    ["/api/terminal-sessions", { command: "node", args: ["-i"] }],
+    ["/api/terminal-sessions/input", {
+      sessionId: "terminal-session-1",
+      input: "1 + 1\n",
+    }],
+    ["/api/terminal-sessions/cancel", { sessionId: "terminal-session-1" }],
+  ]);
+});
+
 test("workflow API client preserves error status and payload", async () => {
   const client = createWorkflowApiClient({
     fetchImpl: async () => jsonResponse(

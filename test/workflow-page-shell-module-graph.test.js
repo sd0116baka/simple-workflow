@@ -46,6 +46,7 @@ function createHarness() {
     workflowPanelRenderers: { type: "panel-renderers" },
     workflowRecommendationRunRenderer: { type: "recommendation-renderer" },
     workflowSectionRenderer: { type: "section-renderer" },
+    workflowTerminalRenderer: { type: "terminal-renderer" },
   };
   const graph = createWorkflowPageShellModuleGraph({
     workflowApi,
@@ -86,6 +87,7 @@ test("workflow page shell module graph creates renderer, controller, and command
   assert.equal(harness.graph.workflowPanelRenderers, harness.rendererGraph.workflowPanelRenderers);
   assert.equal(harness.graph.workflowOverviewRenderers, harness.rendererGraph.workflowOverviewRenderers);
   assert.equal(harness.graph.workflowSectionRenderer, harness.rendererGraph.workflowSectionRenderer);
+  assert.equal(harness.graph.workflowTerminalRenderer, harness.rendererGraph.workflowTerminalRenderer);
   assert.equal(
     harness.graph.workflowRecommendationRunRenderer,
     harness.rendererGraph.workflowRecommendationRunRenderer,
@@ -110,6 +112,7 @@ test("workflow page shell module graph creates renderer, controller, and command
   assert.equal(dataControllerOptions.workflowOverviewRenderers.type, "overview-renderers");
   assert.equal(dataControllerOptions.workflowSectionRenderer.type, "section-renderer");
   assert.equal(dataControllerOptions.workflowRecommendationRunRenderer.type, "recommendation-renderer");
+  assert.equal(dataControllerOptions.workflowTerminalRenderer.type, "terminal-renderer");
   assert.equal(dataControllerOptions.elements, harness.elements);
 
   const commandGraphOptions = harness.calls.find((call) => call[0] === "createCommandGraph")[1];

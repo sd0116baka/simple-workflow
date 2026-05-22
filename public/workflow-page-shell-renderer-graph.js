@@ -2,6 +2,7 @@ import { createWorkflowOverviewRenderers } from "./workflow-overview-renderers.j
 import { createWorkflowPanelRenderers } from "./workflow-panel-renderers.js";
 import { createWorkflowRecommendationRunRenderer } from "./workflow-recommendation-run-renderer.js";
 import { createWorkflowSectionRenderer } from "./workflow-section-renderer.js";
+import { createWorkflowTerminalRenderer } from "./workflow-terminal-renderer.js";
 import {
   createWorkflowOverviewRendererCallbacks,
   createWorkflowPanelRendererCallbacks,
@@ -16,6 +17,7 @@ export function createWorkflowPageShellRendererGraph({
   createPanelRenderers = createWorkflowPanelRenderers,
   createRecommendationRunRenderer = createWorkflowRecommendationRunRenderer,
   createSectionRenderer = createWorkflowSectionRenderer,
+  createTerminalRenderer = createWorkflowTerminalRenderer,
 } = {}) {
   const workflowPanelRenderers = createPanelRenderers({
     ...createWorkflowPanelRendererCallbacks({
@@ -39,11 +41,13 @@ export function createWorkflowPageShellRendererGraph({
       getDataController,
     }),
   });
+  const workflowTerminalRenderer = createTerminalRenderer();
 
   return {
     workflowOverviewRenderers,
     workflowPanelRenderers,
     workflowRecommendationRunRenderer,
     workflowSectionRenderer,
+    workflowTerminalRenderer,
   };
 }

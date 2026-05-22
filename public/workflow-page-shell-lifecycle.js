@@ -5,6 +5,7 @@ export function startWorkflowPageInitialLoad({
   return Promise.all([
     workflowPageDataController.loadTasks(),
     workflowPageDataController.loadRecommendationRun(),
+    workflowPageDataController.loadTerminalSession(),
   ]).catch(showError);
 }
 
@@ -20,6 +21,7 @@ export function connectWorkflowPageShellEvents({
     loadRecommendationRun: workflowPageDataController.loadRecommendationRun,
     syncRecommendationRunSilently:
       workflowPageDataController.syncRecommendationRunSilently,
+    loadTerminalSession: workflowPageDataController.loadTerminalSession,
     showError,
     onConnectionError: () =>
       workflowPageDataController.markRecommendationConnectionInterrupted(),

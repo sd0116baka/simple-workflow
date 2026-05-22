@@ -25,6 +25,11 @@ test("workflow page command surface exposes page commands and document actions",
   const restartCommand = {
     restartServer: async () => calls.push(["restartServer"]),
   };
+  const terminalCommands = {
+    startTerminalSession: async () => calls.push(["startTerminalSession"]),
+    sendTerminalInput: async () => calls.push(["sendTerminalInput"]),
+    cancelTerminalSession: async () => calls.push(["cancelTerminalSession"]),
+  };
 
   const surface = createWorkflowPageCommandSurface({
     autoMergeReplanCommand,
@@ -33,6 +38,7 @@ test("workflow page command surface exposes page commands and document actions",
     recommendationRunCommands,
     refreshPage,
     restartCommand,
+    terminalCommands,
   });
 
   await surface.pageCommands.acceptConvergence();
@@ -41,6 +47,9 @@ test("workflow page command surface exposes page commands and document actions",
   await surface.pageCommands.replanAutoMerge();
   await surface.pageCommands.createRecommendationRun();
   await surface.pageCommands.cancelRecommendationRun();
+  await surface.pageCommands.startTerminalSession();
+  await surface.pageCommands.sendTerminalInput();
+  await surface.pageCommands.cancelTerminalSession();
   await surface.pageCommands.seedStateFixtures();
   await surface.pageCommands.cleanupStateFixtures();
   await surface.pageCommands.restartServer();
@@ -48,6 +57,9 @@ test("workflow page command surface exposes page commands and document actions",
   await surface.commandActions.replanAutoMerge();
   await surface.commandActions.createRecommendationRun();
   await surface.commandActions.cancelRecommendationRun();
+  await surface.commandActions.startTerminalSession();
+  await surface.commandActions.sendTerminalInput();
+  await surface.commandActions.cancelTerminalSession();
   await surface.commandActions.seedStateFixtures();
   await surface.commandActions.cleanupStateFixtures();
   await surface.commandActions.restartServer();
@@ -60,6 +72,9 @@ test("workflow page command surface exposes page commands and document actions",
     ["replanAutoMerge"],
     ["createRecommendationRun"],
     ["cancelRecommendationRun"],
+    ["startTerminalSession"],
+    ["sendTerminalInput"],
+    ["cancelTerminalSession"],
     ["seedStateFixtures"],
     ["cleanupStateFixtures"],
     ["restartServer"],
@@ -67,6 +82,9 @@ test("workflow page command surface exposes page commands and document actions",
     ["replanAutoMerge"],
     ["createRecommendationRun"],
     ["cancelRecommendationRun"],
+    ["startTerminalSession"],
+    ["sendTerminalInput"],
+    ["cancelTerminalSession"],
     ["seedStateFixtures"],
     ["cleanupStateFixtures"],
     ["restartServer"],

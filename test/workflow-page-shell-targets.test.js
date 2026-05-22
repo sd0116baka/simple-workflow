@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   createWorkflowPageCommandTargets,
   createWorkflowPageErrorTargets,
+  createWorkflowPageTerminalTargets,
 } from "../public/workflow-page-shell-targets.js";
 
 function createElements() {
@@ -27,6 +28,14 @@ function createElements() {
     "refreshButton",
     "seedStateFixtureSelect",
     "autoMergeStatus",
+    "terminalStatus",
+    "terminalCommandInput",
+    "terminalArgsInput",
+    "terminalStartButton",
+    "terminalCancelButton",
+    "terminalOutput",
+    "terminalInput",
+    "terminalSendButton",
   ].map((name) => [name, { name }]));
 }
 
@@ -50,6 +59,7 @@ test("workflow page shell targets expose the global error renderer target group"
     seedStateFixturesButton: elements.seedStateFixturesButton,
     cleanupStateFixturesButton: elements.cleanupStateFixturesButton,
     cancelRecommendationButton: elements.cancelRecommendationButton,
+    terminalStatus: elements.terminalStatus,
   });
 });
 
@@ -68,5 +78,26 @@ test("workflow page shell targets expose the command target group", () => {
     recommendationResult: elements.recommendationResult,
     humanDecisionStatus: elements.humanDecisionStatus,
     autoMergeStatus: elements.autoMergeStatus,
+    terminalCommandInput: elements.terminalCommandInput,
+    terminalArgsInput: elements.terminalArgsInput,
+    terminalStartButton: elements.terminalStartButton,
+    terminalCancelButton: elements.terminalCancelButton,
+    terminalInput: elements.terminalInput,
+    terminalSendButton: elements.terminalSendButton,
+  });
+});
+
+test("workflow page shell targets expose the terminal target group", () => {
+  const elements = createElements();
+
+  assert.deepEqual(createWorkflowPageTerminalTargets(elements), {
+    terminalStatus: elements.terminalStatus,
+    terminalCommandInput: elements.terminalCommandInput,
+    terminalArgsInput: elements.terminalArgsInput,
+    terminalStartButton: elements.terminalStartButton,
+    terminalCancelButton: elements.terminalCancelButton,
+    terminalOutput: elements.terminalOutput,
+    terminalInput: elements.terminalInput,
+    terminalSendButton: elements.terminalSendButton,
   });
 });

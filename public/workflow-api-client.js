@@ -142,5 +142,35 @@ export function createWorkflowApiClient({
         errorMessage: "清理状态桩失败",
       });
     },
+
+    loadLatestTerminalSession() {
+      return requestJson("/api/terminal-sessions/latest", {
+        errorMessage: "读取终端失败",
+      });
+    },
+
+    startTerminalSession({ command, args = [] } = {}) {
+      return requestJson("/api/terminal-sessions", {
+        method: "POST",
+        body: { command, args },
+        errorMessage: "启动终端失败",
+      });
+    },
+
+    writeTerminalSessionInput({ sessionId, input } = {}) {
+      return requestJson("/api/terminal-sessions/input", {
+        method: "POST",
+        body: { sessionId, input },
+        errorMessage: "发送终端输入失败",
+      });
+    },
+
+    cancelTerminalSession({ sessionId } = {}) {
+      return requestJson("/api/terminal-sessions/cancel", {
+        method: "POST",
+        body: { sessionId },
+        errorMessage: "停止终端失败",
+      });
+    },
   };
 }

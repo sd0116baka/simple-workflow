@@ -5,6 +5,7 @@ export function createWorkflowServiceRuntime({
   workflowTestFixtureService,
   recommendationRunLifecycle,
   manualWorkflowActionService,
+  terminalSessionService,
   workflowEventBus,
   taskSourceWatcher,
   toRecommendationSnapshot = snapshotRecommendationRun,
@@ -68,6 +69,22 @@ export function createWorkflowServiceRuntime({
 
     async cancelTask({ packageId = null } = {}) {
       return manualWorkflowActionService.cancelTask({ packageId });
+    },
+
+    createTerminalSession(input) {
+      return terminalSessionService.createTerminalSession(input);
+    },
+
+    writeTerminalSessionInput(input) {
+      return terminalSessionService.writeTerminalSessionInput(input);
+    },
+
+    cancelTerminalSession(input) {
+      return terminalSessionService.cancelTerminalSession(input);
+    },
+
+    getLatestTerminalSession() {
+      return terminalSessionService.getLatestTerminalSession();
     },
 
     onEvent(listener) {

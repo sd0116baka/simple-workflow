@@ -5,6 +5,7 @@ export function createWorkflowPageCommandSurface({
   recommendationRunCommands,
   refreshPage,
   restartCommand,
+  terminalCommands = {},
 } = {}) {
   return {
     commandActions: {
@@ -14,6 +15,9 @@ export function createWorkflowPageCommandSurface({
       cleanupStateFixtures: fixtureCommands.cleanupStateFixtures,
       createRecommendationRun: recommendationRunCommands.createRecommendationRun,
       cancelRecommendationRun: recommendationRunCommands.cancelRecommendationRun,
+      startTerminalSession: terminalCommands.startTerminalSession,
+      sendTerminalInput: terminalCommands.sendTerminalInput,
+      cancelTerminalSession: terminalCommands.cancelTerminalSession,
       replanAutoMerge: autoMergeReplanCommand.replanAutoMerge,
     },
     pageCommands: {
@@ -23,6 +27,9 @@ export function createWorkflowPageCommandSurface({
       replanAutoMerge: autoMergeReplanCommand.replanAutoMerge,
       createRecommendationRun: recommendationRunCommands.createRecommendationRun,
       cancelRecommendationRun: recommendationRunCommands.cancelRecommendationRun,
+      startTerminalSession: terminalCommands.startTerminalSession,
+      sendTerminalInput: terminalCommands.sendTerminalInput,
+      cancelTerminalSession: terminalCommands.cancelTerminalSession,
       restartServer: restartCommand.restartServer,
       seedStateFixtures: fixtureCommands.seedStateFixtures,
       cleanupStateFixtures: fixtureCommands.cleanupStateFixtures,

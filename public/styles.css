@@ -801,6 +801,51 @@ h2 {
   white-space: pre-wrap;
 }
 
+.terminal-panel {
+  padding: 14px 16px 16px;
+}
+
+.terminal-toolbar,
+.terminal-input-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.8fr) minmax(180px, 1fr) auto auto;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.terminal-input-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.terminal-command-input,
+.terminal-args-input,
+.terminal-input {
+  min-width: 0;
+  border: 1px solid #c8d2e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #172033;
+  font: inherit;
+}
+
+.terminal-command-input,
+.terminal-args-input {
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.terminal-input {
+  min-height: 54px;
+  padding: 9px 10px;
+  resize: vertical;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+
+.terminal-session-output {
+  max-height: 360px;
+}
+
 .stage-list {
   display: flex;
   flex-direction: column;
@@ -1075,5 +1120,10 @@ h2 {
   .validation-result,
   .debug-result {
     min-height: 360px;
+  }
+
+  .terminal-toolbar,
+  .terminal-input-row {
+    grid-template-columns: 1fr;
   }
 }

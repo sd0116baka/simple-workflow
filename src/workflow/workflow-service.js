@@ -12,6 +12,7 @@ import { createWorkflowEventBus } from "./workflow-event-bus.js";
 import { createManualWorkflowActionTargets } from "./manual-workflow-action-targets.js";
 import { createWorkflowTaskContextMutationService } from "./workflow-task-context-mutation-service.js";
 import { createWorkflowServiceRuntime } from "./workflow-service-runtime.js";
+import { createTerminalSessionService } from "./terminal-session-service.js";
 
 export function createWorkflowService({
   tasksDir,
@@ -82,6 +83,10 @@ export function createWorkflowService({
     recommendationRunLifecycle,
     emitTaskChange: workflowEventBus.emitTaskChange,
   });
+  const terminalSessionService = createTerminalSessionService({
+    repositoryDir,
+    emitTerminalSessionChanged: workflowEventBus.emitTerminalSessionChanged,
+  });
   const workflowReadModelService = createWorkflowReadModelService({
     tasksDir,
     taskContextWorkspace,
@@ -94,6 +99,7 @@ export function createWorkflowService({
     workflowTestFixtureService,
     recommendationRunLifecycle,
     manualWorkflowActionService,
+    terminalSessionService,
     workflowEventBus,
     taskSourceWatcher,
   });

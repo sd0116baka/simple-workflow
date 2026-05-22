@@ -9,6 +9,7 @@ export function createWorkflowPageControllerElement() {
     scrollHeight: 0,
     scrollTop: 0,
     textContent: "",
+    value: "",
     append(...children) {
       this.children.push(...children);
     },
@@ -43,6 +44,14 @@ export function createWorkflowPageControllerElements() {
     recommendationRaw: createWorkflowPageControllerElement(),
     recommendationTerminal: createWorkflowPageControllerElement(),
     recommendationIntentPanel: createWorkflowPageControllerElement(),
+    terminalStatus: createWorkflowPageControllerElement(),
+    terminalCommandInput: createWorkflowPageControllerElement(),
+    terminalArgsInput: createWorkflowPageControllerElement(),
+    terminalStartButton: createWorkflowPageControllerElement(),
+    terminalCancelButton: createWorkflowPageControllerElement(),
+    terminalOutput: createWorkflowPageControllerElement(),
+    terminalInput: createWorkflowPageControllerElement(),
+    terminalSendButton: createWorkflowPageControllerElement(),
     admissionStatus: createWorkflowPageControllerElement(),
     admissionRaw: createWorkflowPageControllerElement(),
     admissionPanel: createWorkflowPageControllerElement(),
@@ -109,6 +118,22 @@ export function createWorkflowPageDataControllerHarness({
       calls.push(["loadRecommendationRun"]);
       return { recommendationRun };
     },
+    async loadLatestTerminalSession() {
+      calls.push(["loadLatestTerminalSession"]);
+      return { terminalSession: null };
+    },
+    async startTerminalSession(input) {
+      calls.push(["startTerminalSession", input]);
+      return { terminalSession: { id: "terminal-session-1", status: "running" } };
+    },
+    async writeTerminalSessionInput(input) {
+      calls.push(["writeTerminalSessionInput", input]);
+      return { terminalSession: { id: "terminal-session-1", status: "running" } };
+    },
+    async cancelTerminalSession(input) {
+      calls.push(["cancelTerminalSession", input]);
+      return { terminalSession: { id: "terminal-session-1", status: "cancelled" } };
+    },
   };
   const workflowOverviewRenderers = {
     renderTaskSource(payload) {
@@ -142,11 +167,20 @@ export function createWorkflowPageDataControllerHarness({
       ]);
     },
   };
+  const workflowTerminalRenderer = {
+    render(payload) {
+      calls.push([
+        "renderTerminalSession",
+        payload.terminalSession?.id ?? null,
+      ]);
+    },
+  };
   const controller = createWorkflowPageDataController({
     workflowApi,
     workflowOverviewRenderers,
     workflowSectionRenderer,
     workflowRecommendationRunRenderer,
+    workflowTerminalRenderer,
     elements,
   });
 

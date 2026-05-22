@@ -62,6 +62,30 @@ test("workflow event bus snapshots recommendation run change events", () => {
   ]);
 });
 
+test("workflow event bus emits terminal session change events", () => {
+  const eventBus = createWorkflowEventBus({
+    now: () => "2026-05-21T00:00:00.000Z",
+  });
+  const events = [];
+  eventBus.onEvent((event) => events.push(event));
+
+  eventBus.emitTerminalSessionChanged({
+    id: "terminal-session-1",
+    status: "running",
+  });
+
+  assert.deepEqual(events, [
+    {
+      type: "terminal-session-changed",
+      terminalSession: {
+        id: "terminal-session-1",
+        status: "running",
+      },
+      timestamp: "2026-05-21T00:00:00.000Z",
+    },
+  ]);
+});
+
 test("workflow event bus clears all listeners", () => {
   const eventBus = createWorkflowEventBus();
   let count = 0;

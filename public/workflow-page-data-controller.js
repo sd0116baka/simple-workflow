@@ -4,6 +4,8 @@ import {
 import { createWorkflowPageDataRenderers } from "./workflow-page-data-renderers.js";
 import { createWorkflowPageRecommendationSyncController } from "./workflow-page-recommendation-sync-controller.js";
 import { createWorkflowPageSnapshotLoader } from "./workflow-page-snapshot-loader.js";
+import { createWorkflowPageTerminalController } from "./workflow-page-terminal-controller.js";
+import { createWorkflowPageTerminalTargets } from "./workflow-page-shell-targets.js";
 import { createWorkflowPageTaskSelection } from "./workflow-page-task-selection.js";
 import { createEmptyWorkflowPageSnapshotState } from "./workflow-page-snapshot-state.js";
 
@@ -12,10 +14,12 @@ export function createWorkflowPageDataController({
   workflowOverviewRenderers,
   workflowSectionRenderer,
   workflowRecommendationRunRenderer,
+  workflowTerminalRenderer,
   elements,
   createDataRenderers = createWorkflowPageDataRenderers,
   createRecommendationSyncController = createWorkflowPageRecommendationSyncController,
   createSnapshotLoader = createWorkflowPageSnapshotLoader,
+  createTerminalController = createWorkflowPageTerminalController,
   createTaskSelection = createWorkflowPageTaskSelection,
 } = {}) {
   let snapshotState = createEmptyWorkflowPageSnapshotState();
@@ -62,6 +66,11 @@ export function createWorkflowPageDataController({
     },
     renderRecommendationRun,
   });
+  const terminalController = createTerminalController({
+    workflowApi,
+    elements: createWorkflowPageTerminalTargets(elements),
+    terminalRenderer: workflowTerminalRenderer,
+  });
 
   function activeTaskContextPackage() {
     return resolveActiveTaskContextPackage({
@@ -98,15 +107,21 @@ export function createWorkflowPageDataController({
     getSelectedFileName: taskSelection.getSelectedFileName,
     isRecommendationRunRunning: recommendationSyncController.isRecommendationRunRunning,
     latestRecommendationSyncAt: recommendationSyncController.latestRecommendationSyncAt,
+    loadTerminalSession: terminalController.loadTerminalSession,
     loadRecommendationRun: recommendationSyncController.loadRecommendationRun,
     markRecommendationConnectionInterrupted:
       recommendationSyncController.markRecommendationConnectionInterrupted,
     loadTasks: snapshotLoader.loadTasks,
     renderRecommendationRun,
+    renderTerminalSession: terminalController.renderTerminalSession,
     renderWorkflowSections,
     selectTask: taskSelection.selectTask,
     setRecommendationRun,
     setSelectedFileName: taskSelection.setSelectedFileName,
+    setTerminalSession: terminalController.setTerminalSession,
     syncRecommendationRunSilently: recommendationSyncController.syncRecommendationRunSilently,
+    startTerminalSession: terminalController.startTerminalSession,
+    sendTerminalInput: terminalController.sendTerminalInput,
+    cancelTerminalSession: terminalController.cancelTerminalSession,
   };
 }

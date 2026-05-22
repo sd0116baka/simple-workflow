@@ -16,6 +16,9 @@ test("workflow page command groups wire page status, command groups, and public 
   const loadRecommendationRun = async () => calls.push(["loadRecommendationRun"]);
   const getSelectedFileName = () => "task-001.yaml";
   const setSelectedFileName = () => calls.push(["setSelectedFileName"]);
+  const startTerminalSession = async () => calls.push(["startTerminalSession"]);
+  const sendTerminalInput = async () => calls.push(["sendTerminalInput"]);
+  const cancelTerminalSession = async () => calls.push(["cancelTerminalSession"]);
 
   const groups = createWorkflowPageCommandGroups({
     workflowApi,
@@ -26,6 +29,9 @@ test("workflow page command groups wire page status, command groups, and public 
     loadRecommendationRun,
     getSelectedFileName,
     setSelectedFileName,
+    startTerminalSession,
+    sendTerminalInput,
+    cancelTerminalSession,
     elements,
     sleepFn,
     setTimeoutFn,
@@ -78,6 +84,9 @@ test("workflow page command groups wire page status, command groups, and public 
           cleanupStateFixtures: options.fixtureCommands.cleanupStateFixtures,
           createRecommendationRun: options.recommendationRunCommands.createRecommendationRun,
           cancelRecommendationRun: options.recommendationRunCommands.cancelRecommendationRun,
+          startTerminalSession: options.terminalCommands.startTerminalSession,
+          sendTerminalInput: options.terminalCommands.sendTerminalInput,
+          cancelTerminalSession: options.terminalCommands.cancelTerminalSession,
           replanAutoMerge: options.autoMergeReplanCommand.replanAutoMerge,
         },
         pageCommands: {
@@ -98,6 +107,9 @@ test("workflow page command groups wire page status, command groups, and public 
   await groups.commandActions.replanAutoMerge();
   await groups.commandActions.createRecommendationRun();
   await groups.commandActions.cancelRecommendationRun();
+  await groups.commandActions.startTerminalSession();
+  await groups.commandActions.sendTerminalInput();
+  await groups.commandActions.cancelTerminalSession();
   await groups.commandActions.seedStateFixtures();
   await groups.commandActions.cleanupStateFixtures();
   await groups.commandActions.restartServer();
@@ -158,6 +170,9 @@ test("workflow page command groups wire page status, command groups, and public 
     groups.commandActions.seedStateFixtures,
   );
   assert.equal(surfaceOptions.restartCommand.restartServer, groups.commandActions.restartServer);
+  assert.equal(surfaceOptions.terminalCommands.startTerminalSession, startTerminalSession);
+  assert.equal(surfaceOptions.terminalCommands.sendTerminalInput, sendTerminalInput);
+  assert.equal(surfaceOptions.terminalCommands.cancelTerminalSession, cancelTerminalSession);
 
   assert.deepEqual(calls.slice(7), [
     ["acceptConvergence"],
@@ -167,6 +182,9 @@ test("workflow page command groups wire page status, command groups, and public 
     ["replanAutoMerge"],
     ["createRecommendationRun"],
     ["cancelRecommendationRun"],
+    ["startTerminalSession"],
+    ["sendTerminalInput"],
+    ["cancelTerminalSession"],
     ["seedStateFixtures"],
     ["cleanupStateFixtures"],
     ["restartServer"],

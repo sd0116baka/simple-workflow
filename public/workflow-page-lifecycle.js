@@ -2,6 +2,7 @@ export function connectWorkflowEventStream({
   EventSourceCtor,
   loadTasks,
   loadRecommendationRun,
+  loadTerminalSession = async () => {},
   syncRecommendationRunSilently,
   showError,
   onConnectionError = () => false,
@@ -27,6 +28,9 @@ export function connectWorkflowEventStream({
   });
   events.addEventListener("recommendation-run-changed", () => {
     Promise.all([loadTasks(), loadRecommendationRun()]).catch(showError);
+  });
+  events.addEventListener("terminal-session-changed", () => {
+    loadTerminalSession().catch(showError);
   });
 
   return events;

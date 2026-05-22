@@ -41,6 +41,10 @@ function createHarness() {
     cleanupStateFixturesButton: new FakeButton(),
     runRecommendationButton: new FakeButton(),
     cancelRecommendationButton: new FakeButton(),
+    terminalStartButton: new FakeButton(),
+    terminalCancelButton: new FakeButton(),
+    terminalSendButton: new FakeButton(),
+    terminalInput: new FakeButton(),
   };
   const commandActions = {
     refreshPage: async () => calls.push(["refreshPage"]),
@@ -49,6 +53,9 @@ function createHarness() {
     cleanupStateFixtures: async () => calls.push(["cleanupStateFixtures"]),
     createRecommendationRun: async () => calls.push(["createRecommendationRun"]),
     cancelRecommendationRun: async () => calls.push(["cancelRecommendationRun"]),
+    startTerminalSession: async () => calls.push(["startTerminalSession"]),
+    sendTerminalInput: async () => calls.push(["sendTerminalInput"]),
+    cancelTerminalSession: async () => calls.push(["cancelTerminalSession"]),
     replanAutoMerge: async (actionButton) => calls.push(["replanAutoMerge", actionButton]),
   };
   const bindings = createWorkflowPageCommandBindings({
@@ -77,6 +84,9 @@ test("workflow page command bindings route page control events to command action
   harness.elements.cleanupStateFixturesButton.click();
   harness.elements.runRecommendationButton.click();
   harness.elements.cancelRecommendationButton.click();
+  harness.elements.terminalStartButton.click();
+  harness.elements.terminalSendButton.click();
+  harness.elements.terminalCancelButton.click();
   await Promise.resolve();
 
   assert.deepEqual(harness.calls, [
@@ -85,6 +95,9 @@ test("workflow page command bindings route page control events to command action
     ["cleanupStateFixtures"],
     ["createRecommendationRun"],
     ["cancelRecommendationRun"],
+    ["startTerminalSession"],
+    ["sendTerminalInput"],
+    ["cancelTerminalSession"],
   ]);
   assert.equal(harness.documentRef.listeners.has("click"), true);
   assert.equal(harness.documentRef.listeners.has("pointerup"), true);

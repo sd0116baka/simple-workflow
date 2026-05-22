@@ -30,6 +30,14 @@ export function createWorkflowEventBus({
       });
     },
 
+    emitTerminalSessionChanged(terminalSession) {
+      emit({
+        type: "terminal-session-changed",
+        terminalSession,
+        timestamp: now(),
+      });
+    },
+
     onEvent(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);

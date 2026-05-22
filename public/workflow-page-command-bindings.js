@@ -45,6 +45,20 @@ export function createWorkflowPageCommandBindings({
     elements.cancelRecommendationButton?.addEventListener("click", () => {
       commandActions.cancelRecommendationRun().catch(showError);
     });
+    elements.terminalStartButton?.addEventListener("click", () => {
+      commandActions.startTerminalSession().catch(showError);
+    });
+    elements.terminalCancelButton?.addEventListener("click", () => {
+      commandActions.cancelTerminalSession().catch(showError);
+    });
+    elements.terminalSendButton?.addEventListener("click", () => {
+      commandActions.sendTerminalInput().catch(showError);
+    });
+    elements.terminalInput?.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.shiftKey) return;
+      event.preventDefault();
+      commandActions.sendTerminalInput().catch(showError);
+    });
     documentRef.addEventListener("click", handleDocumentAction);
     documentRef.addEventListener("pointerup", handleDocumentAction);
     documentRef.addEventListener("keydown", handleDocumentAction);

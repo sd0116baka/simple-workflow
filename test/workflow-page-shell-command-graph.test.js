@@ -16,6 +16,9 @@ test("workflow page shell command graph projects data controller commands and co
     recommendationResult: "recommendationResult",
     humanDecisionStatus: "humanDecisionStatus",
     autoMergeStatus: "autoMergeStatus",
+    terminalStartButton: "terminalStartButton",
+    terminalSendButton: "terminalSendButton",
+    terminalCancelButton: "terminalCancelButton",
   };
   const workflowApi = { id: "workflow-api" };
   const showError = (error) => calls.push(["showError", error.message]);
@@ -25,6 +28,9 @@ test("workflow page shell command graph projects data controller commands and co
     loadRecommendationRun: () => calls.push(["loadRecommendationRun"]),
     loadTasks: () => calls.push(["loadTasks"]),
     renderRecommendationRun: () => calls.push(["renderRecommendationRun"]),
+    startTerminalSession: () => calls.push(["startTerminalSession"]),
+    sendTerminalInput: () => calls.push(["sendTerminalInput"]),
+    cancelTerminalSession: () => calls.push(["cancelTerminalSession"]),
     setRecommendationRun: (recommendationRun) =>
       calls.push(["setRecommendationRun", recommendationRun]),
     setSelectedFileName: (fileName) => calls.push(["setSelectedFileName", fileName]),
@@ -48,12 +54,16 @@ test("workflow page shell command graph projects data controller commands and co
   assert.equal(commandOptions.showError, showError);
   assert.equal(commandOptions.elements.restartButton, elements.restartButton);
   assert.equal(commandOptions.elements.autoMergeStatus, elements.autoMergeStatus);
+  assert.equal(commandOptions.elements.terminalStartButton, elements.terminalStartButton);
   assert.deepEqual(commandOptions.activeTaskContextPackage(), { packageId: "package:001" });
   assert.equal(commandOptions.getSelectedFileName(), "task-001.yaml");
 
   commandOptions.setSelectedFileName("task-002.yaml");
   commandOptions.setRecommendationRun({ id: "run:001" });
   commandOptions.renderRecommendationRun();
+  commandOptions.startTerminalSession();
+  commandOptions.sendTerminalInput();
+  commandOptions.cancelTerminalSession();
   commandOptions.loadTasks();
   commandOptions.loadRecommendationRun();
 
@@ -61,6 +71,9 @@ test("workflow page shell command graph projects data controller commands and co
     ["setSelectedFileName", "task-002.yaml"],
     ["setRecommendationRun", { id: "run:001" }],
     ["renderRecommendationRun"],
+    ["startTerminalSession"],
+    ["sendTerminalInput"],
+    ["cancelTerminalSession"],
     ["loadTasks"],
     ["loadRecommendationRun"],
   ]);

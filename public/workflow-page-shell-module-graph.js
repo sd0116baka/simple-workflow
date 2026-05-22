@@ -26,12 +26,14 @@ export function createWorkflowPageShellModuleGraph({
     workflowPanelRenderers,
     workflowRecommendationRunRenderer,
     workflowSectionRenderer,
+    workflowTerminalRenderer,
   } = rendererGraph;
   workflowPageDataController = createDataController({
     workflowApi,
     workflowOverviewRenderers,
     workflowSectionRenderer,
     workflowRecommendationRunRenderer,
+    workflowTerminalRenderer,
     elements,
   });
   const commandGraph = createCommandGraph({
@@ -49,5 +51,6 @@ export function createWorkflowPageShellModuleGraph({
     workflowPanelRenderers,
     workflowRecommendationRunRenderer,
     workflowSectionRenderer,
+    workflowTerminalRenderer,
   };
 }

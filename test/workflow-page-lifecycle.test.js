@@ -33,6 +33,9 @@ function createCallLog() {
     async recommendation() {
       calls.push("recommendation");
     },
+    async terminal() {
+      calls.push("terminal");
+    },
     async sync() {
       calls.push("sync");
     },
@@ -50,6 +53,7 @@ test("workflow event stream wires server events to page refresh actions", async 
     EventSourceCtor: FakeEventSource,
     loadTasks: log.task.bind(log),
     loadRecommendationRun: log.recommendation.bind(log),
+    loadTerminalSession: log.terminal.bind(log),
     syncRecommendationRunSilently: log.sync.bind(log),
     showError: log.showError.bind(log),
   });
@@ -68,6 +72,16 @@ test("workflow event stream wires server events to page refresh actions", async 
     "tasks",
     "tasks",
     "recommendation",
+  ]);
+
+  await stream.emit("terminal-session-changed");
+  assert.deepEqual(log.calls, [
+    "tasks",
+    "recommendation",
+    "tasks",
+    "tasks",
+    "recommendation",
+    "terminal",
   ]);
 });
 

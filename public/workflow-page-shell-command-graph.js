@@ -17,6 +17,9 @@ export function createWorkflowPageShellCommandGraph({
     loadRecommendationRun: workflowPageDataController.loadRecommendationRun,
     getSelectedFileName: workflowPageDataController.getSelectedFileName,
     setSelectedFileName: workflowPageDataController.setSelectedFileName,
+    startTerminalSession: workflowPageDataController.startTerminalSession,
+    sendTerminalInput: workflowPageDataController.sendTerminalInput,
+    cancelTerminalSession: workflowPageDataController.cancelTerminalSession,
     elements: createWorkflowPageCommandTargets(elements),
     showError,
   });
