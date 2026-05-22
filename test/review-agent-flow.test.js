@@ -5,15 +5,15 @@ import { createArtifactRecordFixture } from "./support/task-context-package-fixt
 import { createReviewReadyPackageFixture } from "./support/review-ready-package-fixtures.js";
 
 function reviewablePackage() {
-  return createReviewReadyPackageFixture();
+  return createReviewReadyPackageFixture({ worktreePath: "." });
 }
 
 test("runs review agent stub and requests review report append", async () => {
   let observed = null;
   const result = await runReviewAgent({
     taskContextPackage: reviewablePackage(),
-    runAgentSession: ({ role, packageId, runId, inputArtifactRefs }) => {
-      observed = { role, packageId, runId, inputArtifactRefs };
+    runAgentSession: ({ role, packageId, cwd, runId, inputArtifactRefs }) => {
+      observed = { role, packageId, cwd, runId, inputArtifactRefs };
       return {
         sessionId: `session:${role}:${packageId}`,
         status: "succeeded",
@@ -39,6 +39,7 @@ test("runs review agent stub and requests review report append", async () => {
   assert.deepEqual(observed, {
     role: "review",
     packageId: "task-context-package:tasks/task-003.yaml",
+    cwd: process.cwd(),
     runId: "review-agent:001",
     inputArtifactRefs: [
       "taskDraft",
@@ -124,6 +125,17 @@ test("does not run review agent before execution report exists", async () => {
 
   assert.equal(result.appendRequest, null);
   assert.match(result.error, /缺少 executionReport/);
+});
+
+test("does not run review agent when isolated workspace path is missing", async () => {
+  const result = await runReviewAgent({
+    taskContextPackage: createReviewReadyPackageFixture({
+      worktreePath: ".missing-review-worktree",
+    }),
+  });
+
+  assert.equal(result.appendRequest, null);
+  assert.match(result.error, /隔离工作树路径不存在/);
 });
 
 test("awaits asynchronous review agent session runners", async () => {

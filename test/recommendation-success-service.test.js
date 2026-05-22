@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createStubAgentSession } from "../src/workflow/agent-session-contract.js";
 import { runStubExecutionAgentSession } from "../src/workflow/execution-agent-stub-session.js";
 import { createWorkflowService } from "../src/workflow/workflow-service.js";
 import {
@@ -44,6 +45,7 @@ test("workflow service captures a successful recommendation run", async (t) => {
       };
     },
     runExecutionAgentSession: runStubExecutionAgentSession,
+    runReviewAgentSession: createStubAgentSession,
   });
 
   const completed = new Promise((resolve) => {
@@ -160,6 +162,7 @@ test("workflow service captures a successful recommendation run", async (t) => {
       throw new Error("should not run");
     },
     runExecutionAgentSession: runStubExecutionAgentSession,
+    runReviewAgentSession: createStubAgentSession,
   });
   const accepted = await resumedHumanDecisionService.acceptConvergenceSuccess({
     packageId: "task-context-package:tasks/task-001.yaml",
@@ -246,6 +249,7 @@ test("workflow service captures a successful recommendation run", async (t) => {
       throw new Error("should not run");
     },
     runExecutionAgentSession: runStubExecutionAgentSession,
+    runReviewAgentSession: createStubAgentSession,
   });
   const taskPoolAfterRestart = await restartedService.listTaskPool();
 

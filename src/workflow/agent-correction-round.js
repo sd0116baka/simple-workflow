@@ -60,6 +60,7 @@ export async function runAgentCorrectionRound({
     : await runReview({
         taskContextPackage: currentPackage,
         runAgentSession: runReviewAgentSession,
+        repositoryDir,
         now,
       });
   currentPackage = await applyRoundAppend({

@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { getRepositoryStatus as readRepositoryStatus } from "./repository-status.js";
 import { runOpencodeExecutionAgentSession } from "./execution-agent-session-runner.js";
+import { runOpencodeReviewAgentSession } from "./review-agent-session-runner.js";
 import { runOpencodeRecommendation } from "./recommendation-runner.js";
 import { createTaskContextPackageWorkspace } from "./task-context-package-workspace.js";
 import { createRecommendationRunLifecycle } from "./recommendation-run-lifecycle.js";
@@ -23,7 +24,7 @@ export function createWorkflowService({
   runRecommendationCommand = null,
   runMainAgentSession,
   runExecutionAgentSession = runOpencodeExecutionAgentSession,
-  runReviewAgentSession,
+  runReviewAgentSession = runOpencodeReviewAgentSession,
   runConvergenceSession,
   watchDebounceMs = 100,
 }) {

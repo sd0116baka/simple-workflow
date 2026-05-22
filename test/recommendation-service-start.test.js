@@ -2,6 +2,7 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createStubAgentSession } from "../src/workflow/agent-session-contract.js";
 import { runStubExecutionAgentSession } from "../src/workflow/execution-agent-stub-session.js";
 import { createWorkflowService } from "../src/workflow/workflow-service.js";
 import { saveTaskContextPackage } from "../src/workflow/task-context-package-store.js";
@@ -68,6 +69,7 @@ test("workflow service does not expose invalid tasks to the recommender prompt",
       };
     },
     runExecutionAgentSession: runStubExecutionAgentSession,
+    runReviewAgentSession: createStubAgentSession,
   });
 
   const completed = new Promise((resolve) => {

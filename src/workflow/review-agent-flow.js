@@ -1,20 +1,28 @@
+import { existsSync } from "node:fs";
 import {
   createAgentSessionRequest,
   createStubAgentSession,
 } from "./agent-session-contract.js";
 import { inputArtifactRefsForReview } from "./agent-input-refs.js";
 import { nextReviewAgentRunId } from "./agent-run-ids.js";
+import { resolveWorktreePath } from "./git-worktree-state.js";
 import { buildReviewReportRequest } from "./review-report-contract.js";
 import { latestExecutionReport } from "./reviewed-execution-artifacts.js";
-import { hasArtifactBody } from "./task-package-artifacts.js";
+import { artifactBody, hasArtifactBody } from "./task-package-artifacts.js";
 
 function hasIsolatedWorkspace(taskContextPackage) {
   return hasArtifactBody(taskContextPackage, "isolatedWorkspace");
 }
 
+function isolatedWorkspacePath(taskContextPackage, repositoryDir) {
+  const worktreePath = artifactBody(taskContextPackage, "isolatedWorkspace")?.worktreePath;
+  return resolveWorktreePath(worktreePath, repositoryDir);
+}
+
 export async function runReviewAgent({
   taskContextPackage,
   runAgentSession = createStubAgentSession,
+  repositoryDir = process.cwd(),
   now = () => new Date().toISOString(),
 } = {}) {
   if (!taskContextPackage?.packageId) {
@@ -36,12 +44,22 @@ export async function runReviewAgent({
   }
 
   const runId = nextReviewAgentRunId(taskContextPackage);
+  const cwd = isolatedWorkspacePath(taskContextPackage, repositoryDir);
+  if (!existsSync(cwd)) {
+    const worktreePath = artifactBody(taskContextPackage, "isolatedWorkspace")?.worktreePath;
+    return {
+      appendRequest: null,
+      error: `隔离工作树路径不存在，不能运行 review agent：${worktreePath}`,
+    };
+  }
+
   const inputArtifactRefs = inputArtifactRefsForReview(taskContextPackage, executionReport);
   const startedAt = now();
   const session = await runAgentSession(createAgentSessionRequest({
     role: "review",
     packageId: taskContextPackage.packageId,
     taskContextPackage,
+    cwd,
     runId,
     inputArtifactRefs,
   }));
