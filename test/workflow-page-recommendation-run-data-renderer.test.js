@@ -75,3 +75,43 @@ test("workflow page recommendation run data renderer maps snapshot payload and t
   assert.equal(payload.elements.autoMergeExecutionStatus, elements.autoMergeExecutionStatus);
   assert.equal(payload.elements.taskCloseoutPanel, elements.taskCloseoutPanel);
 });
+
+test("workflow page recommendation run data renderer projects running agent progress as active package", () => {
+  const calls = [];
+  const elements = createElements();
+  const activeTaskContextPackage = { packageId: "package:selected", currentWorkStage: "task-pool" };
+  const recommendationRun = {
+    id: "run:001",
+    status: "running",
+    executionIntentAppendRequest: {
+      packageId: "task-context-package:tasks/task-001.yaml",
+    },
+    progress: [
+      {
+        type: "review_process_start",
+        message: "启动 review-agent:001：opencode run --format json",
+      },
+    ],
+  };
+  const snapshotState = {
+    poolEntries: [{ sourceFile: "task-001.yaml" }],
+    startupCheck: { canStartWork: true },
+  };
+  const renderer = createWorkflowPageRecommendationRunDataRenderer({
+    elements,
+    workflowRecommendationRunRenderer: {
+      render(payload) {
+        calls.push(payload);
+      },
+    },
+  });
+
+  renderer.renderRecommendationRun({
+    activeTaskContextPackage,
+    recommendationRun,
+    snapshotState,
+  });
+
+  assert.equal(calls[0].taskContextPackage.packageId, "task-context-package:tasks/task-001.yaml");
+  assert.equal(calls[0].taskContextPackage.currentWorkStage, "review-agent");
+});
