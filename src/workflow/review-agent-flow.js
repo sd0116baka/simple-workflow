@@ -10,7 +10,10 @@ import { inputArtifactRefsForReview } from "./agent-input-refs.js";
 import { nextReviewAgentRunId } from "./agent-run-ids.js";
 import { resolveWorktreePath } from "./git-worktree-state.js";
 import { buildReviewReportRequest } from "./review-report-contract.js";
-import { latestExecutionReport } from "./reviewed-execution-artifacts.js";
+import {
+  isUsableExecutionReport,
+  latestExecutionReport,
+} from "./reviewed-execution-artifacts.js";
 import { artifactBody, hasArtifactBody } from "./task-package-artifacts.js";
 
 function hasIsolatedWorkspace(taskContextPackage) {
@@ -39,6 +42,12 @@ export async function runReviewAgent({
     return {
       appendRequest: null,
       error: "任务上下文包缺少 executionReport，不能运行 review agent。",
+    };
+  }
+  if (!isUsableExecutionReport(taskContextPackage, executionReport)) {
+    return {
+      appendRequest: null,
+      error: "最新 executionReport 来自失败的 execution agent，不能运行 review agent。",
     };
   }
   if (!hasIsolatedWorkspace(taskContextPackage)) {

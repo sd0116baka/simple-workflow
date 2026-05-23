@@ -16,7 +16,8 @@ function hasExecutionAuthorization(taskContextPackage) {
 }
 
 function hasMainAgentInitialization(taskContextPackage) {
-  return taskContextPackage?.agentRuns?.[0]?.role === "main";
+  const mainInitialization = taskContextPackage?.agentRuns?.[0];
+  return mainInitialization?.role === "main" && mainInitialization.status === "succeeded";
 }
 
 function hasIsolatedWorkspace(taskContextPackage) {

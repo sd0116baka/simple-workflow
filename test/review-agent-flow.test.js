@@ -133,6 +133,33 @@ test("does not run review agent before execution report exists", async () => {
   assert.match(result.error, /缺少 executionReport/);
 });
 
+test("does not run review agent after failed execution report", async () => {
+  const taskPackage = reviewablePackage();
+  taskPackage.artifacts.executionReport = [
+    createArtifactRecordFixture(
+      "executionReport:001",
+      {
+        status: "failed",
+      },
+      {
+        appendedAt: "2026-05-18T10:00:01.000Z",
+      },
+    ),
+  ];
+  taskPackage.agentRuns[1] = {
+    ...taskPackage.agentRuns[1],
+    status: "failed",
+    outputArtifactRefs: ["executionReport:001"],
+  };
+
+  const result = await runReviewAgent({
+    taskContextPackage: taskPackage,
+  });
+
+  assert.equal(result.appendRequest, null);
+  assert.match(result.error, /失败的 execution agent/);
+});
+
 test("does not run review agent when isolated workspace path is missing", async () => {
   const result = await runReviewAgent({
     taskContextPackage: createReviewReadyPackageFixture({

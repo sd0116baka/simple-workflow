@@ -24,7 +24,9 @@ function emptyRoundSequence(taskPool, packageId) {
 }
 
 function hasMainAgentInitialization({ taskPool, packageId, mainAgentInitialization }) {
-  if (mainAgentInitialization?.appendRequest) return true;
+  if (mainAgentInitialization?.appendRequest) {
+    return mainAgentInitialization.appendRequest.agentRun?.status === "succeeded";
+  }
   const taskContextPackage = findTaskContextPackage(taskPool, packageId);
   return taskContextPackage?.agentRuns?.some((agentRun) =>
     agentRun.runId === MAIN_AGENT_INITIALIZATION_RUN_ID

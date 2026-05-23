@@ -15,7 +15,11 @@ import {
   buildConvergenceSuccessRequest,
 } from "./convergence-contract.js";
 import { convergenceOutcome } from "./convergence-outcome-policy.js";
-import { latestReviewedExecutionArtifacts } from "./reviewed-execution-artifacts.js";
+import {
+  isUsableExecutionReport,
+  isUsableReviewReport,
+  latestReviewedExecutionArtifacts,
+} from "./reviewed-execution-artifacts.js";
 import { artifactBody } from "./task-package-artifacts.js";
 
 function mainAgentSessionId(taskContextPackage) {
@@ -59,10 +63,22 @@ export async function runConvergence({
       error: "任务上下文包缺少 executionReport，不能运行收敛环节。",
     };
   }
+  if (!isUsableExecutionReport(taskContextPackage, executionReport)) {
+    return {
+      appendRequest: null,
+      error: "最新 executionReport 来自失败的 execution agent，不能运行收敛环节。",
+    };
+  }
   if (!reviewReport) {
     return {
       appendRequest: null,
       error: "任务上下文包缺少 reviewReport，不能运行收敛环节。",
+    };
+  }
+  if (!isUsableReviewReport(taskContextPackage, reviewReport)) {
+    return {
+      appendRequest: null,
+      error: "最新 reviewReport 来自失败的 review agent，不能运行收敛环节。",
     };
   }
 

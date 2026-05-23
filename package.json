@@ -10,7 +10,8 @@
     "testenv:reset": "node scripts/create-test-environment.js",
     "testenv:start": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/start-test-environment.ps1",
     "testenv:smoke": "node scripts/smoke-test-environment.js",
-    "testenv:agent-e2e": "node scripts/smoke-agent-e2e.js"
+    "testenv:agent-e2e": "node scripts/smoke-agent-e2e.js",
+    "testenv:agent-failure-e2e": "node scripts/smoke-agent-failure-e2e.js"
   },
   "dependencies": {
     "yaml": "^2.9.0"

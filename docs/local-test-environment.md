@@ -43,6 +43,14 @@ npm.cmd run testenv:reset
 
 `convergence-failure` 选项表示收敛失败场景：生成 `convergenceFailure` 后追加 `humanDecisionRequest`，并停在 `human-decision` 等待人工提供收敛意见继续或取消任务。
 
+真实 agent 失败模型验收：
+
+```powershell
+npm run testenv:agent-failure-e2e
+```
+
+该脚本会重置 5173 测试环境，并用临时 fake `opencode` 命令逐个制造 main 初始化、execution、review、convergence 的非零退出，验证 `agentRun.failure`、流程阻断位置和调试面板可读字段。
+
 `human-guided-execution` 选项表示人工带意见继续收敛后的回环场景：先生成 `convergenceFailure` 和 `humanDecisionRequest`，再追加 `humanConvergenceGuidance`，并直接停在下一轮 `execution-agent`。
 
 每次生成前会先清理旧的 `stub-*` 测试任务，所以一次只保留一个状态桩。测试完成后可以点击“清理状态桩”，删除所有 `stub-*` 任务文件和对应上下文包。

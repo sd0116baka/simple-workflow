@@ -1,7 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runConvergence } from "../src/workflow/convergence-flow.js";
-import { createArtifactRecordFixture } from "./support/task-context-package-fixtures.js";
+import {
+  createAgentRunFixture,
+  createArtifactRecordFixture,
+} from "./support/task-context-package-fixtures.js";
 import { createConvergenceReadyPackageFixture } from "./support/convergence-ready-package-fixtures.js";
 
 function convergenceReadyPackage() {
@@ -205,6 +208,36 @@ test("does not run convergence before review report exists", async () => {
 
   assert.equal(result.appendRequest, null);
   assert.match(result.error, /缺少 reviewReport/);
+});
+
+test("does not run convergence after failed execution report", async () => {
+  const taskPackage = createConvergenceReadyPackageFixture({
+    executionReport: createArtifactRecordFixture(
+      "executionReport:001",
+      {
+        status: "failed",
+      },
+      {
+        appendedAt: "2026-05-18T10:00:01.000Z",
+      },
+    ),
+    agentRuns: [
+      createAgentRunFixture(),
+      createAgentRunFixture({
+        runId: "execution-agent:001",
+        role: "execution",
+        status: "failed",
+        outputArtifactRefs: ["executionReport:001"],
+      }),
+    ],
+  });
+
+  const result = await runConvergence({
+    taskContextPackage: taskPackage,
+  });
+
+  assert.equal(result.appendRequest, null);
+  assert.match(result.error, /失败的 execution agent/);
 });
 
 test("awaits asynchronous convergence session runners", async () => {

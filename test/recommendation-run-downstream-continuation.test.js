@@ -56,6 +56,36 @@ test("recommendation run downstream continuation continues from initialized main
   })), true);
 });
 
+test("recommendation run downstream continuation stops after failed execution agent output", () => {
+  assert.equal(canContinueRecommendationRunDownstream(runFixture({
+    taskContextPackage: {
+      artifacts: {
+        executionAuthorization: { body: {} },
+        isolatedWorkspace: { body: {} },
+        executionReport: [
+          {
+            artifactId: "executionReport:001",
+            body: {
+              status: "failed",
+            },
+          },
+        ],
+      },
+      agentRuns: [
+        {
+          runId: "main-agent:initialization",
+          status: "succeeded",
+        },
+        {
+          runId: "execution-agent:001",
+          status: "failed",
+          outputArtifactRefs: ["executionReport:001"],
+        },
+      ],
+    },
+  })), false);
+});
+
 test("recommendation run downstream continuation stops after terminal requests", () => {
   assert.equal(canContinueRecommendationRunDownstream(runFixture({
     successHumanDecisionRequest: {

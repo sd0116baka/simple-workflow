@@ -188,6 +188,21 @@ test("does not run execution agent before main agent is initialized", async () =
   assert.match(result.error, /缺少 main agent 初始化记录/);
 });
 
+test("does not run execution agent after failed main agent initialization", async () => {
+  const taskPackage = executablePackage();
+  taskPackage.agentRuns[0] = {
+    ...taskPackage.agentRuns[0],
+    status: "failed",
+  };
+
+  const result = await runExecutionAgent({
+    taskContextPackage: taskPackage,
+  });
+
+  assert.equal(result.appendRequest, null);
+  assert.match(result.error, /缺少 main agent 初始化记录/);
+});
+
 test("does not run execution agent when isolated workspace path is missing", async (t) => {
   const repositoryDir = await createGitRepositoryWithWorktree(t);
   const taskPackage = executablePackage(".workflow/worktrees/tasks/missing-task");

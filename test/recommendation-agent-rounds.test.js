@@ -66,6 +66,32 @@ test("recommendation agent rounds return an empty result before main initializat
   assert.equal(result.terminalConvergenceRun, null);
 });
 
+test("recommendation agent rounds do not continue after failed main initialization", async () => {
+  const taskPool = taskPoolFixture();
+  let executionCalled = false;
+
+  const result = await runRecommendationAgentRounds({
+    taskPool,
+    packageId,
+    mainAgentInitialization: {
+      appendRequest: {
+        agentRun: {
+          runId: "main-agent:initialization",
+          status: "failed",
+        },
+      },
+      error: "main failed",
+    },
+    runExecution: async () => {
+      executionCalled = true;
+    },
+  });
+
+  assert.equal(executionCalled, false);
+  assert.deepEqual(result.executionAgentRuns, []);
+  assert.equal(result.terminalConvergenceRun, null);
+});
+
 test("recommendation agent rounds run a second round after convergence advice", async () => {
   let convergenceCount = 0;
   const result = await runRecommendationAgentRounds({

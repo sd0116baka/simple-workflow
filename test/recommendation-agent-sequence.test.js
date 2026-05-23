@@ -31,7 +31,10 @@ test("recommendation agent sequence runs a second round after convergence advice
     packageId,
     mainAgentInitialization: {
       appendRequest: {
-        agentRun: { runId: "main-agent:initialization" },
+        agentRun: {
+          runId: "main-agent:initialization",
+          status: "succeeded",
+        },
       },
     },
     runExecution: async () => ({
@@ -110,7 +113,10 @@ test("recommendation agent sequence stops before review when execution fails", a
     packageId,
     mainAgentInitialization: {
       appendRequest: {
-        agentRun: { runId: "main-agent:initialization" },
+        agentRun: {
+          runId: "main-agent:initialization",
+          status: "succeeded",
+        },
       },
     },
     runExecution: async () => ({
