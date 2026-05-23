@@ -85,6 +85,36 @@
 
           <section class="stage-row">
             <div class="stage-heading">
+              <h3>任务起草助手</h3>
+              <span id="taskDraftStatus">未开始</span>
+            </div>
+            <div class="stage-columns">
+              <div class="stage-cell">
+                <div class="detail-heading"><h3>讨论</h3></div>
+                <div id="taskDraftMessages" class="task-draft-messages">还没有讨论记录。</div>
+                <div class="task-draft-input-row">
+                  <textarea id="taskDraftInput" class="task-draft-input" rows="4" aria-label="任务起草讨论"></textarea>
+                  <div class="task-draft-actions">
+                    <button id="taskDraftDiscussButton" class="secondary-button inline-button" type="button">继续讨论</button>
+                    <button id="taskDraftFinalizeButton" class="primary-button inline-button" type="button">生成任务真源文本</button>
+                  </div>
+                </div>
+              </div>
+              <div class="stage-cell">
+                <div class="detail-heading">
+                  <h3>文本草稿</h3>
+                  <div class="inline-actions">
+                    <span id="taskDraftValidation">等待生成</span>
+                    <button id="taskDraftCreateButton" class="secondary-button inline-button" type="button" disabled>加入任务池</button>
+                  </div>
+                </div>
+                <pre id="taskDraftOutput" class="code-block parsed">敲定后在这里生成 YAML 文本，校验通过后可手动加入任务池。</pre>
+              </div>
+            </div>
+          </section>
+
+          <section class="stage-row">
+            <div class="stage-heading">
               <h3>启动检查</h3>
               <span id="startupCheckStatus">等待载入</span>
             </div>

@@ -139,6 +139,48 @@ test("workflow API client posts terminal session actions as JSON", async () => {
   ]);
 });
 
+test("workflow API client posts task draft discussion as JSON", async () => {
+  const calls = [];
+  const client = createWorkflowApiClient({
+    fetchImpl: async (path, options = {}) => {
+      calls.push({ path, options });
+      return jsonResponse({ taskDraft: { assistantMessage: "继续讨论。" } });
+    },
+  });
+
+  await client.discussTaskSourceDraft({
+    mode: "finalize",
+    messages: [{ role: "user", content: "敲定" }],
+  });
+
+  assert.equal(calls[0].path, "/api/task-draft-assistant");
+  assert.equal(calls[0].options.method, "POST");
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    mode: "finalize",
+    messages: [{ role: "user", content: "敲定" }],
+  });
+});
+
+test("workflow API client posts task source draft creation as JSON", async () => {
+  const calls = [];
+  const client = createWorkflowApiClient({
+    fetchImpl: async (path, options = {}) => {
+      calls.push({ path, options });
+      return jsonResponse({ taskSource: { fileName: "drafted-task.yaml" } });
+    },
+  });
+
+  await client.createTaskSourceFromDraft({
+    taskSourceText: "id: drafted-task\n",
+  });
+
+  assert.equal(calls[0].path, "/api/task-draft-assistant/task-source");
+  assert.equal(calls[0].options.method, "POST");
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    taskSourceText: "id: drafted-task\n",
+  });
+});
+
 test("workflow API client preserves error status and payload", async () => {
   const client = createWorkflowApiClient({
     fetchImpl: async () => jsonResponse(

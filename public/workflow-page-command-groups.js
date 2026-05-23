@@ -4,6 +4,7 @@ import { createWorkflowPageManualActionCommands } from "./workflow-page-manual-a
 import { createWorkflowPageRecommendationRunCommands } from "./workflow-page-recommendation-run-commands.js";
 import { createWorkflowPageRestartCommand } from "./workflow-page-restart-command.js";
 import { createWorkflowPageCommandSurface } from "./workflow-page-command-surface.js";
+import { createWorkflowPageTaskDraftAssistantCommands } from "./workflow-page-task-draft-assistant-commands.js";
 import { sleep } from "./workflow-page-restart-action.js";
 
 function setStatusText(statusElement, text) {
@@ -48,6 +49,7 @@ export function createWorkflowPageCommandGroups({
   createManualActionCommands = createWorkflowPageManualActionCommands,
   createRecommendationRunCommands = createWorkflowPageRecommendationRunCommands,
   createRestartCommand = createWorkflowPageRestartCommand,
+  createTaskDraftAssistantCommands = createWorkflowPageTaskDraftAssistantCommands,
   createPageStatus = createWorkflowPageStatus,
 } = {}) {
   const refreshPage = () => Promise.all([loadTasks(), loadRecommendationRun()]);
@@ -90,6 +92,11 @@ export function createWorkflowPageCommandGroups({
     elements,
     sleepFn,
   });
+  const taskDraftAssistantCommands = createTaskDraftAssistantCommands({
+    workflowApi,
+    elements,
+    refreshPage,
+  });
 
   return createCommandSurface({
     autoMergeReplanCommand,
@@ -98,6 +105,7 @@ export function createWorkflowPageCommandGroups({
     recommendationRunCommands,
     refreshPage,
     restartCommand,
+    taskDraftAssistantCommands,
     terminalCommands: {
       startTerminalSession,
       sendTerminalInput,

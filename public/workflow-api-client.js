@@ -116,6 +116,22 @@ export function createWorkflowApiClient({
       });
     },
 
+    discussTaskSourceDraft({ mode = "discuss", messages = [] } = {}) {
+      return requestJson("/api/task-draft-assistant", {
+        method: "POST",
+        body: { mode, messages },
+        errorMessage: "任务起草助手失败",
+      });
+    },
+
+    createTaskSourceFromDraft({ taskSourceText } = {}) {
+      return requestJson("/api/task-draft-assistant/task-source", {
+        method: "POST",
+        body: { taskSourceText },
+        errorMessage: "写入任务真源失败",
+      });
+    },
+
     restartServer() {
       return requestJson("/api/server/restart", {
         method: "POST",

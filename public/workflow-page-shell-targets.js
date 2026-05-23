@@ -41,6 +41,14 @@ export function createWorkflowPageCommandTargets(elements) {
     terminalCancelButton: elements.terminalCancelButton,
     terminalInput: elements.terminalInput,
     terminalSendButton: elements.terminalSendButton,
+    taskDraftStatus: elements.taskDraftStatus,
+    taskDraftMessages: elements.taskDraftMessages,
+    taskDraftInput: elements.taskDraftInput,
+    taskDraftDiscussButton: elements.taskDraftDiscussButton,
+    taskDraftFinalizeButton: elements.taskDraftFinalizeButton,
+    taskDraftCreateButton: elements.taskDraftCreateButton,
+    taskDraftValidation: elements.taskDraftValidation,
+    taskDraftOutput: elements.taskDraftOutput,
   };
 }
 

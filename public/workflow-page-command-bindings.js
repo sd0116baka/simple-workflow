@@ -48,6 +48,20 @@ export function createWorkflowPageCommandBindings({
     elements.cancelRecommendationButton?.addEventListener("click", () => {
       commandActions.cancelRecommendationRun().catch(showError);
     });
+    elements.taskDraftDiscussButton?.addEventListener("click", () => {
+      commandActions.sendTaskDraftMessage().catch(showError);
+    });
+    elements.taskDraftFinalizeButton?.addEventListener("click", () => {
+      commandActions.finalizeTaskDraft().catch(showError);
+    });
+    elements.taskDraftCreateButton?.addEventListener("click", () => {
+      commandActions.createTaskSourceFromDraft().catch(showError);
+    });
+    elements.taskDraftInput?.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.shiftKey) return;
+      event.preventDefault();
+      commandActions.sendTaskDraftMessage().catch(showError);
+    });
     elements.terminalStartButton?.addEventListener("click", () => {
       commandActions.startTerminalSession().catch(showError);
     });

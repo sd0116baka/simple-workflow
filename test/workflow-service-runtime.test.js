@@ -64,6 +64,18 @@ function createRuntimeHarness() {
         return { cancelled: true };
       },
     },
+    taskSourceDraftAssistant: {
+      async discussTaskSourceDraft(input) {
+        calls.push(["discussTaskSourceDraft", input]);
+        return { assistantMessage: "继续澄清。" };
+      },
+    },
+    taskSourceMutationService: {
+      async createTaskSourceFromText(input) {
+        calls.push(["createTaskSourceFromText", input]);
+        return { fileName: "drafted-task.yaml" };
+      },
+    },
     terminalSessionService: {
       createTerminalSession(input) {
         calls.push(["createTerminalSession", input]);
@@ -189,6 +201,44 @@ test("workflow service runtime delegates manual workflow actions with provided i
     ],
     ["cancelTask", { packageId: "pkg-4" }],
   ]);
+});
+
+test("workflow service runtime delegates task source draft discussion", async () => {
+  const { calls, runtime } = createRuntimeHarness();
+
+  assert.deepEqual(
+    await runtime.discussTaskSourceDraft({
+      mode: "discuss",
+      messages: [{ role: "user", content: "做一个导入功能" }],
+    }),
+    { assistantMessage: "继续澄清。" },
+  );
+
+  assert.deepEqual(calls, [[
+    "discussTaskSourceDraft",
+    {
+      mode: "discuss",
+      messages: [{ role: "user", content: "做一个导入功能" }],
+    },
+  ]]);
+});
+
+test("workflow service runtime delegates task source draft creation", async () => {
+  const { calls, runtime } = createRuntimeHarness();
+
+  assert.deepEqual(
+    await runtime.createTaskSourceFromDraft({
+      taskSourceText: "id: drafted-task\n",
+    }),
+    { fileName: "drafted-task.yaml" },
+  );
+
+  assert.deepEqual(calls, [[
+    "createTaskSourceFromText",
+    {
+      taskSourceText: "id: drafted-task\n",
+    },
+  ]]);
 });
 
 test("workflow service runtime delegates event subscription and watcher lifecycle", async () => {

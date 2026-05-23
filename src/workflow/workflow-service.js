@@ -15,18 +15,23 @@ import { createManualWorkflowActionTargets } from "./manual-workflow-action-targ
 import { createWorkflowTaskContextMutationService } from "./workflow-task-context-mutation-service.js";
 import { createWorkflowServiceRuntime } from "./workflow-service-runtime.js";
 import { createTerminalSessionService } from "./terminal-session-service.js";
+import { createTaskSourceDraftAssistant } from "./task-source-draft-assistant.js";
+import { createTaskSourceMutationService } from "./task-source-mutation-service.js";
 
 export function createWorkflowService({
   tasksDir,
   repositoryDir = process.cwd(),
   getRepositoryStatus = () => readRepositoryStatus({ cwd: repositoryDir }),
-  recommendationPromptPath = join(repositoryDir, "project_profiles", "recommender-agent.prompt.md"),
+  promptProfileDir = join(process.cwd(), "project_profiles"),
+  recommendationPromptPath = join(promptProfileDir, "recommender-agent.prompt.md"),
+  taskSourceDraftPromptPath = join(promptProfileDir, "task-source-drafter.prompt.md"),
   taskContextPackageStoreDir = join(repositoryDir, ".workflow", "task-context-packages"),
   runRecommendationCommand = null,
   runMainAgentSession = runOpencodeMainAgentSession,
   runExecutionAgentSession = runOpencodeExecutionAgentSession,
   runReviewAgentSession = runOpencodeReviewAgentSession,
   runConvergenceSession = runOpencodeMainAgentSession,
+  runTaskSourceDraftAssistant,
   watchDebounceMs = 100,
 }) {
   const workflowEventBus = createWorkflowEventBus();
@@ -42,6 +47,12 @@ export function createWorkflowService({
   const terminalSessionService = createTerminalSessionService({
     repositoryDir,
     emitTerminalSessionChanged: workflowEventBus.emitTerminalSessionChanged,
+  });
+  const taskSourceDraftAssistant = createTaskSourceDraftAssistant({
+    repositoryDir,
+    promptPath: taskSourceDraftPromptPath,
+    listTasks: () => workflowReadModelService.listTasks(),
+    runAssistant: runTaskSourceDraftAssistant,
   });
   const effectiveRunRecommendationCommand = runRecommendationCommand
     ?? (({ prompt, onProgress, onTerminalSession, signal }) =>
@@ -99,12 +110,18 @@ export function createWorkflowService({
     getRepositoryStatus,
     getLatestRecommendationRun: () => recommendationRunLifecycle.getLatestRecommendationRun(),
   });
+  const taskSourceMutationService = createTaskSourceMutationService({
+    tasksDir,
+    emitTaskChange: workflowEventBus.emitTaskChange,
+  });
 
   return createWorkflowServiceRuntime({
     workflowReadModelService,
     workflowTestFixtureService,
     recommendationRunLifecycle,
     manualWorkflowActionService,
+    taskSourceDraftAssistant,
+    taskSourceMutationService,
     terminalSessionService,
     workflowEventBus,
     taskSourceWatcher,

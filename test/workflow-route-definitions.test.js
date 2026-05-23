@@ -38,6 +38,8 @@ test("workflow route definitions expose method and path metadata", () => {
       "POST /api/human-decisions/continue-convergence-with-guidance",
       "POST /api/human-decisions/cancel-task",
       "POST /api/auto-merge/replan",
+      "POST /api/task-draft-assistant",
+      "POST /api/task-draft-assistant/task-source",
       "POST /api/terminal-sessions",
       "GET /api/terminal-sessions/latest",
       "POST /api/terminal-sessions/input",

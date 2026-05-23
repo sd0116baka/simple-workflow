@@ -5,6 +5,7 @@ export function createWorkflowPageCommandSurface({
   recommendationRunCommands,
   refreshPage,
   restartCommand,
+  taskDraftAssistantCommands = {},
   terminalCommands = {},
 } = {}) {
   return {
@@ -16,6 +17,9 @@ export function createWorkflowPageCommandSurface({
       createRecommendationRun: recommendationRunCommands.createRecommendationRun,
       createWorkflowRun: recommendationRunCommands.createWorkflowRun,
       cancelRecommendationRun: recommendationRunCommands.cancelRecommendationRun,
+      sendTaskDraftMessage: taskDraftAssistantCommands.sendTaskDraftMessage,
+      finalizeTaskDraft: taskDraftAssistantCommands.finalizeTaskDraft,
+      createTaskSourceFromDraft: taskDraftAssistantCommands.createTaskSourceFromDraft,
       startTerminalSession: terminalCommands.startTerminalSession,
       sendTerminalInput: terminalCommands.sendTerminalInput,
       cancelTerminalSession: terminalCommands.cancelTerminalSession,
@@ -29,6 +33,9 @@ export function createWorkflowPageCommandSurface({
       createRecommendationRun: recommendationRunCommands.createRecommendationRun,
       createWorkflowRun: recommendationRunCommands.createWorkflowRun,
       cancelRecommendationRun: recommendationRunCommands.cancelRecommendationRun,
+      sendTaskDraftMessage: taskDraftAssistantCommands.sendTaskDraftMessage,
+      finalizeTaskDraft: taskDraftAssistantCommands.finalizeTaskDraft,
+      createTaskSourceFromDraft: taskDraftAssistantCommands.createTaskSourceFromDraft,
       startTerminalSession: terminalCommands.startTerminalSession,
       sendTerminalInput: terminalCommands.sendTerminalInput,
       cancelTerminalSession: terminalCommands.cancelTerminalSession,

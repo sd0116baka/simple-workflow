@@ -300,6 +300,55 @@ h2 {
   margin-top: 6px;
 }
 
+.task-draft-messages {
+  min-height: 170px;
+  max-height: 320px;
+  padding: 14px;
+  overflow-y: auto;
+  border-bottom: 1px solid #e4e9f2;
+  background: #fbfdff;
+  color: #172033;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.task-draft-message + .task-draft-message {
+  margin-top: 10px;
+}
+
+.task-draft-message.user {
+  font-weight: 650;
+}
+
+.task-draft-message.assistant {
+  color: #40516c;
+}
+
+.task-draft-input-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.task-draft-input {
+  width: 100%;
+  min-height: 92px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid #c8d2e1;
+  border-radius: 6px;
+  color: #172033;
+  font: inherit;
+}
+
+.task-draft-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+}
+
 .git-list {
   color: #607089;
   font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
@@ -1132,6 +1181,10 @@ h2 {
 
   .stage-columns,
   .source-stage-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .task-draft-input-row {
     grid-template-columns: 1fr;
   }
 

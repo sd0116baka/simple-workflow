@@ -1,8 +1,8 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isSupportedTaskFile, listRawTasks } from "../src/workflow/task-source.js";
+import { createRawTaskSource, isSupportedTaskFile, listRawTasks } from "../src/workflow/task-source.js";
 
 test("detects supported task source files", () => {
   assert.equal(isSupportedTaskFile("task.yaml"), true);
@@ -51,4 +51,51 @@ test("returns an empty list when the tasks directory does not exist", async () =
   const tasks = await listRawTasks(join(process.cwd(), ".tmp-test-tasks", "missing"));
 
   assert.deepEqual(tasks, []);
+});
+
+test("creates a validated YAML task source file", async () => {
+  const dir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "create");
+  const task = await createRawTaskSource({
+    tasksDir: dir,
+    taskSourceText: [
+      "id: drafted-task",
+      "title: 起草任务",
+      "type: feature",
+      "description: 测试写入",
+      "acceptance:",
+      "  - 写入成功",
+    ].join("\n"),
+  });
+
+  assert.equal(task.fileName, "drafted-task.yaml");
+  assert.equal(task.validation.status, "valid");
+  assert.equal(
+    await readFile(join(dir, "drafted-task.yaml"), "utf8"),
+    [
+      "id: drafted-task",
+      "title: 起草任务",
+      "type: feature",
+      "description: 测试写入",
+      "acceptance:",
+      "  - 写入成功",
+      "",
+    ].join("\n"),
+  );
+});
+
+test("rejects invalid and unsafe task source writes", async () => {
+  await assert.rejects(
+    () => createRawTaskSource({
+      tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "invalid"),
+      taskSourceText: "id: ../bad\ntitle: 坏任务\ntype: feature\ndescription: no\nacceptance:\n  - no\n",
+    }),
+    /kebab-case/,
+  );
+  await assert.rejects(
+    () => createRawTaskSource({
+      tasksDir: join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "missing-fields"),
+      taskSourceText: "id: missing-fields\n",
+    }),
+    /task source is invalid/,
+  );
 });

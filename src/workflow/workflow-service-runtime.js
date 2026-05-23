@@ -5,6 +5,8 @@ export function createWorkflowServiceRuntime({
   workflowTestFixtureService,
   recommendationRunLifecycle,
   manualWorkflowActionService,
+  taskSourceDraftAssistant,
+  taskSourceMutationService,
   terminalSessionService,
   workflowEventBus,
   taskSourceWatcher,
@@ -69,6 +71,14 @@ export function createWorkflowServiceRuntime({
 
     async cancelTask({ packageId = null } = {}) {
       return manualWorkflowActionService.cancelTask({ packageId });
+    },
+
+    async discussTaskSourceDraft(input = {}) {
+      return taskSourceDraftAssistant.discussTaskSourceDraft(input);
+    },
+
+    async createTaskSourceFromDraft(input = {}) {
+      return taskSourceMutationService.createTaskSourceFromText(input);
     },
 
     createTerminalSession(input) {

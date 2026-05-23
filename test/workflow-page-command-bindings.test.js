@@ -42,6 +42,10 @@ function createHarness() {
     runRecommendationButton: new FakeButton(),
     runWorkflowButton: new FakeButton(),
     cancelRecommendationButton: new FakeButton(),
+    taskDraftDiscussButton: new FakeButton(),
+    taskDraftFinalizeButton: new FakeButton(),
+    taskDraftCreateButton: new FakeButton(),
+    taskDraftInput: new FakeButton(),
     terminalStartButton: new FakeButton(),
     terminalCancelButton: new FakeButton(),
     terminalSendButton: new FakeButton(),
@@ -55,6 +59,9 @@ function createHarness() {
     createRecommendationRun: async (input) => calls.push(["createRecommendationRun", input]),
     createWorkflowRun: async () => calls.push(["createWorkflowRun"]),
     cancelRecommendationRun: async () => calls.push(["cancelRecommendationRun"]),
+    sendTaskDraftMessage: async () => calls.push(["sendTaskDraftMessage"]),
+    finalizeTaskDraft: async () => calls.push(["finalizeTaskDraft"]),
+    createTaskSourceFromDraft: async () => calls.push(["createTaskSourceFromDraft"]),
     startTerminalSession: async () => calls.push(["startTerminalSession"]),
     sendTerminalInput: async () => calls.push(["sendTerminalInput"]),
     cancelTerminalSession: async () => calls.push(["cancelTerminalSession"]),
@@ -87,6 +94,9 @@ test("workflow page command bindings route page control events to command action
   harness.elements.runRecommendationButton.click();
   harness.elements.runWorkflowButton.click();
   harness.elements.cancelRecommendationButton.click();
+  harness.elements.taskDraftDiscussButton.click();
+  harness.elements.taskDraftFinalizeButton.click();
+  harness.elements.taskDraftCreateButton.click();
   harness.elements.terminalStartButton.click();
   harness.elements.terminalSendButton.click();
   harness.elements.terminalCancelButton.click();
@@ -99,6 +109,9 @@ test("workflow page command bindings route page control events to command action
     ["createRecommendationRun", { mode: "probe" }],
     ["createWorkflowRun"],
     ["cancelRecommendationRun"],
+    ["sendTaskDraftMessage"],
+    ["finalizeTaskDraft"],
+    ["createTaskSourceFromDraft"],
     ["startTerminalSession"],
     ["sendTerminalInput"],
     ["cancelTerminalSession"],
