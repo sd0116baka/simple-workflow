@@ -41,6 +41,10 @@ function createRuntimeHarness() {
         calls.push(["cancelRecommendationRun"]);
         return { cancelled: true };
       },
+      updateRecommendationRunStageSwitches(input) {
+        calls.push(["updateRecommendationRunStageSwitches", input]);
+        return { updated: true };
+      },
       getLatestRecommendationRun() {
         calls.push(["getLatestRecommendationRun"]);
         return latestRun;
@@ -132,6 +136,9 @@ test("workflow service runtime delegates read, fixture, and recommendation opera
   assert.deepEqual(await runtime.cleanupTestStateFixtures(), { cleaned: true });
   assert.deepEqual(await runtime.createRecommendationRun(), { id: "run-2" });
   assert.deepEqual(runtime.cancelRecommendationRun(), { cancelled: true });
+  assert.deepEqual(runtime.updateRecommendationRunStageSwitches({
+    stageSwitches: { executionAdmission: true },
+  }), { updated: true });
   assert.deepEqual(runtime.getLatestRecommendationRun(), { snapshotId: "run-1" });
 
   assert.deepEqual(calls, [
@@ -142,6 +149,7 @@ test("workflow service runtime delegates read, fixture, and recommendation opera
     ["cleanupTestStateFixtures"],
     ["createRecommendationRun"],
     ["cancelRecommendationRun"],
+    ["updateRecommendationRunStageSwitches", { stageSwitches: { executionAdmission: true } }],
     ["getLatestRecommendationRun"],
     ["toRecommendationSnapshot", { id: "run-1", status: "completed" }],
   ]);

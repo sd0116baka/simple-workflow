@@ -1,20 +1,14 @@
 import { runAgentCorrectionRound } from "./agent-correction-round.js";
 import { applyAppendRequest, findTaskContextPackage } from "./task-pool.js";
+import { multiArtifactRecords } from "./task-package-artifacts.js";
 
-function collectRoundRuns(firstRound, secondRound) {
+const MAIN_AGENT_INITIALIZATION_RUN_ID = "main-agent:initialization";
+
+function collectRoundRuns(rounds) {
   return {
-    executionAgentRuns: [
-      firstRound.executionAgentRun,
-      secondRound.executionAgentRun,
-    ].filter(Boolean),
-    reviewAgentRuns: [
-      firstRound.reviewAgentRun,
-      secondRound.reviewAgentRun,
-    ].filter(Boolean),
-    convergenceRuns: [
-      firstRound.convergenceRun,
-      secondRound.convergenceRun,
-    ].filter(Boolean),
+    executionAgentRuns: rounds.map((round) => round.executionAgentRun).filter(Boolean),
+    reviewAgentRuns: rounds.map((round) => round.reviewAgentRun).filter(Boolean),
+    convergenceRuns: rounds.map((round) => round.convergenceRun).filter(Boolean),
   };
 }
 
@@ -27,6 +21,33 @@ function emptyRoundSequence(taskPool, packageId) {
     convergenceRuns: [],
     terminalConvergenceRun: null,
   };
+}
+
+function hasMainAgentInitialization({ taskPool, packageId, mainAgentInitialization }) {
+  if (mainAgentInitialization?.appendRequest) return true;
+  const taskContextPackage = findTaskContextPackage(taskPool, packageId);
+  return taskContextPackage?.agentRuns?.some((agentRun) =>
+    agentRun.runId === MAIN_AGENT_INITIALIZATION_RUN_ID
+      && agentRun.status === "succeeded") === true;
+}
+
+function isTerminalConvergenceRun(round) {
+  return [
+    "convergenceSuccess",
+    "convergenceFailure",
+  ].includes(round?.convergenceRun?.appendRequest?.artifactType);
+}
+
+function existingAdviceCount(taskPool, packageId) {
+  return multiArtifactRecords(
+    findTaskContextPackage(taskPool, packageId),
+    "convergenceAdvice",
+  ).length;
+}
+
+function remainingRoundLimit({ taskPool, packageId, maxIterations }) {
+  if (!Number.isInteger(maxIterations)) return 2;
+  return Math.max(maxIterations + 1 - existingAdviceCount(taskPool, packageId), 1);
 }
 
 export async function runRecommendationAgentRounds({
@@ -47,7 +68,11 @@ export async function runRecommendationAgentRounds({
   runConverge,
   runCorrectionRound = runAgentCorrectionRound,
 }) {
-  if (!taskPool || !packageId || !mainAgentInitialization?.appendRequest) {
+  if (!taskPool || !packageId || !hasMainAgentInitialization({
+    taskPool,
+    packageId,
+    mainAgentInitialization,
+  })) {
     return emptyRoundSequence(taskPool, packageId);
   }
 
@@ -73,22 +98,21 @@ export async function runRecommendationAgentRounds({
       },
     });
 
-  const firstRound = await runRound();
-  const shouldRunSecondRound =
-    firstRound.convergenceRun?.appendRequest?.artifactType === "convergenceAdvice";
-  const secondRound = shouldRunSecondRound
-    ? await runRound()
-    : {
-        executionAgentRun: null,
-        reviewAgentRun: null,
-        convergenceRun: null,
-      };
+  const rounds = [];
+  const roundLimit = remainingRoundLimit({ taskPool: currentTaskPool, packageId, maxIterations });
+  for (let roundIndex = 0; roundIndex < roundLimit; roundIndex += 1) {
+    const round = await runRound();
+    rounds.push(round);
+    const artifactType = round.convergenceRun?.appendRequest?.artifactType;
+    if (artifactType !== "convergenceAdvice") break;
+  }
 
-  const roundRuns = collectRoundRuns(firstRound, secondRound);
+  const roundRuns = collectRoundRuns(rounds);
+  const terminalRound = rounds.findLast(isTerminalConvergenceRun);
   return {
     taskPool: currentTaskPool,
     taskContextPackage: findTaskContextPackage(currentTaskPool, packageId),
     ...roundRuns,
-    terminalConvergenceRun: secondRound.convergenceRun ?? firstRound.convergenceRun,
+    terminalConvergenceRun: terminalRound?.convergenceRun ?? null,
   };
 }

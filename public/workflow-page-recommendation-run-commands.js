@@ -60,9 +60,21 @@ export function createWorkflowPageRecommendationRunCommands({
     });
   }
 
+  async function updateStageSwitches() {
+    const payload = await workflowApi.updateRecommendationRunStageSwitches({
+      stageSwitches: readStageSwitches(elements),
+    });
+    if (payload.recommendationRun) {
+      setRecommendationRun(payload.recommendationRun);
+      renderRecommendationRun();
+    }
+    return { ok: true, payload };
+  }
+
   return {
     createRecommendationRun,
     createWorkflowRun,
     cancelRecommendationRun,
+    updateStageSwitches,
   };
 }

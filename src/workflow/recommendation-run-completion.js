@@ -4,6 +4,7 @@ import {
   applyCompletedRecommendationRun as applyCompletedRun,
   applyFailedRecommendationRun as applyFailedRun,
 } from "./recommendation-run-completion-outcome.js";
+import { canContinueRecommendationRunDownstream } from "./recommendation-run-downstream-continuation.js";
 
 export function createRecommendationRunCompletion({
   tasksDir,
@@ -51,6 +52,13 @@ export function createRecommendationRunCompletion({
         persistTaskContextPackage,
       });
       shouldEmitChange = outcome.applied;
+      if (outcome.applied && canContinueRecommendationRunDownstream(run)) {
+        run.status = "running";
+        run.finishedAt = null;
+        emitRecommendationChanged(run);
+        await continueRecommendationRun(run, onProgress);
+        shouldEmitChange = false;
+      }
     } catch (error) {
       const outcome = applyFailedRecommendationRun({
         run,
@@ -66,7 +74,57 @@ export function createRecommendationRunCompletion({
     }
   }
 
+  async function continueRecommendationRun(run, onProgress) {
+    let shouldEmitChange = false;
+    try {
+      const commandResult = {
+        stdout: run.stdout ?? "",
+        stderr: run.stderr ?? "",
+        exitCode: run.exitCode ?? null,
+        error: run.error ?? null,
+        terminalSessionId: run.terminalSessionId ?? null,
+      };
+      const completionInput = await loadRecommendationRunCompletionInput({
+        run,
+        commandResult,
+        tasksDir,
+        repositoryDir,
+        taskContextWorkspace,
+        getStartupCheck,
+        getLatestRecommendationRun,
+        runMainAgentSession,
+        runExecutionAgentSession,
+        runReviewAgentSession,
+        runConvergenceSession,
+        recommendationRunControllerRegistry,
+        onProgress,
+      });
+      const completedRun = await completeRecommendationFlow({
+        ...completionInput,
+        mode: "workflow",
+      });
+      const outcome = await applyCompletedRecommendationRun({
+        run,
+        completedRun,
+        persistTaskContextPackage,
+      });
+      shouldEmitChange = outcome.applied;
+    } catch (error) {
+      const outcome = applyFailedRecommendationRun({
+        run,
+        error,
+        now,
+      });
+      shouldEmitChange = outcome.applied;
+    }
+    if (shouldEmitChange) {
+      emitRecommendationChanged(run);
+    }
+    return run;
+  }
+
   return {
+    continueRecommendationRun,
     finishRecommendationRun,
   };
 }

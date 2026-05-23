@@ -42,6 +42,7 @@ test("recommendation run route definitions expose run lifecycle routes", () => {
       "POST /api/recommendation-runs/cancel",
       "POST /api/recommendation-runs",
       "GET /api/recommendation-runs/latest",
+      "PATCH /api/recommendation-runs/stage-switches",
     ],
   );
 });
@@ -234,5 +235,52 @@ test("recommendation run routes map cancel and latest responses", async () => {
   assert.equal(latestResponse.sent.status, 200);
   assert.deepEqual(latestResponse.sent.payload, {
     recommendationRun: latestRun,
+  });
+});
+
+test("recommendation run route updates live stage switches", async () => {
+  const httpAdapter = createHttpAdapterProbe();
+  const calls = [];
+  const updatedRun = { id: "recommendation-run:001" };
+  const definitions = createWorkflowRecommendationRunRouteDefinitions({
+    httpAdapter,
+    workflowService: {
+      updateRecommendationRunStageSwitches(input) {
+        calls.push(input);
+        return { updated: true, recommendationRun: updatedRun };
+      },
+    },
+  });
+  const response = {};
+
+  await findRoute(definitions, {
+    method: "PATCH",
+    path: "/api/recommendation-runs/stage-switches",
+  }).handle({
+    request: {
+      body: {
+        stageSwitches: {
+          executionAdmission: false,
+          mainAgent: false,
+        },
+      },
+    },
+    response,
+  });
+
+  assert.deepEqual(calls, [{
+    stageSwitches: {
+      executionAdmission: false,
+      isolatedWorkspace: true,
+      mainAgent: false,
+      executionAgent: true,
+      reviewAgent: true,
+      convergence: true,
+    },
+  }]);
+  assert.equal(response.sent.status, 200);
+  assert.deepEqual(response.sent.payload, {
+    updated: true,
+    recommendationRun: updatedRun,
   });
 });

@@ -101,6 +101,95 @@ test("recommendation run completion completes, persists, cleans controller, and 
   assert.equal(calls[4][0], "emitRecommendationChanged");
 });
 
+test("recommendation run completion continues downstream from saved command output", async () => {
+  const { calls, completion } = createCompletionHarness();
+  const run = {
+    id: "recommendation-run-1",
+    status: "running",
+    stdout: "{\"appendRequest\":{}}",
+    stderr: "",
+    exitCode: 0,
+    error: null,
+    terminalSessionId: "terminal-session-1",
+  };
+
+  await completion.continueRecommendationRun(run, () => {});
+
+  assert.equal(calls[0][0], "loadRecommendationRunCompletionInput");
+  assert.deepEqual(calls[0][1].commandResult, {
+    stdout: "{\"appendRequest\":{}}",
+    stderr: "",
+    exitCode: 0,
+    error: null,
+    terminalSessionId: "terminal-session-1",
+  });
+  assert.equal(calls[1][0], "completeRecommendationFlow");
+  assert.equal(calls[1][1].mode, "workflow");
+  assert.equal(calls.at(-1)[0], "emitRecommendationChanged");
+});
+
+test("recommendation run completion auto-continues when completed probe has open downstream gates", async () => {
+  let completionCount = 0;
+  const { calls, completion } = createCompletionHarness({
+    async completeRecommendationFlow(input) {
+      completionCount += 1;
+      calls.push(["completeRecommendationFlow", input]);
+      return completionCount === 1
+        ? {
+            status: "succeeded",
+            exitCode: 0,
+            error: null,
+            executionIntentAppendRequest: {
+              packageId: "task-context-package:tasks/task-001.yaml",
+            },
+            stageSwitches: {
+              executionAdmission: true,
+              isolatedWorkspace: true,
+              mainAgent: true,
+              executionAgent: true,
+              reviewAgent: true,
+              convergence: true,
+            },
+            taskContextPackage: null,
+          }
+        : {
+            status: "succeeded",
+            exitCode: 0,
+            error: null,
+            executionIntentAppendRequest: {
+              packageId: "task-context-package:tasks/task-001.yaml",
+            },
+            stageSwitches: {
+              executionAdmission: true,
+              isolatedWorkspace: true,
+              mainAgent: true,
+              executionAgent: true,
+              reviewAgent: true,
+              convergence: true,
+            },
+            successHumanDecisionRequest: {
+              appendRequest: {
+                artifactType: "humanDecisionRequest",
+              },
+            },
+            taskContextPackage: { packageId: "completed-package" },
+          };
+    },
+  });
+  const run = { id: "recommendation-run-1", status: "running" };
+
+  await completion.finishRecommendationRun(
+    run,
+    Promise.resolve({ stdout: "{}", stderr: "", exitCode: 0 }),
+    () => {},
+  );
+
+  const completionCalls = calls.filter(([name]) => name === "completeRecommendationFlow");
+  assert.equal(completionCalls.length, 2);
+  assert.equal(completionCalls[1][1].mode, "workflow");
+  assert.equal(run.successHumanDecisionRequest.appendRequest.artifactType, "humanDecisionRequest");
+});
+
 test("recommendation run completion marks failed command results and emits", async () => {
   const { calls, completion } = createCompletionHarness();
   const run = { id: "recommendation-run-1", status: "running" };

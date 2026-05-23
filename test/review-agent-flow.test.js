@@ -10,10 +10,14 @@ function reviewablePackage() {
 
 test("runs review agent stub and requests review report append", async () => {
   let observed = null;
+  const onProgress = () => {};
+  const signal = { aborted: false };
   const result = await runReviewAgent({
     taskContextPackage: reviewablePackage(),
-    runAgentSession: ({ role, packageId, cwd, runId, inputArtifactRefs }) => {
-      observed = { role, packageId, cwd, runId, inputArtifactRefs };
+    onProgress,
+    signal,
+    runAgentSession: ({ role, packageId, cwd, runId, inputArtifactRefs, onProgress: progress, signal: runSignal }) => {
+      observed = { role, packageId, cwd, runId, inputArtifactRefs, onProgress: progress, signal: runSignal };
       return {
         sessionId: `session:${role}:${packageId}`,
         status: "succeeded",
@@ -47,6 +51,8 @@ test("runs review agent stub and requests review report append", async () => {
       "isolatedWorkspace",
       "executionReport:001",
     ],
+    onProgress,
+    signal,
   });
   assert.deepEqual(result.appendRequest.agentRun.inputArtifactRefs, [
     "taskDraft",

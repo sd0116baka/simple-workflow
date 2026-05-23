@@ -43,6 +43,10 @@ function createHarness() {
       calls.push(["cancelRecommendationRun"]);
       return { recommendationRun: null };
     },
+    async updateRecommendationRunStageSwitches(input) {
+      calls.push(["updateRecommendationRunStageSwitches", input]);
+      return { recommendationRun: { id: "recommendation-run:001", stageSwitches: input.stageSwitches } };
+    },
   };
   const commands = createWorkflowPageRecommendationRunCommands({
     workflowApi,
@@ -132,6 +136,31 @@ test("workflow page recommendation run commands cancel a running recommendation 
   assert.deepEqual(harness.calls, [
     ["cancelRecommendationRun"],
     ["setRecommendationRun", null],
+    ["renderRecommendationRun"],
+  ]);
+});
+
+test("workflow page recommendation run commands update live stage switches", async () => {
+  const harness = createHarness();
+  harness.elements.stageSwitchExecutionAdmission.checked = true;
+
+  const result = await harness.commands.updateStageSwitches();
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(harness.calls, [
+    ["updateRecommendationRunStageSwitches", {
+      stageSwitches: {
+        ...DEFAULT_STAGE_SWITCHES,
+        executionAdmission: true,
+      },
+    }],
+    ["setRecommendationRun", {
+      id: "recommendation-run:001",
+      stageSwitches: {
+        ...DEFAULT_STAGE_SWITCHES,
+        executionAdmission: true,
+      },
+    }],
     ["renderRecommendationRun"],
   ]);
 });

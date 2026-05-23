@@ -69,6 +69,14 @@ export function createWorkflowApiClient({
       });
     },
 
+    updateRecommendationRunStageSwitches({ stageSwitches } = {}) {
+      return requestJson("/api/recommendation-runs/stage-switches", {
+        method: "PATCH",
+        body: { stageSwitches },
+        errorMessage: "更新流程开关失败",
+      });
+    },
+
     cancelRecommendationRun() {
       return requestJson("/api/recommendation-runs/cancel", {
         method: "POST",

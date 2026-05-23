@@ -41,6 +41,10 @@ export function createWorkflowServiceRuntime({
       return recommendationRunLifecycle.cancelRecommendationRun();
     },
 
+    updateRecommendationRunStageSwitches(input = {}) {
+      return recommendationRunLifecycle.updateRecommendationRunStageSwitches(input);
+    },
+
     getLatestRecommendationRun() {
       return toRecommendationSnapshot(recommendationRunLifecycle.getLatestRecommendationRun());
     },

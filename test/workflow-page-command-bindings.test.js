@@ -15,6 +15,10 @@ class FakeButton {
   click() {
     return this.listeners.get("click")?.({ target: this });
   }
+
+  change() {
+    return this.listeners.get("change")?.({ target: this });
+  }
 }
 
 class FakeDocument {
@@ -42,6 +46,12 @@ function createHarness() {
     runRecommendationButton: new FakeButton(),
     runWorkflowButton: new FakeButton(),
     cancelRecommendationButton: new FakeButton(),
+    stageSwitchExecutionAdmission: new FakeButton(),
+    stageSwitchIsolatedWorkspace: new FakeButton(),
+    stageSwitchMainAgent: new FakeButton(),
+    stageSwitchExecutionAgent: new FakeButton(),
+    stageSwitchReviewAgent: new FakeButton(),
+    stageSwitchConvergence: new FakeButton(),
     taskDraftDiscussButton: new FakeButton(),
     taskDraftFinalizeButton: new FakeButton(),
     taskDraftCreateButton: new FakeButton(),
@@ -59,6 +69,7 @@ function createHarness() {
     createRecommendationRun: async (input) => calls.push(["createRecommendationRun", input]),
     createWorkflowRun: async () => calls.push(["createWorkflowRun"]),
     cancelRecommendationRun: async () => calls.push(["cancelRecommendationRun"]),
+    updateStageSwitches: async () => calls.push(["updateStageSwitches"]),
     sendTaskDraftMessage: async () => calls.push(["sendTaskDraftMessage"]),
     finalizeTaskDraft: async () => calls.push(["finalizeTaskDraft"]),
     createTaskSourceFromDraft: async () => calls.push(["createTaskSourceFromDraft"]),
@@ -94,6 +105,7 @@ test("workflow page command bindings route page control events to command action
   harness.elements.runRecommendationButton.click();
   harness.elements.runWorkflowButton.click();
   harness.elements.cancelRecommendationButton.click();
+  harness.elements.stageSwitchExecutionAdmission.change();
   harness.elements.taskDraftDiscussButton.click();
   harness.elements.taskDraftFinalizeButton.click();
   harness.elements.taskDraftCreateButton.click();
@@ -109,6 +121,7 @@ test("workflow page command bindings route page control events to command action
     ["createRecommendationRun", { mode: "probe" }],
     ["createWorkflowRun"],
     ["cancelRecommendationRun"],
+    ["updateStageSwitches"],
     ["sendTaskDraftMessage"],
     ["finalizeTaskDraft"],
     ["createTaskSourceFromDraft"],

@@ -1105,6 +1105,14 @@ h2 {
   background: #ffffff;
 }
 
+.stage-switch-note {
+  margin: 0;
+  padding: 8px 16px 0;
+  color: #5b6472;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .workflow-stage-switch {
   display: flex;
   align-items: center;

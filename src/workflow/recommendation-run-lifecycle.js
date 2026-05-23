@@ -3,6 +3,9 @@ import { createRecommendationRunCompletion } from "./recommendation-run-completi
 import { createRecommendationRunLifecycleState } from "./recommendation-run-lifecycle-state.js";
 import { cancelRecommendationRunTransaction } from "./recommendation-run-cancellation.js";
 import { createRecommendationRunTransaction } from "./recommendation-run-creation.js";
+import { canContinueRecommendationRunDownstream } from "./recommendation-run-downstream-continuation.js";
+import { appendRecommendationRunProgress } from "./recommendation-run-progress.js";
+import { normalizeWorkflowStageSwitches } from "./workflow-stage-switches.js";
 
 export function createRecommendationRunLifecycle({
   tasksDir,
@@ -67,10 +70,36 @@ export function createRecommendationRunLifecycle({
     });
   }
 
+  function updateRecommendationRunStageSwitches({ stageSwitches } = {}) {
+    const run = getLatestRecommendationRun();
+    if (!run) {
+      return { updated: false, recommendationRun: null };
+    }
+
+    run.stageSwitches = normalizeWorkflowStageSwitches(stageSwitches);
+    emitRecommendationChanged(run);
+    if (canContinueRecommendationRunDownstream(run)) {
+      run.status = "running";
+      run.finishedAt = null;
+      emitRecommendationChanged(run);
+      const appendProgress = (progress) => {
+        appendRecommendationRunProgress(run, progress);
+        emitRecommendationChanged(run);
+      };
+      recommendationRunCompletion.continueRecommendationRun(run, appendProgress);
+    }
+
+    return {
+      updated: true,
+      recommendationRun: run,
+    };
+  }
+
   return {
     getLatestRecommendationRun,
     setLatestRecommendationRun,
     createRecommendationRun,
     cancelRecommendationRun,
+    updateRecommendationRunStageSwitches,
   };
 }

@@ -9,6 +9,15 @@ export function createWorkflowPageCommandBindings({
   isActionPending = isActionFeedbackPending,
   resetRestartControlsFn = resetRestartControls,
 } = {}) {
+  const stageSwitches = [
+    elements.stageSwitchExecutionAdmission,
+    elements.stageSwitchIsolatedWorkspace,
+    elements.stageSwitchMainAgent,
+    elements.stageSwitchExecutionAgent,
+    elements.stageSwitchReviewAgent,
+    elements.stageSwitchConvergence,
+  ];
+
   function handleDocumentAction(event) {
     const actionButton = event.target.closest?.("[data-action]");
     if (!actionButton) return;
@@ -47,6 +56,11 @@ export function createWorkflowPageCommandBindings({
     });
     elements.cancelRecommendationButton?.addEventListener("click", () => {
       commandActions.cancelRecommendationRun().catch(showError);
+    });
+    stageSwitches.forEach((stageSwitch) => {
+      stageSwitch?.addEventListener("change", () => {
+        commandActions.updateStageSwitches().catch(showError);
+      });
     });
     elements.taskDraftDiscussButton?.addEventListener("click", () => {
       commandActions.sendTaskDraftMessage().catch(showError);

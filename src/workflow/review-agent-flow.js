@@ -24,6 +24,8 @@ export async function runReviewAgent({
   runAgentSession = createStubAgentSession,
   repositoryDir = process.cwd(),
   now = () => new Date().toISOString(),
+  onProgress,
+  signal,
 } = {}) {
   if (!taskContextPackage?.packageId) {
     throw new Error("taskContextPackage.packageId is required");
@@ -62,6 +64,8 @@ export async function runReviewAgent({
     cwd,
     runId,
     inputArtifactRefs,
+    onProgress,
+    signal,
   }));
   const finishedAt = now();
 

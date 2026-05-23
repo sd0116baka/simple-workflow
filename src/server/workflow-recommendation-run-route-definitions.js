@@ -43,5 +43,16 @@ export function createWorkflowRecommendationRunRouteDefinitions({
         });
       },
     },
+    {
+      method: "PATCH",
+      path: "/api/recommendation-runs/stage-switches",
+      async handle({ request, response }) {
+        const body = request ? await httpAdapter.readJsonBody(request) : {};
+        const result = workflowService.updateRecommendationRunStageSwitches({
+          stageSwitches: normalizeWorkflowStageSwitches(body.stageSwitches),
+        });
+        httpAdapter.sendJson(response, 200, result);
+      },
+    },
   ];
 }

@@ -1,6 +1,7 @@
 import { runConvergence } from "./convergence-flow.js";
 import { runExecutionAgent } from "./execution-agent-flow.js";
 import { runReviewAgent } from "./review-agent-flow.js";
+import { artifactRecord, latestArtifactRecord } from "./task-package-artifacts.js";
 import { isWorkflowStageEnabled } from "./workflow-stage-switches.js";
 
 async function applyRoundAppend({
@@ -32,7 +33,7 @@ export async function runAgentCorrectionRound({
 } = {}) {
   let currentPackage = taskContextPackage;
 
-  if (!currentPackage || !isWorkflowStageEnabled(stageSwitches, "executionAgent")) {
+  if (!currentPackage) {
     return {
       taskContextPackage: currentPackage,
       executionAgentRun: null,
@@ -41,7 +42,22 @@ export async function runAgentCorrectionRound({
     };
   }
 
-  const executionAgentRun = !currentPackage
+  const startsNewCorrectionCycle = Boolean(
+    latestArtifactRecord(currentPackage, "convergenceAdvice")
+      ?? latestArtifactRecord(currentPackage, "humanConvergenceGuidance"),
+  );
+  const hasExecutionReport = !startsNewCorrectionCycle
+    && Boolean(latestArtifactRecord(currentPackage, "executionReport"));
+  if (!hasExecutionReport && !isWorkflowStageEnabled(stageSwitches, "executionAgent")) {
+    return {
+      taskContextPackage: currentPackage,
+      executionAgentRun: null,
+      reviewAgentRun: null,
+      convergenceRun: null,
+    };
+  }
+
+  const executionAgentRun = hasExecutionReport
     ? null
     : await runExecution({
         taskContextPackage: currentPackage,
@@ -57,7 +73,11 @@ export async function runAgentCorrectionRound({
     currentPackage,
     applyAppendRequest,
   });
-  if (!executionAgentRun?.appendRequest || executionAgentRun.error) {
+  const executionReportReady = Boolean(
+    latestArtifactRecord(currentPackage, "executionReport")
+      ?? executionAgentRun?.appendRequest,
+  );
+  if (!executionReportReady || executionAgentRun?.error) {
     return {
       taskContextPackage: currentPackage,
       executionAgentRun,
@@ -66,7 +86,10 @@ export async function runAgentCorrectionRound({
     };
   }
 
-  if (!isWorkflowStageEnabled(stageSwitches, "reviewAgent")) {
+  const hasReviewReport = !startsNewCorrectionCycle
+    && !executionAgentRun?.appendRequest
+    && Boolean(latestArtifactRecord(currentPackage, "reviewReport"));
+  if (!hasReviewReport && !isWorkflowStageEnabled(stageSwitches, "reviewAgent")) {
     return {
       taskContextPackage: currentPackage,
       executionAgentRun,
@@ -75,13 +98,15 @@ export async function runAgentCorrectionRound({
     };
   }
 
-  const reviewAgentRun = !currentPackage
+  const reviewAgentRun = hasReviewReport
     ? null
     : await runReview({
         taskContextPackage: currentPackage,
         runAgentSession: runReviewAgentSession,
         repositoryDir,
         now,
+        onProgress,
+        signal,
       });
   currentPackage = await applyRoundAppend({
     appendRequest: reviewAgentRun?.appendRequest,
@@ -89,7 +114,11 @@ export async function runAgentCorrectionRound({
     currentPackage,
     applyAppendRequest,
   });
-  if (!reviewAgentRun?.appendRequest) {
+  const reviewReportReady = Boolean(
+    latestArtifactRecord(currentPackage, "reviewReport")
+      ?? reviewAgentRun?.appendRequest,
+  );
+  if (!reviewReportReady) {
     return {
       taskContextPackage: currentPackage,
       executionAgentRun,
@@ -98,7 +127,11 @@ export async function runAgentCorrectionRound({
     };
   }
 
-  if (!isWorkflowStageEnabled(stageSwitches, "convergence")) {
+  const hasConvergenceResult = Boolean(
+    artifactRecord(currentPackage, "convergenceSuccess")
+      ?? latestArtifactRecord(currentPackage, "convergenceFailure"),
+  ) && !reviewAgentRun?.appendRequest;
+  if (!hasConvergenceResult && !isWorkflowStageEnabled(stageSwitches, "convergence")) {
     return {
       taskContextPackage: currentPackage,
       executionAgentRun,
@@ -107,7 +140,7 @@ export async function runAgentCorrectionRound({
     };
   }
 
-  const convergenceRun = !currentPackage
+  const convergenceRun = hasConvergenceResult
     ? null
     : await runConverge({
         taskContextPackage: currentPackage,

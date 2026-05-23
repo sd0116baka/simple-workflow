@@ -18,6 +18,7 @@ test("workflow page command surface exposes page commands and document actions",
     createRecommendationRun: async () => calls.push(["createRecommendationRun"]),
     createWorkflowRun: async () => calls.push(["createWorkflowRun"]),
     cancelRecommendationRun: async () => calls.push(["cancelRecommendationRun"]),
+    updateStageSwitches: async () => calls.push(["updateStageSwitches"]),
   };
   const fixtureCommands = {
     seedStateFixtures: async () => calls.push(["seedStateFixtures"]),
@@ -55,6 +56,7 @@ test("workflow page command surface exposes page commands and document actions",
   await surface.pageCommands.createRecommendationRun();
   await surface.pageCommands.createWorkflowRun();
   await surface.pageCommands.cancelRecommendationRun();
+  await surface.pageCommands.updateStageSwitches();
   await surface.pageCommands.sendTaskDraftMessage();
   await surface.pageCommands.finalizeTaskDraft();
   await surface.pageCommands.createTaskSourceFromDraft();
@@ -69,6 +71,7 @@ test("workflow page command surface exposes page commands and document actions",
   await surface.commandActions.createRecommendationRun();
   await surface.commandActions.createWorkflowRun();
   await surface.commandActions.cancelRecommendationRun();
+  await surface.commandActions.updateStageSwitches();
   await surface.commandActions.sendTaskDraftMessage();
   await surface.commandActions.finalizeTaskDraft();
   await surface.commandActions.createTaskSourceFromDraft();
@@ -88,6 +91,7 @@ test("workflow page command surface exposes page commands and document actions",
     ["createRecommendationRun"],
     ["createWorkflowRun"],
     ["cancelRecommendationRun"],
+    ["updateStageSwitches"],
     ["sendTaskDraftMessage"],
     ["finalizeTaskDraft"],
     ["createTaskSourceFromDraft"],
@@ -102,6 +106,7 @@ test("workflow page command surface exposes page commands and document actions",
     ["createRecommendationRun"],
     ["createWorkflowRun"],
     ["cancelRecommendationRun"],
+    ["updateStageSwitches"],
     ["sendTaskDraftMessage"],
     ["finalizeTaskDraft"],
     ["createTaskSourceFromDraft"],

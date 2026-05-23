@@ -96,6 +96,31 @@ test("recommendation run lifecycle keeps blocked startup runs inside the lifecyc
   assert.equal(emitted[0].status, "blocked");
 });
 
+test("recommendation run lifecycle updates live stage switches", async (t) => {
+  const { lifecycle, emitted } = await createLifecycle(t);
+  const run = { id: "recommendation-run-1", status: "blocked" };
+  lifecycle.setLatestRecommendationRun(run);
+
+  const result = lifecycle.updateRecommendationRunStageSwitches({
+    stageSwitches: {
+      executionAdmission: false,
+      mainAgent: false,
+    },
+  });
+
+  assert.equal(result.updated, true);
+  assert.equal(result.recommendationRun, run);
+  assert.deepEqual(run.stageSwitches, {
+    executionAdmission: false,
+    isolatedWorkspace: true,
+    mainAgent: false,
+    executionAgent: true,
+    reviewAgent: true,
+    convergence: true,
+  });
+  assert.equal(emitted.at(-1), run);
+});
+
 test("recommendation run lifecycle aborts running commands through the controller registry", async (t) => {
   const abortedRunIds = [];
   const signalsByRunId = new Map();

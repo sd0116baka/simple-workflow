@@ -34,6 +34,7 @@ test("workflow route definitions expose method and path metadata", () => {
       "POST /api/recommendation-runs/cancel",
       "POST /api/recommendation-runs",
       "GET /api/recommendation-runs/latest",
+      "PATCH /api/recommendation-runs/stage-switches",
       "POST /api/human-decisions/accept-convergence",
       "POST /api/human-decisions/continue-convergence-with-guidance",
       "POST /api/human-decisions/cancel-task",

@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runRecommendationAgentRounds } from "../src/workflow/recommendation-agent-rounds.js";
 import { buildTaskPool } from "../src/workflow/task-pool.js";
+import { applyAppendRequestToTaskPackage } from "../src/workflow/task-package-append-request.js";
 
 function taskPoolFixture() {
   return buildTaskPool([
@@ -108,6 +109,83 @@ test("recommendation agent rounds run a second round after convergence advice", 
   assert.equal(result.taskContextPackage.currentWorkStage, "convergence");
   assert.equal(result.taskContextPackage.artifacts.convergenceAdvice[0].artifactId, "convergenceAdvice:001");
   assert.equal(result.taskContextPackage.artifacts.convergenceSuccess.artifactId, "convergenceSuccess");
+});
+
+test("recommendation agent rounds keep running advice loops within the iteration budget", async () => {
+  let convergenceCount = 0;
+  const result = await runRecommendationAgentRounds({
+    taskPool: taskPoolFixture(),
+    packageId,
+    maxIterations: 3,
+    mainAgentInitialization: {
+      appendRequest: {
+        agentRun: agentRun("main-agent:initialization"),
+      },
+    },
+    runExecution: async () => ({
+      appendRequest: appendRequest(
+        "executionReport",
+        `execution-agent:00${convergenceCount + 1}`,
+      ),
+      error: null,
+    }),
+    runReview: () => ({
+      appendRequest: appendRequest(
+        "reviewReport",
+        `review-agent:00${convergenceCount + 1}`,
+      ),
+      error: null,
+    }),
+    runConverge: () => {
+      convergenceCount += 1;
+      return {
+        appendRequest: appendRequest(
+          convergenceCount < 3 ? "convergenceAdvice" : "convergenceSuccess",
+          `main-agent:convergence:00${convergenceCount}`,
+        ),
+        error: null,
+      };
+    },
+  });
+
+  assert.equal(result.executionAgentRuns.length, 3);
+  assert.equal(result.reviewAgentRuns.length, 3);
+  assert.equal(result.convergenceRuns.length, 3);
+  assert.equal(result.terminalConvergenceRun.appendRequest.artifactType, "convergenceSuccess");
+  assert.equal(result.taskContextPackage.artifacts.convergenceAdvice.length, 2);
+});
+
+test("recommendation agent rounds continue when main initialization already exists", async () => {
+  const initializedTaskPool = taskPoolFixture();
+  initializedTaskPool.taskContextPackages = initializedTaskPool.taskContextPackages.map((taskPackage) =>
+    taskPackage.packageId === packageId
+      ? applyAppendRequestToTaskPackage(taskPackage, {
+          packageId,
+          agentRun: agentRun("main-agent:initialization"),
+        }, { currentWorkStage: "main-agent" })
+      : taskPackage);
+
+  const result = await runRecommendationAgentRounds({
+    taskPool: initializedTaskPool,
+    packageId,
+    mainAgentInitialization: null,
+    runExecution: async () => ({
+      appendRequest: appendRequest("executionReport", "execution-agent:001"),
+      error: null,
+    }),
+    runReview: () => ({
+      appendRequest: appendRequest("reviewReport", "review-agent:001"),
+      error: null,
+    }),
+    runConverge: () => ({
+      appendRequest: appendRequest("convergenceSuccess", "main-agent:convergence:001"),
+      error: null,
+    }),
+  });
+
+  assert.equal(result.executionAgentRuns.length, 1);
+  assert.equal(result.reviewAgentRuns.length, 1);
+  assert.equal(result.convergenceRuns.length, 1);
 });
 
 test("recommendation agent rounds stop without a terminal convergence run when execution fails", async () => {

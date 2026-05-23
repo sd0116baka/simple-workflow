@@ -63,6 +63,37 @@ test("agent correction round runs execution, review, and convergence through one
   assert.equal(result.convergenceRun.appendRequest.artifactType, "convergenceSuccess");
 });
 
+test("agent correction round passes progress and cancellation through review", async () => {
+  const progressEntries = [];
+  const signal = AbortSignal.timeout(1000);
+
+  await runAgentCorrectionRound({
+    taskContextPackage: createTaskContextPackageFixture({
+      currentWorkStage: "execution-agent",
+    }),
+    onProgress: (entry) => progressEntries.push(entry),
+    signal,
+    runExecution: async () => ({
+      appendRequest: appendRequest("executionReport"),
+      error: null,
+    }),
+    runReview: async ({ onProgress, signal: receivedSignal }) => {
+      assert.equal(receivedSignal, signal);
+      onProgress({ type: "review_process_start", message: "review started" });
+      return { appendRequest: appendRequest("reviewReport"), error: null };
+    },
+    runConverge: async () => ({ appendRequest: appendRequest("convergenceSuccess"), error: null }),
+    applyAppendRequest: async (request, { currentWorkStage }) => ({
+      packageId: request.packageId,
+      currentWorkStage,
+    }),
+  });
+
+  assert.deepEqual(progressEntries, [
+    { type: "review_process_start", message: "review started" },
+  ]);
+});
+
 test("agent correction round stops before review when execution fails", async () => {
   const applied = [];
   const result = await runAgentCorrectionRound({

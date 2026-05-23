@@ -112,6 +112,30 @@ test("workflow API client posts recommendation stage switches as JSON", async ()
   });
 });
 
+test("workflow API client patches live recommendation stage switches as JSON", async () => {
+  const calls = [];
+  const stageSwitches = {
+    executionAdmission: true,
+    isolatedWorkspace: true,
+    mainAgent: false,
+    executionAgent: false,
+    reviewAgent: false,
+    convergence: false,
+  };
+  const client = createWorkflowApiClient({
+    fetchImpl: async (path, options = {}) => {
+      calls.push({ path, options });
+      return jsonResponse({ updated: true, recommendationRun: { id: "recommendation-run:001" } });
+    },
+  });
+
+  await client.updateRecommendationRunStageSwitches({ stageSwitches });
+
+  assert.equal(calls[0].path, "/api/recommendation-runs/stage-switches");
+  assert.equal(calls[0].options.method, "PATCH");
+  assert.deepEqual(JSON.parse(calls[0].options.body), { stageSwitches });
+});
+
 
 test("workflow API client posts terminal session actions as JSON", async () => {
   const calls = [];
