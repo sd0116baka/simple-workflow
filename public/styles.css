@@ -866,6 +866,84 @@ h2 {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+.agent-debug-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.agent-debug-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #d6dbe3;
+  background: #ffffff;
+}
+
+.agent-debug-card.running {
+  border-color: #2f7dd3;
+  background: #f5faff;
+}
+
+.agent-debug-card.failed {
+  border-color: #b42318;
+  background: #fff7f6;
+}
+
+.agent-debug-card-header,
+.agent-debug-counters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.agent-debug-run-id {
+  font-weight: 700;
+  color: #172033;
+}
+
+.agent-debug-status,
+.agent-debug-counter {
+  padding: 2px 7px;
+  border: 1px solid #d6dbe3;
+  background: #f7f8fb;
+  color: #384253;
+  font-size: 12px;
+}
+
+.agent-debug-meta,
+.agent-debug-refs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 6px 12px;
+}
+
+.agent-debug-meta-item {
+  min-width: 0;
+}
+
+.agent-debug-label {
+  display: block;
+  color: #667085;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.agent-debug-value {
+  display: block;
+  overflow-wrap: anywhere;
+  color: #222b3a;
+  font-size: 12px;
+}
+
+.agent-debug-last {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #4c5565;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .terminal-command-input,
 .terminal-args-input,
 .terminal-input {

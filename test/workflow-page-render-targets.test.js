@@ -15,6 +15,8 @@ function createElements() {
     "taskContextPackageRaw",
     "recommendationRaw",
     "recommendationTerminal",
+    "agentDebugStatus",
+    "agentDebugPanel",
     "admissionRaw",
     "recommendationInputs",
     "admissionInputs",
@@ -74,6 +76,7 @@ test("workflow page render targets group recommendation run elements", () => {
 
   assert.equal(targets.recommendationResult, elements.recommendationResult);
   assert.equal(targets.recommendationTerminal, elements.recommendationTerminal);
+  assert.equal(targets.agentDebugPanel, elements.agentDebugPanel);
   assert.equal(targets.runRecommendationButton, elements.runRecommendationButton);
   assert.equal(targets.runWorkflowButton, elements.runWorkflowButton);
   assert.equal(targets.cancelRecommendationButton, elements.cancelRecommendationButton);
@@ -81,5 +84,5 @@ test("workflow page render targets group recommendation run elements", () => {
   assert.equal(targets.humanDecisionStatus, elements.humanDecisionStatus);
   assert.equal(targets.autoMergeExecutionRaw, elements.autoMergeExecutionRaw);
   assert.equal(targets.taskCloseoutPanel, elements.taskCloseoutPanel);
-  assert.equal(Object.keys(targets).length, 28);
+  assert.equal(Object.keys(targets).length, 30);
 });

@@ -1,4 +1,5 @@
 import { buildRecommendationRunViewModel } from "./recommendation-run-view-model.js";
+import { renderRecommendationRunAgentDebug } from "./recommendation-run-agent-debug-renderer.js";
 import { renderRecommendationRunSummary } from "./recommendation-run-summary-renderer.js";
 import { renderRecommendationRunTaskContext } from "./recommendation-run-task-context-renderer.js";
 import { renderRecommendationRunNoRunState } from "./recommendation-run-no-run-renderer.js";
@@ -31,8 +32,10 @@ export function createWorkflowRecommendationRunRenderer({
     elements.admissionPanel.replaceChildren();
     elements.taskContextPackagePanel.replaceChildren();
     renderRecommendationRunLiveState({
+      documentRef,
       elements,
       recommendationRun,
+      taskContextPackage,
       viewModel,
       workflowOverviewRenderers,
     });
@@ -67,8 +70,10 @@ export function createWorkflowRecommendationRunRenderer({
 }
 
 export function renderRecommendationRunLiveState({
+  documentRef,
   elements,
   recommendationRun,
+  taskContextPackage,
   viewModel,
   workflowOverviewRenderers,
 }) {
@@ -78,6 +83,12 @@ export function renderRecommendationRunLiveState({
     elements.recommendationTerminal.textContent = formatTerminalProgress(recommendationRun);
     elements.recommendationTerminal.scrollTop = elements.recommendationTerminal.scrollHeight;
   }
+  renderRecommendationRunAgentDebug({
+    documentRef,
+    elements,
+    recommendationRun,
+    taskContextPackage,
+  });
 
   elements.admissionRaw.textContent = formatJsonBlock(recommendationRun?.executionIntentAppendRequest);
   workflowOverviewRenderers.renderInputs(elements.recommendationInputs, viewModel.recommendationInputs);

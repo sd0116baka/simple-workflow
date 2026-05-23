@@ -41,6 +41,8 @@ const WORKFLOW_PAGE_SELECTORS = {
   recommendationRaw: "#recommendationRaw",
   recommendationTerminal: "#recommendationTerminal",
   recommendationIntentPanel: "#recommendationIntentPanel",
+  agentDebugStatus: "#agentDebugStatus",
+  agentDebugPanel: "#agentDebugPanel",
   terminalStatus: "#terminalStatus",
   terminalCommandInput: "#terminalCommandInput",
   terminalArgsInput: "#terminalArgsInput",

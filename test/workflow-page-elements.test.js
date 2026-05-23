@@ -10,6 +10,7 @@ test("workflow page elements expose the selector registry", () => {
 
   assert.equal(selectors.taskList, "#taskList");
   assert.equal(selectors.recommendationTerminal, "#recommendationTerminal");
+  assert.equal(selectors.agentDebugPanel, "#agentDebugPanel");
   assert.equal(selectors.autoMergeExecutionPanel, "#autoMergeExecutionPanel");
   assert.equal(selectors.taskCloseoutPanel, "#taskCloseoutPanel");
 

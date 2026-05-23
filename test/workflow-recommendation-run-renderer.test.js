@@ -7,7 +7,10 @@ import {
   markerElement,
 } from "./support/fake-dom.js";
 import { createRunningRecommendationRunFixture } from "./support/recommendation-run-fixtures.js";
-import { createTaskContextPackageFixture } from "./support/task-context-package-fixtures.js";
+import {
+  createAgentRunFixture,
+  createTaskContextPackageFixture,
+} from "./support/task-context-package-fixtures.js";
 
 function createElements() {
   return fakeElements([
@@ -38,6 +41,8 @@ function createElements() {
     "taskCloseoutStatus",
     "taskCloseoutRaw",
     "taskCloseoutPanel",
+    "agentDebugStatus",
+    "agentDebugPanel",
   ]);
 }
 
@@ -138,7 +143,15 @@ test("workflow recommendation run renderer renders running run panels and contro
 test("workflow recommendation run renderer renders task context package panel", () => {
   const { renderer, workflowSections } = createRendererHarness();
   const elements = createElements();
-  const packageSnapshot = createTaskContextPackageFixture();
+  const packageSnapshot = createTaskContextPackageFixture({
+    agentRuns: [
+      createAgentRunFixture({
+        runId: "execution-agent:001",
+        role: "execution",
+        sessionId: "session:execution",
+      }),
+    ],
+  });
 
   renderer.render({
     elements,
@@ -151,5 +164,7 @@ test("workflow recommendation run renderer renders task context package panel", 
   assert.equal(elements.taskContextPackageStatus.textContent, "task-001.yaml · execution-agent");
   assert.match(elements.taskContextPackageRaw.textContent, /"packageId": "task-context-package:tasks\/task-001.yaml"/);
   assert.match(elements.taskContextPackagePanel.textContent, /package:task-context-package:tasks\/task-001.yaml/);
+  assert.match(elements.agentDebugPanel.textContent, /execution-agent:001/);
+  assert.match(elements.agentDebugStatus.textContent, /1 个 agent run/);
   assert.deepEqual(workflowSections, ["task-context-package:tasks/task-001.yaml"]);
 });

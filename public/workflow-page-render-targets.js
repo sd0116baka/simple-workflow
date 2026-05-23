@@ -40,6 +40,8 @@ export function createRecommendationRunRenderTargets(elements) {
     taskContextPackageRaw: elements.taskContextPackageRaw,
     recommendationRaw: elements.recommendationRaw,
     recommendationTerminal: elements.recommendationTerminal,
+    agentDebugStatus: elements.agentDebugStatus,
+    agentDebugPanel: elements.agentDebugPanel,
     admissionRaw: elements.admissionRaw,
     recommendationInputs: elements.recommendationInputs,
     admissionInputs: elements.admissionInputs,
