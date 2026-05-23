@@ -56,6 +56,30 @@ test("recommendation run snapshot fills optional fields with read defaults", () 
   assert.equal(snapshot.terminalSessionId, null);
 });
 
+test("recommendation run snapshot preserves stage switches", () => {
+  const snapshot = toRecommendationSnapshot({
+    id: "recommendation-run-1",
+    status: "running",
+    stageSwitches: {
+      executionAdmission: true,
+      isolatedWorkspace: true,
+      mainAgent: false,
+      executionAgent: false,
+      reviewAgent: true,
+      convergence: true,
+    },
+  });
+
+  assert.deepEqual(snapshot.stageSwitches, {
+    executionAdmission: true,
+    isolatedWorkspace: true,
+    mainAgent: false,
+    executionAgent: false,
+    reviewAgent: true,
+    convergence: true,
+  });
+});
+
 test("recommendation run snapshot uses fresh field default collections", () => {
   const first = toRecommendationSnapshot({
     id: "recommendation-run-1",

@@ -12,6 +12,11 @@ function cloneJsonFieldOrDefault(run, defaults, fieldName) {
   return run[fieldName] ? cloneJsonValue(run[fieldName]) : defaults[fieldName];
 }
 
+function cloneSnapshotJsonField(run, snapshot, defaults, fieldName) {
+  if (fieldName === "stageSwitches") return;
+  snapshot[fieldName] = cloneJsonFieldOrDefault(run, defaults, fieldName);
+}
+
 function cloneStringArrayFieldOrDefault(run, defaults, fieldName) {
   return run[fieldName] ? [...run[fieldName]] : defaults[fieldName];
 }
@@ -32,7 +37,7 @@ export function toRecommendationSnapshot(run) {
   };
 
   for (const fieldName of RECOMMENDATION_RUN_FIELD_CLONE_GROUPS.jsonOrNull) {
-    snapshot[fieldName] = cloneJsonFieldOrDefault(run, defaults, fieldName);
+    cloneSnapshotJsonField(run, snapshot, defaults, fieldName);
   }
   for (const fieldName of RECOMMENDATION_RUN_FIELD_CLONE_GROUPS.jsonArray) {
     snapshot[fieldName] = cloneJsonFieldOrDefault(run, defaults, fieldName);
