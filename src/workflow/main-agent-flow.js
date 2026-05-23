@@ -1,5 +1,8 @@
 import { existsSync } from "node:fs";
 import {
+  agentSessionErrorMessage,
+  agentSessionFailure,
+  buildAgentRunAppendRequest,
   createAgentSessionRequest,
   createStubAgentSession,
 } from "./agent-session-contract.js";
@@ -59,6 +62,21 @@ export async function initializeMainAgent({
     signal,
   }));
   const finishedAt = now();
+  const failure = agentSessionFailure(session);
+  if (failure) {
+    return {
+      appendRequest: buildAgentRunAppendRequest({
+        taskContextPackage,
+        runId: MAIN_AGENT_INITIALIZATION_RUN_ID,
+        role: "main",
+        session,
+        inputArtifactRefs: MAIN_AGENT_INITIALIZATION_INPUT_REFS,
+        startedAt,
+        finishedAt,
+      }),
+      error: agentSessionErrorMessage(session, "main agent 初始化失败。"),
+    };
+  }
 
   return {
     appendRequest: buildMainAgentInitializationRequest({

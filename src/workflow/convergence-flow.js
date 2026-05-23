@@ -1,5 +1,8 @@
 import { existsSync } from "node:fs";
 import {
+  agentSessionErrorMessage,
+  agentSessionFailure,
+  buildAgentRunAppendRequest,
   createAgentSessionRequest,
   createStubAgentSession,
 } from "./agent-session-contract.js";
@@ -91,6 +94,22 @@ export async function runConvergence({
     signal,
   }));
   const finishedAt = now();
+  const failure = agentSessionFailure(session);
+  if (failure) {
+    return {
+      appendRequest: buildAgentRunAppendRequest({
+        taskContextPackage,
+        runId,
+        role: "main",
+        session,
+        inputArtifactRefs,
+        startedAt,
+        finishedAt,
+      }),
+      error: agentSessionErrorMessage(session, "收敛 agent 运行失败。"),
+    };
+  }
+
   const commonRequest = {
     taskContextPackage,
     runId,

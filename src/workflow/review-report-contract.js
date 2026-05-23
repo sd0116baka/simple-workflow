@@ -1,3 +1,5 @@
+import { buildAgentRunRecord } from "./agent-session-contract.js";
+
 export function buildReviewReportRequest({
   taskContextPackage,
   runId,
@@ -19,15 +21,13 @@ export function buildReviewReportRequest({
       summary: summary ?? session.summary ?? "stub review passed",
       findings: reportFindings,
     },
-    agentRun: {
+    agentRun: buildAgentRunRecord({
       runId,
       role: "review",
-      sessionId: session.sessionId,
+      session,
       inputArtifactRefs,
-      outputArtifactRefs: [],
-      status: session.status ?? "succeeded",
       startedAt,
       finishedAt,
-    },
+    }),
   };
 }

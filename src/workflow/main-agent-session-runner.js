@@ -1,4 +1,7 @@
-import { normalizeAgentProcessStatus } from "./agent-session-contract.js";
+import {
+  buildAgentProcessFailure,
+  normalizeAgentProcessStatus,
+} from "./agent-session-contract.js";
 import { createAgentProcessProgressEntries } from "./agent-process-progress.js";
 import { runAgentProcess } from "./agent-process-runner.js";
 import {
@@ -11,6 +14,27 @@ import {
 } from "./opencode-json-events.js";
 
 export const OPENCODE_MAIN_ARGS = ["run", "--format", "json"];
+
+function cancelledMainSession({ role, packageId, runId, sessionId }) {
+  const failure = buildAgentProcessFailure({ role, cancelled: true });
+  return {
+    role,
+    packageId,
+    sessionId: sessionId ?? `opencode-session-cancelled:${runId}`,
+    status: "cancelled",
+    failure,
+    summary: "main agent 已取消。",
+    nextAction: "",
+    findings: [],
+    rawOutput: {
+      stdout: "",
+      stderr: "",
+      exitCode: null,
+      error: "cancelled",
+      failure,
+    },
+  };
+}
 
 export function runOpencodeMainAgentSession({
   role,
@@ -34,21 +58,7 @@ export function runOpencodeMainAgentSession({
     inputArtifactRefs,
   });
   if (signal?.aborted) {
-    return Promise.resolve({
-      role,
-      packageId,
-      sessionId: sessionId ?? `opencode-session-cancelled:${runId}`,
-      status: "cancelled",
-      summary: "main agent 已取消。",
-      nextAction: "",
-      findings: [],
-      rawOutput: {
-        stdout: "",
-        stderr: "",
-        exitCode: null,
-        error: "cancelled",
-      },
-    });
+    return Promise.resolve(cancelledMainSession({ role, packageId, runId, sessionId }));
   }
 
   return runAgentProcess({
@@ -70,9 +80,14 @@ export function runOpencodeMainAgentSession({
   }).then((result) => {
     const extractedText = extractTextFromJsonEvents(result.stdout);
     const report = parseMainAgentOutputText(extractedText);
-    const status = result.cancelled
-      ? "cancelled"
-      : normalizeAgentProcessStatus({ exitCode: result.exitCode, error: result.error });
+    const failure = buildAgentProcessFailure({
+      role,
+      exitCode: result.exitCode,
+      error: result.error,
+      cancelled: result.cancelled,
+      stderr: result.stderr,
+    });
+    const status = normalizeAgentProcessStatus({ failure });
     const nextSessionId = findSessionIdInJsonEvents(result.stdout)
       ?? sessionId
       ?? `opencode-session-unavailable:${runId}`;
@@ -82,9 +97,10 @@ export function runOpencodeMainAgentSession({
       packageId,
       sessionId: nextSessionId,
       status,
+      ...(failure ? { failure } : {}),
       summary: typeof report.summary === "string" && report.summary.trim().length > 0
         ? report.summary
-        : extractedText.trim(),
+        : extractedText.trim() || failure?.message,
       nextAction: typeof report.nextAction === "string" ? report.nextAction : "",
       findings: Array.isArray(report.findings) ? report.findings : [],
       rawOutput: {
@@ -92,6 +108,7 @@ export function runOpencodeMainAgentSession({
         stderr: result.stderr,
         exitCode: result.exitCode,
         error: result.error,
+        failure,
       },
     };
   });

@@ -1,5 +1,8 @@
 import { existsSync } from "node:fs";
 import {
+  agentSessionErrorMessage,
+  agentSessionFailure,
+  buildAgentRunAppendRequest,
   createAgentSessionRequest,
   createStubAgentSession,
 } from "./agent-session-contract.js";
@@ -68,6 +71,21 @@ export async function runReviewAgent({
     signal,
   }));
   const finishedAt = now();
+  const failure = agentSessionFailure(session);
+  if (failure) {
+    return {
+      appendRequest: buildAgentRunAppendRequest({
+        taskContextPackage,
+        runId,
+        role: "review",
+        session,
+        inputArtifactRefs,
+        startedAt,
+        finishedAt,
+      }),
+      error: agentSessionErrorMessage(session, "review agent 运行失败。"),
+    };
+  }
 
   return {
     appendRequest: buildReviewReportRequest({

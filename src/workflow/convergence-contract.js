@@ -1,3 +1,5 @@
+import { buildAgentRunRecord } from "./agent-session-contract.js";
+
 function basisRefsFor(executionReport, reviewReport) {
   return [
     executionReport.artifactId,
@@ -12,16 +14,14 @@ function agentRun({
   startedAt,
   finishedAt,
 }) {
-  return {
+  return buildAgentRunRecord({
     runId,
     role: "main",
-    sessionId: session.sessionId,
+    session,
     inputArtifactRefs,
-    outputArtifactRefs: [],
-    status: session.status ?? "succeeded",
     startedAt,
     finishedAt,
-  };
+  });
 }
 
 export function buildConvergenceAdviceRequest({

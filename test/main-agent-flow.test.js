@@ -98,3 +98,23 @@ test("awaits asynchronous main agent session runners", async () => {
   assert.equal(init.error, null);
   assert.equal(init.appendRequest.agentRun.sessionId, "async-session:main-agent:initialization");
 });
+
+test("records main agent initialization failures", async () => {
+  const init = await initializeMainAgent({
+    taskContextPackage: authorizedPackage(),
+    runAgentSession: () => ({
+      sessionId: "failed-main-session",
+      status: "failed",
+      rawOutput: {
+        exitCode: null,
+        error: "main spawn failed",
+        stderr: "",
+      },
+    }),
+  });
+
+  assert.equal(init.error, "main spawn failed");
+  assert.equal(init.appendRequest.artifactType, undefined);
+  assert.equal(init.appendRequest.agentRun.status, "failed");
+  assert.equal(init.appendRequest.agentRun.failure.code, "agent.process-error");
+});

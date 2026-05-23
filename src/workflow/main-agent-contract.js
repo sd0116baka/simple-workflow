@@ -1,3 +1,5 @@
+import { buildAgentRunRecord } from "./agent-session-contract.js";
+
 export const MAIN_AGENT_INITIALIZATION_RUN_ID = "main-agent:initialization";
 export const MAIN_AGENT_INITIALIZATION_INPUT_REFS = [
   "taskDraft",
@@ -13,15 +15,13 @@ export function buildMainAgentInitializationRequest({
 }) {
   return {
     packageId: taskContextPackage.packageId,
-    agentRun: {
+    agentRun: buildAgentRunRecord({
       runId: MAIN_AGENT_INITIALIZATION_RUN_ID,
       role: "main",
-      sessionId: session.sessionId,
+      session,
       inputArtifactRefs: [...MAIN_AGENT_INITIALIZATION_INPUT_REFS],
-      outputArtifactRefs: [],
-      status: session.status,
       startedAt,
       finishedAt,
-    },
+    }),
   };
 }

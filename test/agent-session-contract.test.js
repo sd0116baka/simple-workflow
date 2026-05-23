@@ -42,6 +42,6 @@ test("creates deterministic stub agent sessions", () => {
 test("normalizes agent process status from exits and errors", () => {
   assert.equal(normalizeAgentProcessStatus({ exitCode: 0 }), "succeeded");
   assert.equal(normalizeAgentProcessStatus({ exitCode: 1 }), "failed");
-  assert.equal(normalizeAgentProcessStatus({ exitCode: 0, error: "cancelled" }), "failed");
+  assert.equal(normalizeAgentProcessStatus({ exitCode: 0, error: "cancelled" }), "cancelled");
   assert.equal(normalizeAgentProcessStatus({ error: "spawn failed" }), "failed");
 });

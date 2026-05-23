@@ -219,3 +219,23 @@ test("awaits asynchronous convergence session runners", async () => {
   assert.equal(result.error, null);
   assert.equal(result.appendRequest.agentRun.sessionId, "async-session:main-agent:convergence:001");
 });
+
+test("records convergence process failures without appending convergence artifacts", async () => {
+  const result = await runConvergence({
+    taskContextPackage: convergenceReadyPackage(),
+    runAgentSession: ({ runId }) => ({
+      sessionId: `failed-session:${runId}`,
+      status: "failed",
+      rawOutput: {
+        exitCode: 1,
+        error: null,
+        stderr: "main convergence failed",
+      },
+    }),
+  });
+
+  assert.equal(result.error, "main convergence failed");
+  assert.equal(result.appendRequest.artifactType, undefined);
+  assert.equal(result.appendRequest.agentRun.status, "failed");
+  assert.equal(result.appendRequest.agentRun.failure.code, "agent.non-zero-exit");
+});

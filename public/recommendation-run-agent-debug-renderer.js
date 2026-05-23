@@ -35,6 +35,7 @@ function appendCard(documentRef, parent, run) {
   appendMeta(documentRef, meta, "session", run.sessionId);
   appendMeta(documentRef, meta, "cwd", run.cwd);
   appendMeta(documentRef, meta, "command", run.command);
+  appendMeta(documentRef, meta, "failure", run.failure?.code);
   appendMeta(documentRef, meta, "started", run.startedAt);
   appendMeta(documentRef, meta, "finished", run.finishedAt);
   card.append(meta);
@@ -60,6 +61,13 @@ function appendCard(documentRef, parent, run) {
     last.className = "agent-debug-last";
     last.textContent = run.lastMessage;
     card.append(last);
+  }
+
+  if (run.failure?.message) {
+    const failure = documentRef.createElement("p");
+    failure.className = "agent-debug-last agent-debug-failure";
+    failure.textContent = run.failure.message;
+    card.append(failure);
   }
 
   parent.append(card);

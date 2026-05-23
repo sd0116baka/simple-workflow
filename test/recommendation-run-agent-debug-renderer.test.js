@@ -43,3 +43,35 @@ test("agent debug renderer writes agent cards", () => {
   assert.match(elements.agentDebugPanel.textContent, /pid777/);
   assert.match(elements.agentDebugPanel.textContent, /running/);
 });
+
+test("agent debug renderer writes failure details", () => {
+  const elements = fakeElements(["agentDebugStatus", "agentDebugPanel"]);
+
+  renderRecommendationRunAgentDebug({
+    documentRef: createFakeDocument(),
+    elements,
+    taskContextPackage: {
+      agentRuns: [
+        {
+          runId: "execution-agent:001",
+          role: "execution",
+          sessionId: "session:execution",
+          inputArtifactRefs: [],
+          outputArtifactRefs: [],
+          status: "failed",
+          startedAt: "2026-05-23T10:00:00.000Z",
+          finishedAt: "2026-05-23T10:00:01.000Z",
+          failure: {
+            code: "agent.non-zero-exit",
+            kind: "non-zero-exit",
+            message: "execution failed",
+            exitCode: 1,
+          },
+        },
+      ],
+    },
+  });
+
+  assert.match(elements.agentDebugPanel.textContent, /agent.non-zero-exit/);
+  assert.match(elements.agentDebugPanel.textContent, /execution failed/);
+});

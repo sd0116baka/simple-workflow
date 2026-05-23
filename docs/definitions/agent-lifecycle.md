@@ -101,6 +101,46 @@ review
 
 `sessionId` 必须记录。三种 Agent 都需要通过 `sessionId` 支持事故后追溯。
 
+`status` 表示调用层状态，不表示业务审查结论：
+
+```text
+succeeded
+failed
+cancelled
+```
+
+`review` Agent 认为任务未通过时，调用层仍然可以是 `succeeded`，业务结论写入 `reviewReport.body.outcome: failed`。
+
+`failed` / `cancelled` 表示真实 Agent 进程或会话本身没有可靠完成。此时 `agentRun.failure` 必须记录统一失败模型：
+
+```json
+{
+  "code": "agent.non-zero-exit",
+  "kind": "non-zero-exit",
+  "message": "execution failed",
+  "exitCode": 1,
+  "error": null,
+  "stderr": "execution failed"
+}
+```
+
+第一版失败类型：
+
+```text
+agent.cancelled       -> 用户或系统取消，status: cancelled
+agent.process-error   -> 进程启动或运行时错误，status: failed
+agent.non-zero-exit   -> 进程正常退出但 exitCode 非 0，status: failed
+```
+
+`message` 是面向调试面板和流程错误汇总的短消息。非零退出优先使用 stderr 摘要；没有 stderr 时使用标准退出码消息。
+
+真实 Agent 调用失败和业务失败必须区分：
+
+- 调用失败：写 `agentRun.failure`，流程返回 `error`，后续环节不进入。
+- execution 调用失败：可以追加 `executionReport(status: failed)` 记录执行侧结果，但仍通过 `error` 阻断 review。
+- review / main 收敛调用失败：只追加 `agentRun`，不追加 `reviewReport` / `convergenceAdvice` / `convergenceSuccess` / `convergenceFailure`，避免把不可靠输出当成业务事实。
+- review 业务失败：`agentRun.status: succeeded`，`reviewReport.outcome: failed`，随后进入正常收敛判断。
+
 `inputArtifactRefs` 由调用 Agent 的 flow 生成，表示系统本次明确交给 Agent 参考的任务上下文包内容。
 
 `outputArtifactRefs` 由任务池在追加 artifact 后生成，表示本次调用最终产出了哪些任务上下文包 artifact。
@@ -108,6 +148,8 @@ review
 Agent 不生成 `inputArtifactRefs`，也不生成 `outputArtifactRefs`。
 
 原始 prompt、stdout、stderr、rawOutput、parseError 不进入任务上下文包。它们属于运行记录，通过 `runId` 追溯。
+
+`agentRun.failure.stderr` 只允许保存短摘要，不保存完整 stderr。完整 stdout/stderr 仍属于运行记录。
 
 ## 追加请求
 

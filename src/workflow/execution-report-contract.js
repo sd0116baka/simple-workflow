@@ -1,4 +1,5 @@
 import { normalizePathForGit } from "./git-path.js";
+import { buildAgentRunRecord } from "./agent-session-contract.js";
 
 export function buildExecutionReportRequest({
   taskContextPackage,
@@ -23,15 +24,13 @@ export function buildExecutionReportRequest({
       notes: session.notes ?? [],
       rawOutput: session.rawOutput ?? null,
     },
-    agentRun: {
+    agentRun: buildAgentRunRecord({
       runId,
       role: "execution",
-      sessionId: session.sessionId,
+      session,
       inputArtifactRefs,
-      outputArtifactRefs: [],
-      status,
       startedAt,
       finishedAt,
-    },
+    }),
   };
 }

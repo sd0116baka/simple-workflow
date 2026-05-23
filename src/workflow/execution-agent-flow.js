@@ -2,7 +2,10 @@ import { existsSync } from "node:fs";
 import { relative } from "node:path";
 import { inputArtifactRefsForExecution } from "./agent-input-refs.js";
 import { nextExecutionAgentRunId } from "./agent-run-ids.js";
-import { createAgentSessionRequest } from "./agent-session-contract.js";
+import {
+  agentSessionErrorMessage,
+  createAgentSessionRequest,
+} from "./agent-session-contract.js";
 import { buildExecutionReportRequest } from "./execution-report-contract.js";
 import { runStubExecutionAgentSession } from "./execution-agent-stub-session.js";
 import { changedFilesInWorktree, resolveWorktreePath } from "./git-worktree-state.js";
@@ -82,9 +85,7 @@ export async function runExecutionAgent({
   const status = session.status ?? "succeeded";
   const error = status === "succeeded"
     ? null
-    : session.rawOutput?.error
-      ?? session.rawOutput?.stderr
-      ?? "execution agent 运行失败。";
+    : agentSessionErrorMessage(session, "execution agent 运行失败。");
 
   return {
     appendRequest: buildExecutionReportRequest({

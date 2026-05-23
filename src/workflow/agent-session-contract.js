@@ -1,3 +1,8 @@
+import {
+  agentSessionFailure,
+  normalizeAgentProcessStatus as normalizeProcessStatus,
+} from "./agent-failure-model.js";
+
 export function createAgentSessionRequest({
   role,
   packageId,
@@ -40,6 +45,54 @@ export function createStubAgentSession({ role, packageId }) {
   };
 }
 
-export function normalizeAgentProcessStatus({ exitCode, error } = {}) {
-  return !error && exitCode === 0 ? "succeeded" : "failed";
+export function normalizeAgentProcessStatus(input = {}) {
+  return normalizeProcessStatus(input);
 }
+
+export function buildAgentRunRecord({
+  runId,
+  role,
+  session,
+  inputArtifactRefs,
+  outputArtifactRefs = [],
+  startedAt,
+  finishedAt,
+}) {
+  const failure = agentSessionFailure({ ...session, role });
+  return {
+    runId,
+    role,
+    sessionId: session.sessionId,
+    inputArtifactRefs,
+    outputArtifactRefs,
+    status: session.status ?? normalizeProcessStatus({ failure }),
+    startedAt,
+    finishedAt,
+    ...(failure ? { failure } : {}),
+  };
+}
+
+export function buildAgentRunAppendRequest({
+  taskContextPackage,
+  runId,
+  role,
+  session,
+  inputArtifactRefs,
+  startedAt,
+  finishedAt,
+}) {
+  return {
+    packageId: taskContextPackage.packageId,
+    agentRun: buildAgentRunRecord({
+      runId,
+      role,
+      session,
+      inputArtifactRefs,
+      startedAt,
+      finishedAt,
+    }),
+  };
+}
+
+export { agentSessionFailure, agentSessionErrorMessage } from "./agent-failure-model.js";
+export { buildAgentProcessFailure } from "./agent-failure-model.js";

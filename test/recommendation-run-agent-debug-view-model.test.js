@@ -72,6 +72,7 @@ test("agent debug view model merges final agent run metadata", () => {
           role: "review",
           sessionId: "ses_review_001",
           status: "succeeded",
+          failure: null,
           startedAt: "2026-05-23T10:00:00.000Z",
           finishedAt: "2026-05-23T10:00:30.000Z",
           inputArtifactRefs: ["executionReport:001"],
@@ -82,9 +83,35 @@ test("agent debug view model merges final agent run metadata", () => {
   });
 
   assert.equal(viewModel.runs[0].status, "succeeded");
+  assert.equal(viewModel.runs[0].failure, null);
   assert.equal(viewModel.runs[0].sessionId, "ses_review_001");
   assert.deepEqual(viewModel.runs[0].inputArtifactRefs, ["executionReport:001"]);
   assert.deepEqual(viewModel.runs[0].outputArtifactRefs, ["reviewReport:001"]);
+});
+
+test("agent debug view model exposes final agent failures", () => {
+  const viewModel = buildRecommendationRunAgentDebugViewModel(null, {
+    taskContextPackage: {
+      agentRuns: [
+        createAgentRunFixture({
+          runId: "review-agent:001",
+          role: "review",
+          status: "failed",
+          failure: {
+            code: "agent.non-zero-exit",
+            kind: "non-zero-exit",
+            message: "review failed",
+            exitCode: 1,
+            error: null,
+            stderr: "review failed",
+          },
+        }),
+      ],
+    },
+  });
+
+  assert.equal(viewModel.statusText, "1 个 agent run · running 0 · done 0 · failed 1");
+  assert.equal(viewModel.runs[0].failure.message, "review failed");
 });
 
 test("agent debug view model returns empty state without a run", () => {

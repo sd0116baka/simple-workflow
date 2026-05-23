@@ -156,3 +156,23 @@ test("awaits asynchronous review agent session runners", async () => {
   assert.equal(result.error, null);
   assert.equal(result.appendRequest.agentRun.sessionId, "async-session:review-agent:001");
 });
+
+test("records review agent process failures without appending review report", async () => {
+  const result = await runReviewAgent({
+    taskContextPackage: reviewablePackage(),
+    runAgentSession: ({ runId }) => ({
+      sessionId: `failed-session:${runId}`,
+      status: "failed",
+      rawOutput: {
+        exitCode: 1,
+        error: null,
+        stderr: "review process failed",
+      },
+    }),
+  });
+
+  assert.equal(result.error, "review process failed");
+  assert.equal(result.appendRequest.artifactType, undefined);
+  assert.equal(result.appendRequest.agentRun.status, "failed");
+  assert.equal(result.appendRequest.agentRun.failure.code, "agent.non-zero-exit");
+});

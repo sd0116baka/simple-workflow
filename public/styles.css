@@ -944,6 +944,10 @@ h2 {
   line-height: 1.45;
 }
 
+.agent-debug-failure {
+  color: #b42318;
+}
+
 .terminal-command-input,
 .terminal-args-input,
 .terminal-input {

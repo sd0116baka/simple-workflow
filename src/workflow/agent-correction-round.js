@@ -118,7 +118,7 @@ export async function runAgentCorrectionRound({
     latestArtifactRecord(currentPackage, "reviewReport")
       ?? reviewAgentRun?.appendRequest,
   );
-  if (!reviewReportReady) {
+  if (!reviewReportReady || reviewAgentRun?.error) {
     return {
       taskContextPackage: currentPackage,
       executionAgentRun,

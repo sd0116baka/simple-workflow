@@ -83,3 +83,26 @@ test("runs opencode execution session command in the isolated workspace", async 
   assert.equal(progress.some((entry) => entry.type === "execution_stdout"), true);
   assert.equal(existsSync(join(worktreeDir, "agent-output.txt")), true);
 });
+
+test("execution session records structured process failures", async (t) => {
+  const repositoryDir = await createGitRepositoryWithWorktree(t);
+  const worktreeDir = join(repositoryDir, ".workflow", "worktrees", "tasks", "tasks-task-003");
+
+  const session = await runOpencodeExecutionAgentSession({
+    role: "execution",
+    packageId: "task-context-package:tasks/task-003.yaml",
+    cwd: worktreeDir,
+    runId: "execution-agent:001",
+    taskContextPackage: executablePackage(),
+    inputArtifactRefs: ["taskDraft", "executionIntent", "executionAuthorization", "isolatedWorkspace"],
+    command: process.execPath,
+    args: ["-e", "process.stderr.write('execution boom'); process.exit(2);"],
+    shell: false,
+  });
+
+  assert.equal(session.status, "failed");
+  assert.equal(session.failure.code, "agent.non-zero-exit");
+  assert.equal(session.failure.message, "execution boom");
+  assert.equal(session.rawOutput.failure, session.failure);
+  assert.equal(session.summary, "execution boom");
+});

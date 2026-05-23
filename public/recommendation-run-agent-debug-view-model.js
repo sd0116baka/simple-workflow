@@ -64,6 +64,7 @@ function createDebugRun(runId) {
     finishedAt: null,
     lastTimestamp: null,
     lastMessage: null,
+    failure: null,
     inputArtifactRefs: [],
     outputArtifactRefs: [],
     counts: {
@@ -88,6 +89,7 @@ function applyAgentRun(debugRun, agentRun) {
   debugRun.sessionId = agentRun.sessionId ?? debugRun.sessionId;
   debugRun.startedAt = agentRun.startedAt ?? debugRun.startedAt;
   debugRun.finishedAt = agentRun.finishedAt ?? debugRun.finishedAt;
+  debugRun.failure = agentRun.failure ?? debugRun.failure;
   debugRun.inputArtifactRefs = agentRun.inputArtifactRefs ?? debugRun.inputArtifactRefs;
   debugRun.outputArtifactRefs = agentRun.outputArtifactRefs ?? debugRun.outputArtifactRefs;
 }
