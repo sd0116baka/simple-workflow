@@ -166,6 +166,7 @@ test("recommendation execution preparation skips downstream work for failed comm
 test("recommendation execution preparation stops after intent when admission is disabled", async (t) => {
   const repositoryDir = await createGitRepository(t);
   let mainAgentCalled = false;
+  const packageBindings = [];
 
   const result = await prepareRecommendationExecution({
     commandResult: commandResult(),
@@ -188,9 +189,11 @@ test("recommendation execution preparation stops after intent when admission is 
       mainAgentCalled = true;
       return { status: "succeeded" };
     },
+    onPackageBound: (binding) => packageBindings.push(binding),
     repositoryDir,
   });
 
+  assert.deepEqual(packageBindings, [{ packageId: "task-context-package:tasks/task-001.yaml" }]);
   assert.equal(result.executionAdmission, null);
   assert.equal(result.isolatedWorkspaceAllocation, null);
   assert.equal(result.mainAgentInitialization, null);

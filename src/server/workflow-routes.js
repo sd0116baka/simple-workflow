@@ -6,7 +6,27 @@ function requestPath(request) {
 }
 
 function matchesRoute(route, { method, path }) {
-  return route.path === path && (!route.method || route.method === method);
+  if (route.method && route.method !== method) return false;
+  return Boolean(routeParams(route.path, path));
+}
+
+function routeParams(routePath, requestPathValue) {
+  if (routePath === requestPathValue) return {};
+  const routeParts = routePath.split("/").filter(Boolean);
+  const requestParts = requestPathValue.split("/").filter(Boolean);
+  if (routeParts.length !== requestParts.length) return null;
+
+  const params = {};
+  for (let index = 0; index < routeParts.length; index += 1) {
+    const routePart = routeParts[index];
+    const requestPart = requestParts[index];
+    if (routePart.startsWith(":")) {
+      params[routePart.slice(1)] = decodeURIComponent(requestPart);
+    } else if (routePart !== requestPart) {
+      return null;
+    }
+  }
+  return params;
 }
 
 export function createWorkflowRoutes({
@@ -27,7 +47,7 @@ export function createWorkflowRoutes({
       const route = routeDefinitions.find((definition) => matchesRoute(definition, { method, path }));
 
       if (route) {
-        await route.handle({ request, response });
+        await route.handle({ request, response, params: routeParams(route.path, path) });
         return true;
       }
 

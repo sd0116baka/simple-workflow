@@ -38,6 +38,7 @@ export function ensureManualWorkflowActionRun(currentRun, {
 
 export function requestRecommendationRunCancellation(run, {
   now = () => new Date().toISOString(),
+  appendCancellationProgress = appendRecommendationRunCancellationProgress,
 } = {}) {
   if (!run || run.status !== "running") {
     return {
@@ -49,7 +50,7 @@ export function requestRecommendationRunCancellation(run, {
   run.status = "cancelled";
   run.finishedAt = now();
   run.error = "cancelled";
-  appendRecommendationRunCancellationProgress(run, { now });
+  appendCancellationProgress(run, { now });
   return {
     cancelled: true,
     error: null,

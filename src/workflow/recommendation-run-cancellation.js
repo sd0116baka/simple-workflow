@@ -7,10 +7,13 @@ export function cancelRecommendationRunTransaction({
   recommendationRunLifecycleState,
   recommendationRunControllerRegistry,
   emitRecommendationChanged,
+  progressRecorder = null,
   requestCancellation = requestRecommendationRunCancellation,
   snapshotRun = toRecommendationSnapshot,
 }) {
-  const cancellation = requestCancellation(recommendationRunLifecycleState.getLatestRun());
+  const cancellation = requestCancellation(recommendationRunLifecycleState.getLatestRun(), {
+    appendCancellationProgress: progressRecorder?.appendCancellationProgress,
+  });
   if (!cancellation.cancelled) {
     return {
       cancelled: false,
@@ -21,6 +24,7 @@ export function cancelRecommendationRunTransaction({
 
   recommendationRunLifecycleState.setLatestRun(cancellation.run);
   recommendationRunControllerRegistry.abort(cancellation.run.id);
+  progressRecorder?.recordRunFinished(cancellation.run);
   emitRecommendationChanged(cancellation.run);
   return {
     cancelled: true,

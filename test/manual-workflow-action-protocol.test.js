@@ -21,14 +21,19 @@ function packageFixture(overrides = {}) {
 function createLifecycle(initialRun = null) {
   let latestRun = initialRun;
   const setCalls = [];
+  const systemEvents = [];
   return {
     setCalls,
+    systemEvents,
     getLatestRecommendationRun() {
       return latestRun;
     },
     setLatestRecommendationRun(run) {
       latestRun = run;
       setCalls.push(run);
+    },
+    recordRecommendationRunSystemEvent(run, event) {
+      systemEvents.push({ run, event });
     },
   };
 }
@@ -85,6 +90,7 @@ test("manual workflow action protocol attaches a manual run, emits, and snapshot
   });
 
   const result = await protocol.runManualWorkflowAction({
+    actionType: "continue_convergence_with_guidance",
     packageId: taskContextPackage.packageId,
     findTaskContextPackage: async (packageId) => {
       assert.equal(packageId, taskContextPackage.packageId);
@@ -112,6 +118,14 @@ test("manual workflow action protocol attaches a manual run, emits, and snapshot
   assert.equal(result.recommendationRun.id, "manual-workflow-action");
   assert.equal(result.recommendationRun.taskContextPackage.currentWorkStage, "execution-agent");
   assert.equal(lifecycle.setCalls.length, 1);
+  assert.equal(lifecycle.systemEvents.length, 1);
+  assert.equal(lifecycle.systemEvents[0].run.id, "manual-workflow-action");
+  assert.deepEqual(lifecycle.systemEvents[0].event, {
+    type: "manual_action_started",
+    message: "手动流程动作已启动。",
+    actionType: "continue_convergence_with_guidance",
+    packageId: taskContextPackage.packageId,
+  });
   assert.equal(emitted.length, 1);
 });
 

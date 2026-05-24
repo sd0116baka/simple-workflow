@@ -49,6 +49,10 @@ export function createWorkflowServiceRuntime({
       return toRecommendationSnapshot(recommendationRunLifecycle.getLatestRecommendationRun());
     },
 
+    readRecommendationRunProgressLog(runId) {
+      return recommendationRunLifecycle.readRecommendationRunProgressLog(runId);
+    },
+
     async acceptConvergenceSuccess({ packageId = null } = {}) {
       return manualWorkflowActionService.acceptConvergenceSuccess({ packageId });
     },

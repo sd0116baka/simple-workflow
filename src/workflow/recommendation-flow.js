@@ -42,6 +42,7 @@ export async function completeRecommendationFlow({
   repositoryDir = process.cwd(),
   now = () => new Date().toISOString(),
   onProgress,
+  onPackageBound,
   signal,
 }) {
   const preparation = await prepareRecommendationExecution({
@@ -55,6 +56,7 @@ export async function completeRecommendationFlow({
     repositoryDir,
     now,
     prepareDownstream: mode !== "probe",
+    onPackageBound,
   });
   const sequence = mode === "probe"
     ? createSkippedRecommendationSequence(preparation.taskPool)

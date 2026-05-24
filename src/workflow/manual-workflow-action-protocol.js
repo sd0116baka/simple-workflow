@@ -45,6 +45,7 @@ export function createManualWorkflowActionProtocol({
   }
 
   async function runManualWorkflowAction({
+    actionType = "manual",
     packageId = null,
     findTaskContextPackage,
     isUnavailable = (taskContextPackage) => !taskContextPackage,
@@ -65,6 +66,12 @@ export function createManualWorkflowActionProtocol({
     }
 
     const recommendationRun = ensureLatestRecommendationRun(taskContextPackage);
+    recommendationRunLifecycle.recordRecommendationRunSystemEvent?.(recommendationRun, {
+      type: "manual_action_started",
+      message: "手动流程动作已启动。",
+      actionType,
+      packageId: taskContextPackage.packageId,
+    });
     return finishAction(await run({ taskContextPackage, recommendationRun }));
   }
 

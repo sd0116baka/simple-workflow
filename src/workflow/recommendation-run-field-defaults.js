@@ -44,6 +44,8 @@ export const RECOMMENDATION_RUN_FIELD_CLONE_GROUPS = Object.freeze({
     stderr: "",
     exitCode: null,
     terminalSessionId: null,
+    progressLogError: null,
+    progressLogPackageId: null,
   }),
 });
 

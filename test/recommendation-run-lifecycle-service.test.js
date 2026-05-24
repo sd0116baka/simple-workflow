@@ -1,11 +1,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createWorkflowService } from "../src/workflow/workflow-service.js";
 import {
   createGitRepository,
   writePrompt,
   writeValidTasksDir,
 } from "./support/recommendation-service-fixtures.js";
+
+async function createProgressLogDir(t) {
+  const dir = await mkdtemp(join(tmpdir(), "simple-workflow-service-progress-log-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  return dir;
+}
 
 test("workflow service keeps successful runs when recommendation intent parsing fails", async (t) => {
   const repositoryDir = await createGitRepository(t);
@@ -73,6 +82,52 @@ test("workflow service emits running progress for recommendation runs", async (t
 
   assert.equal(running.status, "running");
   assert.equal(running.progress[0].message, "开始运行 opencode");
+});
+
+test("workflow service persists complete recommendation run progress logs", async (t) => {
+  const repositoryDir = await createGitRepository(t);
+  const promptPath = await writePrompt("recommendation-progress-log");
+  const tasksDir = await writeValidTasksDir("recommendation-progress-log");
+  const recommendationRunProgressLogDir = await createProgressLogDir(t);
+  const service = createWorkflowService({
+    tasksDir,
+    repositoryDir,
+    recommendationPromptPath: promptPath,
+    recommendationRunProgressLogDir,
+    getRepositoryStatus: async () => ({ clean: true, entries: [] }),
+    runRecommendationCommand: async ({ onProgress }) => {
+      for (let index = 1; index <= 205; index += 1) {
+        onProgress({ type: "stdout", message: `line-${index}` });
+      }
+      return {
+        stdout: "不是 JSON",
+        stderr: "",
+        exitCode: 0,
+        error: null,
+      };
+    },
+  });
+
+  const completed = new Promise((resolve) => {
+    service.onEvent((event) => {
+      if (event.type === "recommendation-run-changed" && event.run.status === "succeeded") {
+        resolve(event.run);
+      }
+    });
+  });
+
+  await service.createRecommendationRun();
+  const finished = await completed;
+  const progressLog = service.readRecommendationRunProgressLog(finished.id);
+  const stdoutEvents = progressLog.events.filter((event) => event.type === "stdout");
+
+  assert.equal(finished.progress.length, 200);
+  assert.equal(finished.progress[0].message, "line-6");
+  assert.equal(progressLog.runId, finished.id);
+  assert.equal(stdoutEvents.length, 205);
+  assert.equal(stdoutEvents[0].message, "line-1");
+  assert.equal(progressLog.events.some((event) => event.type === "run_started"), true);
+  assert.equal(progressLog.events.some((event) => event.type === "run_finished"), true);
 });
 
 test("workflow service cancels a running recommendation run", async (t) => {

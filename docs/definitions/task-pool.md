@@ -357,6 +357,8 @@ finishedAt
 
 `agentRuns` 不保存 agent 聊天记录、完整 prompt、stdout/stderr、终端 transcript、进程事件、pid、command、cwd 或调试计数。这些属于实时调试态，可以存在于当前 `recommendationRun.progress`、terminal session 或临时日志中，但不进入任务上下文包的长期事实。
 
+完整运行观测日志保存在 `.workflow/recommendation-run-logs/<recommendationRunId>.ndjson`，不进入任务上下文包。`recommendationRun.progress` 仍然只是当前进程内的实时缓存，保留最近一段事件用于界面刷新；完整日志通过 `GET /api/recommendation-runs/:id/progress-log` 按需读取。日志事件从 recommendation run 创建开始记录，推荐器选中任务后通过 `package_bound` 绑定单个 `packageId`，后续事件尽量携带该 `packageId` 方便按任务聚合。
+
 `agentRun` 是调用账本，artifact 是业务产物。Agent 的最终结构化输出只通过对应 artifact 长期保存，例如 `executionReport`、`reviewReport`、`convergenceAdvice`、`convergenceSuccess` 或 `convergenceFailure`。`agentRun.outputArtifactRefs` 只保存这些产物的引用，不复制产物正文。
 
 `agentRun.status` 是运行状态摘要，`agentRun.failure` 是失败详情。二者必须保持一致：

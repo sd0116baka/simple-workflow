@@ -14,6 +14,7 @@ export async function loadRecommendationRunCompletionInput({
   runConvergenceSession,
   recommendationRunControllerRegistry,
   onProgress,
+  onPackageBound,
   listTasks = listRawTasks,
 }) {
   const tasks = await listTasks(tasksDir);
@@ -43,6 +44,7 @@ export async function loadRecommendationRunCompletionInput({
     runConvergenceSession,
     repositoryDir,
     onProgress,
+    onPackageBound,
     signal,
   };
 }

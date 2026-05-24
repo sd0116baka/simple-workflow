@@ -26,6 +26,7 @@ export function createManualWorkflowActionDefinitions({
   return {
     acceptConvergenceSuccess({ packageId = null } = {}) {
       return {
+        actionType: "accept_convergence_success",
         packageId,
         findTaskContextPackage: findAcceptableTaskContextPackage,
         unavailableResponse: { accepted: false },
@@ -50,6 +51,7 @@ export function createManualWorkflowActionDefinitions({
       expectedNextOutcome = "",
     } = {}) {
       return {
+        actionType: "continue_convergence_with_guidance",
         packageId,
         findTaskContextPackage: findGuidableConvergenceDecisionPackage,
         unavailableResponse: { continued: false },
@@ -73,6 +75,7 @@ export function createManualWorkflowActionDefinitions({
 
     cancelTask({ packageId = null } = {}) {
       return {
+        actionType: "cancel_task",
         packageId,
         findTaskContextPackage: findCancellableHumanDecisionPackage,
         unavailableResponse: { cancelled: false },

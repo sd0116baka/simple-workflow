@@ -42,6 +42,7 @@ test("recommendation run route definitions expose run lifecycle routes", () => {
       "POST /api/recommendation-runs/cancel",
       "POST /api/recommendation-runs",
       "GET /api/recommendation-runs/latest",
+      "GET /api/recommendation-runs/:id/progress-log",
       "PATCH /api/recommendation-runs/stage-switches",
     ],
   );
@@ -235,6 +236,41 @@ test("recommendation run routes map cancel and latest responses", async () => {
   assert.equal(latestResponse.sent.status, 200);
   assert.deepEqual(latestResponse.sent.payload, {
     recommendationRun: latestRun,
+  });
+});
+
+test("recommendation run route reads a persisted progress log", async () => {
+  const httpAdapter = createHttpAdapterProbe();
+  const progressLog = {
+    runId: "recommendation-run-1",
+    events: [{ type: "run_started" }],
+  };
+  const definitions = createWorkflowRecommendationRunRouteDefinitions({
+    httpAdapter,
+    workflowService: {
+      readRecommendationRunProgressLog(runId) {
+        return {
+          ...progressLog,
+          runId,
+        };
+      },
+    },
+  });
+  const response = {};
+
+  await findRoute(definitions, {
+    method: "GET",
+    path: "/api/recommendation-runs/:id/progress-log",
+  }).handle({
+    response,
+    params: {
+      id: "recommendation-run-1",
+    },
+  });
+
+  assert.equal(response.sent.status, 200);
+  assert.deepEqual(response.sent.payload, {
+    progressLog,
   });
 });
 

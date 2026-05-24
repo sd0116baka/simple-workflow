@@ -4,7 +4,7 @@ import { createRecommendationRunLifecycleState } from "./recommendation-run-life
 import { cancelRecommendationRunTransaction } from "./recommendation-run-cancellation.js";
 import { createRecommendationRunTransaction } from "./recommendation-run-creation.js";
 import { canContinueRecommendationRunDownstream } from "./recommendation-run-downstream-continuation.js";
-import { appendRecommendationRunProgress } from "./recommendation-run-progress.js";
+import { createRecommendationRunProgressRecorder } from "./recommendation-run-progress-log.js";
 import { normalizeWorkflowStageSwitches } from "./workflow-stage-switches.js";
 
 export function createRecommendationRunLifecycle({
@@ -20,9 +20,14 @@ export function createRecommendationRunLifecycle({
   runReviewAgentSession,
   runConvergenceSession,
   emitRecommendationChanged,
+  progressLogStore = null,
   recommendationRunControllerRegistry = createRecommendationRunControllerRegistry(),
   recommendationRunLifecycleState = createRecommendationRunLifecycleState(),
 }) {
+  const progressRecorder = createRecommendationRunProgressRecorder({
+    progressLogStore,
+    emitRecommendationChanged,
+  });
   const recommendationRunCompletion = createRecommendationRunCompletion({
     tasksDir,
     repositoryDir,
@@ -36,6 +41,7 @@ export function createRecommendationRunLifecycle({
     runConvergenceSession,
     recommendationRunControllerRegistry,
     emitRecommendationChanged,
+    progressRecorder,
   });
 
   function setLatestRecommendationRun(run) {
@@ -59,6 +65,7 @@ export function createRecommendationRunLifecycle({
       recommendationRunControllerRegistry,
       recommendationRunCompletion,
       emitRecommendationChanged,
+      progressRecorder,
     });
   }
 
@@ -67,6 +74,7 @@ export function createRecommendationRunLifecycle({
       recommendationRunLifecycleState,
       recommendationRunControllerRegistry,
       emitRecommendationChanged,
+      progressRecorder,
     });
   }
 
@@ -77,14 +85,22 @@ export function createRecommendationRunLifecycle({
     }
 
     run.stageSwitches = normalizeWorkflowStageSwitches(stageSwitches);
+    progressRecorder.recordSystemEvent(run, {
+      type: "stage_switches_updated",
+      message: "流程实时开关已更新。",
+      stageSwitches: run.stageSwitches,
+    });
     emitRecommendationChanged(run);
     if (canContinueRecommendationRunDownstream(run)) {
       run.status = "running";
       run.finishedAt = null;
+      progressRecorder.recordSystemEvent(run, {
+        type: "downstream_continuation_started",
+        message: "实时开关允许后续流程继续执行。",
+      });
       emitRecommendationChanged(run);
       const appendProgress = (progress) => {
-        appendRecommendationRunProgress(run, progress);
-        emitRecommendationChanged(run);
+        progressRecorder.appendProgress(run, progress);
       };
       recommendationRunCompletion.continueRecommendationRun(run, appendProgress);
     }
@@ -101,5 +117,14 @@ export function createRecommendationRunLifecycle({
     createRecommendationRun,
     cancelRecommendationRun,
     updateRecommendationRunStageSwitches,
+    recordRecommendationRunSystemEvent(run, event) {
+      progressRecorder.recordSystemEvent(run, event);
+    },
+    readRecommendationRunProgressLog(runId) {
+      return {
+        runId,
+        events: progressLogStore?.read(runId) ?? [],
+      };
+    },
   };
 }

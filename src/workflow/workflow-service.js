@@ -17,6 +17,7 @@ import { createWorkflowServiceRuntime } from "./workflow-service-runtime.js";
 import { createTerminalSessionService } from "./terminal-session-service.js";
 import { createTaskSourceDraftAssistant } from "./task-source-draft-assistant.js";
 import { createTaskSourceMutationService } from "./task-source-mutation-service.js";
+import { createRecommendationRunProgressLogStore } from "./recommendation-run-progress-log.js";
 
 export function createWorkflowService({
   tasksDir,
@@ -26,6 +27,7 @@ export function createWorkflowService({
   recommendationPromptPath = join(promptProfileDir, "recommender-agent.prompt.md"),
   taskSourceDraftPromptPath = join(promptProfileDir, "task-source-drafter.prompt.md"),
   taskContextPackageStoreDir = join(repositoryDir, ".workflow", "task-context-packages"),
+  recommendationRunProgressLogDir = join(repositoryDir, ".workflow", "recommendation-run-logs"),
   runRecommendationCommand = null,
   runMainAgentSession = runOpencodeMainAgentSession,
   runExecutionAgentSession = runOpencodeExecutionAgentSession,
@@ -35,6 +37,9 @@ export function createWorkflowService({
   watchDebounceMs = 100,
 }) {
   const workflowEventBus = createWorkflowEventBus();
+  const recommendationRunProgressLogStore = createRecommendationRunProgressLogStore({
+    logDir: recommendationRunProgressLogDir,
+  });
   const taskContextWorkspace = createTaskContextPackageWorkspace({
     tasksDir,
     taskContextPackageStoreDir,
@@ -82,6 +87,7 @@ export function createWorkflowService({
     runReviewAgentSession,
     runConvergenceSession,
     emitRecommendationChanged: workflowEventBus.emitRecommendationChanged,
+    progressLogStore: recommendationRunProgressLogStore,
   });
   const manualWorkflowActionTargets = createManualWorkflowActionTargets({
     taskContextWorkspace,

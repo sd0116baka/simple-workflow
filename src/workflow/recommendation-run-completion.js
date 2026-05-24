@@ -19,12 +19,21 @@ export function createRecommendationRunCompletion({
   runConvergenceSession,
   recommendationRunControllerRegistry,
   emitRecommendationChanged,
+  progressRecorder = null,
   completeRecommendationFlow = completeFlow,
   loadRecommendationRunCompletionInput = loadCompletionInput,
   applyCompletedRecommendationRun = applyCompletedRun,
   applyFailedRecommendationRun = applyFailedRun,
   now = () => new Date().toISOString(),
 }) {
+  function onPackageBoundFor(run) {
+    return ({ packageId }) => progressRecorder?.bindPackage(run, packageId);
+  }
+
+  function recordFinished(run) {
+    progressRecorder?.recordRunFinished(run);
+  }
+
   async function finishRecommendationRun(run, startedCommand, onProgress) {
     let shouldEmitChange = false;
     try {
@@ -44,6 +53,7 @@ export function createRecommendationRunCompletion({
         runConvergenceSession,
         recommendationRunControllerRegistry,
         onProgress,
+        onPackageBound: onPackageBoundFor(run),
       });
       const completedRun = await completeRecommendationFlow(completionInput);
       const outcome = await applyCompletedRecommendationRun({
@@ -55,9 +65,15 @@ export function createRecommendationRunCompletion({
       if (outcome.applied && canContinueRecommendationRunDownstream(run)) {
         run.status = "running";
         run.finishedAt = null;
+        progressRecorder?.recordSystemEvent(run, {
+          type: "downstream_continuation_started",
+          message: "实时开关允许后续流程继续执行。",
+        });
         emitRecommendationChanged(run);
         await continueRecommendationRun(run, onProgress);
         shouldEmitChange = false;
+      } else if (outcome.applied) {
+        recordFinished(run);
       }
     } catch (error) {
       const outcome = applyFailedRecommendationRun({
@@ -66,6 +82,9 @@ export function createRecommendationRunCompletion({
         now,
       });
       shouldEmitChange = outcome.applied;
+      if (outcome.applied) {
+        recordFinished(run);
+      }
     } finally {
       recommendationRunControllerRegistry.delete(run.id);
     }
@@ -98,6 +117,7 @@ export function createRecommendationRunCompletion({
         runConvergenceSession,
         recommendationRunControllerRegistry,
         onProgress,
+        onPackageBound: onPackageBoundFor(run),
       });
       const completedRun = await completeRecommendationFlow({
         ...completionInput,
@@ -109,6 +129,9 @@ export function createRecommendationRunCompletion({
         persistTaskContextPackage,
       });
       shouldEmitChange = outcome.applied;
+      if (outcome.applied) {
+        recordFinished(run);
+      }
     } catch (error) {
       const outcome = applyFailedRecommendationRun({
         run,
@@ -116,6 +139,9 @@ export function createRecommendationRunCompletion({
         now,
       });
       shouldEmitChange = outcome.applied;
+      if (outcome.applied) {
+        recordFinished(run);
+      }
     }
     if (shouldEmitChange) {
       emitRecommendationChanged(run);

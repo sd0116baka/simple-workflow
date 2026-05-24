@@ -44,6 +44,15 @@ export function createWorkflowRecommendationRunRouteDefinitions({
       },
     },
     {
+      method: "GET",
+      path: "/api/recommendation-runs/:id/progress-log",
+      async handle({ response, params }) {
+        httpAdapter.sendJson(response, 200, {
+          progressLog: workflowService.readRecommendationRunProgressLog(params.id),
+        });
+      },
+    },
+    {
       method: "PATCH",
       path: "/api/recommendation-runs/stage-switches",
       async handle({ request, response }) {

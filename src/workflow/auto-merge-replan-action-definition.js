@@ -8,6 +8,7 @@ export function createAutoMergeReplanActionDefinition({
 } = {}) {
   return function replanAutoMerge({ packageId = null } = {}) {
     return {
+      actionType: "replan_auto_merge",
       packageId,
       findTaskContextPackage: findAutoMergePlannablePackage,
       isUnavailable: (taskContextPackage) =>

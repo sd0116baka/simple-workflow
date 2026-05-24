@@ -106,6 +106,33 @@ test("workflow routes forward human convergence guidance body", async () => {
   assert.equal(response.sent.status, 200);
 });
 
+test("workflow routes pass dynamic route params", async () => {
+  const httpAdapter = createHttpAdapterProbe();
+  const response = {};
+  const routes = createWorkflowRoutes({
+    httpAdapter,
+    workflowService: {
+      readRecommendationRunProgressLog(runId) {
+        return {
+          runId,
+          events: [],
+        };
+      },
+    },
+  });
+
+  const handled = await routes.handle(
+    request({ method: "GET", url: "/api/recommendation-runs/recommendation-run-1/progress-log" }),
+    response,
+  );
+
+  assert.equal(handled, true);
+  assert.deepEqual(response.sent.payload.progressLog, {
+    runId: "recommendation-run-1",
+    events: [],
+  });
+});
+
 test("workflow routes trigger restart only when a restart handler exists", async () => {
   let restartCalled = false;
   const unavailableAdapter = createHttpAdapterProbe();

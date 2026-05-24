@@ -40,6 +40,7 @@ export async function prepareRecommendationExecution({
   repositoryDir,
   now = () => new Date().toISOString(),
   prepareDownstream = true,
+  onPackageBound,
 }) {
   const commandFailed = Boolean(commandResult.error || commandResult.exitCode !== 0);
   const parsed = commandFailed
@@ -50,6 +51,9 @@ export async function prepareRecommendationExecution({
   });
 
   if (!prepareDownstream) {
+    if (!commandFailed && parsed.appendRequest?.packageId) {
+      onPackageBound?.({ packageId: parsed.appendRequest.packageId });
+    }
     return {
       commandFailed,
       parsed,
@@ -71,6 +75,7 @@ export async function prepareRecommendationExecution({
   }
 
   const packageId = parsed.appendRequest.packageId;
+  onPackageBound?.({ packageId });
   const candidateTasks = taskPool.views.candidateTasks;
   let currentPackage = findTaskContextPackage(taskPool, packageId);
   if (!hasArtifactBody(currentPackage, "executionIntent")) {
