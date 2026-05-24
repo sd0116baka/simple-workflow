@@ -43,3 +43,15 @@ test("task package append validation checks agent run shape", () => {
     },
   }), /appendRequest\.agentRun\.inputArtifactRefs must be an array/);
 });
+
+test("task package append validation rejects runtime debug data on agent runs", () => {
+  for (const field of ["prompt", "transcript", "stdout", "stderr", "rawOutput", "events", "command", "cwd", "pid"]) {
+    assert.throws(() => assertAppendRequest({
+      packageId: "task-context-package:tasks/task-001.yaml",
+      agentRun: {
+        ...executionAgentRun(),
+        [field]: "debug payload",
+      },
+    }), new RegExp(`appendRequest\\.agentRun\\.${field} is runtime debug data`));
+  }
+});

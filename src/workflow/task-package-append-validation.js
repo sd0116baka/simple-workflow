@@ -1,4 +1,27 @@
+const FORBIDDEN_AGENT_RUN_FIELDS = Object.freeze([
+  "command",
+  "conversation",
+  "cwd",
+  "events",
+  "messages",
+  "pid",
+  "processEvents",
+  "progress",
+  "progressEvents",
+  "prompt",
+  "rawOutput",
+  "stderr",
+  "stdout",
+  "terminalOutput",
+  "transcript",
+]);
+
 function validateAgentRun(agentRun) {
+  for (const field of FORBIDDEN_AGENT_RUN_FIELDS) {
+    if (Object.hasOwn(agentRun, field)) {
+      throw new Error(`appendRequest.agentRun.${field} is runtime debug data and must not be persisted`);
+    }
+  }
   for (const field of ["runId", "role", "sessionId", "status", "startedAt", "finishedAt"]) {
     if (!agentRun[field]) {
       throw new Error(`appendRequest.agentRun.${field} is required`);

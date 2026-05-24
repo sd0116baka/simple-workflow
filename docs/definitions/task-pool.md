@@ -341,6 +341,26 @@ Agent 调用也通过同一个追加请求接口进入任务池。
 如果同一次追加请求同时包含 artifact 和 agentRun，任务池生成 artifactId 并补全 agentRun.outputArtifactRefs。
 ```
 
+`agentRuns` 是任务上下文包内的最小持久运行账本，只保存后续流程判断和长期追溯需要的事实：
+
+```text
+runId
+role
+sessionId
+status
+failure
+inputArtifactRefs
+outputArtifactRefs
+startedAt
+finishedAt
+```
+
+`agentRuns` 不保存 agent 聊天记录、完整 prompt、stdout/stderr、终端 transcript、进程事件、pid、command、cwd 或调试计数。这些属于实时调试态，可以存在于当前 `recommendationRun.progress`、terminal session 或临时日志中，但不进入任务上下文包的长期事实。
+
+`agentRun` 是调用账本，artifact 是业务产物。Agent 的最终结构化输出只通过对应 artifact 长期保存，例如 `executionReport`、`reviewReport`、`convergenceAdvice`、`convergenceSuccess` 或 `convergenceFailure`。`agentRun.outputArtifactRefs` 只保存这些产物的引用，不复制产物正文。
+
+失败的 agent run 可以追加本环节失败报告，例如 `executionReport(status: failed)`，但失败报告不能作为下游成功输入。下游环节必须检查对应 `agentRun.status` 和 artifact 状态，避免失败产物继续驱动 review、convergence 或后续自动化。
+
 执行前产物是单例。Agent loop 产物是多例。
 
 ## 派生视图
