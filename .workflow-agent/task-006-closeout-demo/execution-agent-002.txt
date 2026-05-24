@@ -1,4 +1,0 @@
-runId: execution-agent:002
-packageId: task-context-package:tasks/task-006-closeout-demo.yaml
-cwd: D:\Project\simple-workflow\.workflow\worktrees\tasks\tasks-task-006-closeout-demo
-inputArtifactRefs: taskDraft, executionIntent, executionAuthorization, convergenceAdvice:001, isolatedWorkspace

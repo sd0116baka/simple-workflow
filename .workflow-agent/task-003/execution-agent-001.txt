@@ -1,4 +1,0 @@
-runId: execution-agent:001
-packageId: task-context-package:tasks/task-003.yaml
-cwd: D:\Project\simple-workflow\.workflow\worktrees\tasks\tasks-task-003
-inputArtifactRefs: taskDraft, executionIntent, executionAuthorization, isolatedWorkspace

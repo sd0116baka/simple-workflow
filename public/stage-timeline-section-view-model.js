@@ -6,6 +6,7 @@ export function formatStageTimestamp(node) {
   const date = new Date(node.timestamp);
   if (Number.isNaN(date.getTime())) return node.timestamp;
   return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",

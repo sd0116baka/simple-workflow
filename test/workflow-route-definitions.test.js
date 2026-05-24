@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createWorkflowRouteDefinitions } from "../src/server/workflow-route-definitions.js";
+import { createWorkflowRouteDefinitions } from "../src/server/workflow-routes.js";
 
 function createHttpAdapterProbe(body = {}) {
   const calls = [];

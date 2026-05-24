@@ -1,4 +1,10 @@
-import { createWorkflowRouteDefinitions } from "./workflow-route-definitions.js";
+import { createWorkflowAutoMergeRouteDefinitions } from "./workflow-auto-merge-route-definitions.js";
+import { createWorkflowManualActionRouteDefinitions } from "./workflow-manual-action-route-definitions.js";
+import { createWorkflowRecommendationRunRouteDefinitions } from "./workflow-recommendation-run-route-definitions.js";
+import { createWorkflowReadRouteDefinitions } from "./workflow-read-route-definitions.js";
+import { createWorkflowTaskDraftRouteDefinitions } from "./workflow-task-draft-route-definitions.js";
+import { createWorkflowTerminalSessionRouteDefinitions } from "./workflow-terminal-session-route-definitions.js";
+import { createWorkflowTestFixtureRouteDefinitions } from "./workflow-test-fixture-route-definitions.js";
 
 function requestPath(request) {
   const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
@@ -27,6 +33,49 @@ function routeParams(routePath, requestPathValue) {
     }
   }
   return params;
+}
+
+function eventRoute({ workflowService, httpAdapter }) {
+  return {
+    path: "/api/events",
+    handle({ request, response }) {
+      httpAdapter.serveEvents(request, response, workflowService);
+    },
+  };
+}
+
+function restartRoute({ restartServer = null, httpAdapter }) {
+  return {
+    method: "POST",
+    path: "/api/server/restart",
+    async handle({ response }) {
+      if (!restartServer) {
+        httpAdapter.sendJson(response, 501, { error: "Server restart is not available." });
+        return;
+      }
+
+      httpAdapter.sendJson(response, 202, { restarting: true });
+      restartServer();
+    },
+  };
+}
+
+export function createWorkflowRouteDefinitions({
+  workflowService,
+  restartServer = null,
+  httpAdapter,
+}) {
+  return [
+    eventRoute({ workflowService, httpAdapter }),
+    ...createWorkflowRecommendationRunRouteDefinitions({ workflowService, httpAdapter }),
+    ...createWorkflowManualActionRouteDefinitions({ workflowService, httpAdapter }),
+    ...createWorkflowAutoMergeRouteDefinitions({ workflowService, httpAdapter }),
+    ...createWorkflowTaskDraftRouteDefinitions({ workflowService, httpAdapter }),
+    ...createWorkflowTerminalSessionRouteDefinitions({ workflowService, httpAdapter }),
+    restartRoute({ restartServer, httpAdapter }),
+    ...createWorkflowTestFixtureRouteDefinitions({ workflowService, httpAdapter }),
+    ...createWorkflowReadRouteDefinitions({ workflowService, httpAdapter }),
+  ];
 }
 
 export function createWorkflowRoutes({

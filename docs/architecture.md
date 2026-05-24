@@ -1,18 +1,30 @@
-# 架构维护说明
+# 架构收敛说明
 
-本项目已经完成一轮大规模拆分和收尾。后续目标不是持续追求文件数量更少或更多，而是让每个模块保留清晰职责、稳定接口和足够行为深度。
+本项目当前阶段只保留一个最小闭环：读取 `tasks/` 任务真源，生成任务池，创建推荐运行，按准入、隔离工作树、agent 执行、审查、收敛、人工决策、自动合并、收尾推进，并在浏览器页面上展示状态和手动动作。
 
-## 稳定方向
+后续维护的默认动作是删减，不是扩展。新增模块、配置项或文档页之前，必须先证明它解决了当前主流程里的真实重复、真实复杂度或真实错误面。
 
-- `src/server/server.js` 保持为进程入口，实际 HTTP 组合、路由分发、静态资源和重启流程放在 `src/server/` 的专门模块中。
-- `src/workflow/workflow-service.js` 保持为 workflow 组合入口，read model、推荐运行、人工动作、测试状态桩、事件总线和任务监听各自拥有清晰接口。
-- 浏览器端保留 page shell、API client、状态选择、view model 和 renderer 的分层，让 DOM 写入与 workflow 数据解释分开。
-- `task-package-artifacts`、`stage-timeline`、agent session contract、auto-merge transaction 这类被多处消费且承载规则的模块优先保留。
-- 测试优先覆盖行为、contract、错误分支和端到端流程，而不是锁死内部转发关系。
+## 当前核心边界
 
-## 当前可接受的模块形状
+- `src/server/server.js` 是进程入口。
+- `src/server/server-app.js` 只负责 HTTP server 组合。
+- `src/server/http-adapter.js` 集中处理 JSON、SSE 和静态文件这三类 HTTP 细节；这些能力太小，不再拆成多个 adapter 文件。
+- `src/server/workflow-routes.js` 是唯一的路由目录和分发器；单独成族的路由只保留给有实际业务分支的接口组。
+- `src/workflow/workflow-service.js` 是服务组合入口，`workflow-service-runtime.js` 是对外方法表。
+- `src/workflow/*-flow.js` 和 `src/workflow/*-contract.js` 只在承载业务推进规则或结构化契约时保留。
+- `public/` 仍按页面状态、命令、view model、renderer 分层，但薄转发文件不应继续增加。
 
-- Server layer: 入口、runtime config、HTTP adapter、route catalog、route family definitions。
-- Workflow layer: service composition、runtime facade、read model、task context mutation、recommendation lifecycle、manual action、test fixture、agent/session contracts。
-- UI layer: page shell、snapshot state、data controller、commands/actions、section view models、section renderers、shared render helpers。
+## 收敛规则
 
+- 不为“未来可能接别的实现”保留空扩展点。
+- 不把三五行的转发函数拆成独立文件，除非它被多个生产路径复用并承载稳定语义。
+- 配置项只能对应当前可以验证的运行差异；失效脚本和缺文件脚本直接删除。
+- 运行时产物不进仓库；测试、依赖和 workflow 本地状态必须被 `.gitignore` 挡住。
+- 自动化流程不能依赖开发机隐式状态，例如 git 用户配置必须由流程自己提供。
+
+## 删除优先级
+
+1. 删除已经失效或缺少实现文件的脚本、文档入口和本地运行产物。
+2. 合并只有一个生产调用方、没有独立业务规则的薄模块。
+3. 保留会影响主流程正确性的 contract、flow、transaction 和持久化边界。
+4. 对文档只记录当前闭环和维护规则，不把愿景当成已经存在的架构。

@@ -64,7 +64,14 @@ export function runAutoMergeExecutionTransaction({
     }
 
     if (!git.isAncestor(targetCommit, sourceCommit, repositoryDir)) {
-      git.runGit(["rebase", targetCommit], { cwd: absoluteWorktreePath });
+      git.runGit([
+        "-c",
+        "user.name=Simple Workflow",
+        "-c",
+        "user.email=simple-workflow@example.invalid",
+        "rebase",
+        targetCommit,
+      ], { cwd: absoluteWorktreePath });
       sourceCommit = git.runGit(["rev-parse", "HEAD"], { cwd: absoluteWorktreePath });
       sourceRebased = true;
     }
