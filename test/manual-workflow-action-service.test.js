@@ -17,14 +17,19 @@ function packageFixture(overrides = {}) {
 function createLifecycle(initialRun = null) {
   let latestRun = initialRun;
   const setCalls = [];
+  const systemEvents = [];
   return {
     setCalls,
+    systemEvents,
     getLatestRecommendationRun() {
       return latestRun;
     },
     setLatestRecommendationRun(run) {
       latestRun = run;
       setCalls.push(run);
+    },
+    recordRecommendationRunSystemEvent(run, event) {
+      systemEvents.push({ run, event });
     },
   };
 }
@@ -196,4 +201,34 @@ test("manual workflow action service attaches a manual run before invoking an ac
   assert.equal(actionArgs.runExecutionAgentSession, runExecutionAgentSession);
   assert.equal(actionArgs.runReviewAgentSession, runReviewAgentSession);
   assert.equal(actionArgs.runConvergenceSession, runConvergenceSession);
+});
+
+test("manual workflow action service records manual action start events", async () => {
+  const taskContextPackage = packageFixture();
+  const { service, recommendationRunLifecycle, emitted } = createService({
+    findCancellableHumanDecisionPackage: async (packageId) => {
+      assert.equal(packageId, taskContextPackage.packageId);
+      return taskContextPackage;
+    },
+    cancelTaskAction: async () => ({
+      shouldEmit: false,
+      response: { cancelled: true, error: null },
+    }),
+  });
+
+  const result = await service.cancelTask({
+    packageId: taskContextPackage.packageId,
+  });
+
+  assert.equal(result.cancelled, true);
+  assert.equal(result.error, null);
+  assert.equal(recommendationRunLifecycle.systemEvents.length, 1);
+  assert.equal(recommendationRunLifecycle.systemEvents[0].run.id, "manual-workflow-action");
+  assert.deepEqual(recommendationRunLifecycle.systemEvents[0].event, {
+    type: "manual_action_started",
+    message: "手动流程动作已启动。",
+    actionType: "cancel_task",
+    packageId: taskContextPackage.packageId,
+  });
+  assert.deepEqual(emitted, []);
 });
