@@ -359,6 +359,14 @@ finishedAt
 
 `agentRun` 是调用账本，artifact 是业务产物。Agent 的最终结构化输出只通过对应 artifact 长期保存，例如 `executionReport`、`reviewReport`、`convergenceAdvice`、`convergenceSuccess` 或 `convergenceFailure`。`agentRun.outputArtifactRefs` 只保存这些产物的引用，不复制产物正文。
 
+`agentRun.status` 是运行状态摘要，`agentRun.failure` 是失败详情。二者必须保持一致：
+
+```text
+running/succeeded 不保存 failure。
+failed 必须保存 failure，且 failure.kind 不能是 cancelled。
+cancelled 必须保存 failure，且 failure.kind 必须是 cancelled。
+```
+
 失败的 agent run 可以追加本环节失败报告，例如 `executionReport(status: failed)`，但失败报告不能作为下游成功输入。下游环节必须检查对应 `agentRun.status` 和 artifact 状态，避免失败产物继续驱动 review、convergence 或后续自动化。
 
 执行前产物是单例。Agent loop 产物是多例。

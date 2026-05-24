@@ -15,6 +15,16 @@ function executionAgentRun() {
   };
 }
 
+function failure(overrides = {}) {
+  return {
+    code: "agent.process-error",
+    kind: "process-error",
+    message: "execution failed",
+    exitCode: null,
+    ...overrides,
+  };
+}
+
 test("task package append validation requires an append target and payload", () => {
   assert.throws(() => assertAppendRequest(null), /appendRequest\.packageId is required/);
   assert.throws(() => assertAppendRequest({
@@ -42,6 +52,66 @@ test("task package append validation checks agent run shape", () => {
       inputArtifactRefs: null,
     },
   }), /appendRequest\.agentRun\.inputArtifactRefs must be an array/);
+});
+
+test("task package append validation keeps agent run status and failure consistent", () => {
+  assert.doesNotThrow(() => assertAppendRequest({
+    packageId: "task-context-package:tasks/task-001.yaml",
+    agentRun: {
+      ...executionAgentRun(),
+      status: "failed",
+      failure: failure(),
+    },
+  }));
+  assert.doesNotThrow(() => assertAppendRequest({
+    packageId: "task-context-package:tasks/task-001.yaml",
+    agentRun: {
+      ...executionAgentRun(),
+      status: "cancelled",
+      failure: failure({
+        code: "agent.cancelled",
+        kind: "cancelled",
+        message: "execution agent 已取消。",
+      }),
+    },
+  }));
+  assert.throws(() => assertAppendRequest({
+    packageId: "task-context-package:tasks/task-001.yaml",
+    agentRun: {
+      ...executionAgentRun(),
+      status: "paused",
+    },
+  }), /appendRequest\.agentRun\.status must be running, succeeded, failed, or cancelled/);
+  assert.throws(() => assertAppendRequest({
+    packageId: "task-context-package:tasks/task-001.yaml",
+    agentRun: {
+      ...executionAgentRun(),
+      failure: failure(),
+    },
+  }), /appendRequest\.agentRun\.failure must be absent unless status is failed or cancelled/);
+  assert.throws(() => assertAppendRequest({
+    packageId: "task-context-package:tasks/task-001.yaml",
+    agentRun: {
+      ...executionAgentRun(),
+      status: "failed",
+    },
+  }), /appendRequest\.agentRun\.failure is required when status is failed or cancelled/);
+  assert.throws(() => assertAppendRequest({
+    packageId: "task-context-package:tasks/task-001.yaml",
+    agentRun: {
+      ...executionAgentRun(),
+      status: "failed",
+      failure: failure({ kind: "cancelled" }),
+    },
+  }), /appendRequest\.agentRun\.failure\.kind must not be cancelled when status is failed/);
+  assert.throws(() => assertAppendRequest({
+    packageId: "task-context-package:tasks/task-001.yaml",
+    agentRun: {
+      ...executionAgentRun(),
+      status: "cancelled",
+      failure: failure(),
+    },
+  }), /appendRequest\.agentRun\.failure\.kind must be cancelled when status is cancelled/);
 });
 
 test("task package append validation rejects runtime debug data on agent runs", () => {

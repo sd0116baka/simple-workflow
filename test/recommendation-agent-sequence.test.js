@@ -129,6 +129,12 @@ test("recommendation agent sequence stops before review when execution fails", a
           role: "execution",
           sessionId: "execution-session",
           status: "failed",
+          failure: {
+            code: "agent.process-error",
+            kind: "process-error",
+            message: "execution failed",
+            exitCode: null,
+          },
           startedAt: "2026-05-21T00:00:00.000Z",
           finishedAt: "2026-05-21T00:00:00.000Z",
           inputArtifactRefs: [],

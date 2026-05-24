@@ -16,6 +16,31 @@ const FORBIDDEN_AGENT_RUN_FIELDS = Object.freeze([
   "transcript",
 ]);
 
+const AGENT_RUN_STATUSES = Object.freeze(["running", "succeeded", "failed", "cancelled"]);
+
+function isObject(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function validateAgentRunFailure(agentRun) {
+  const hasFailure = isObject(agentRun.failure);
+  if (!AGENT_RUN_STATUSES.includes(agentRun.status)) {
+    throw new Error("appendRequest.agentRun.status must be running, succeeded, failed, or cancelled");
+  }
+  if (["running", "succeeded"].includes(agentRun.status) && hasFailure) {
+    throw new Error("appendRequest.agentRun.failure must be absent unless status is failed or cancelled");
+  }
+  if (["failed", "cancelled"].includes(agentRun.status) && !hasFailure) {
+    throw new Error("appendRequest.agentRun.failure is required when status is failed or cancelled");
+  }
+  if (agentRun.status === "failed" && agentRun.failure.kind === "cancelled") {
+    throw new Error("appendRequest.agentRun.failure.kind must not be cancelled when status is failed");
+  }
+  if (agentRun.status === "cancelled" && agentRun.failure.kind !== "cancelled") {
+    throw new Error("appendRequest.agentRun.failure.kind must be cancelled when status is cancelled");
+  }
+}
+
 function validateAgentRun(agentRun) {
   for (const field of FORBIDDEN_AGENT_RUN_FIELDS) {
     if (Object.hasOwn(agentRun, field)) {
@@ -36,6 +61,7 @@ function validateAgentRun(agentRun) {
   if (!Array.isArray(agentRun.outputArtifactRefs)) {
     throw new Error("appendRequest.agentRun.outputArtifactRefs must be an array");
   }
+  validateAgentRunFailure(agentRun);
 }
 
 export function assertAppendRequest(appendRequest) {
