@@ -31,6 +31,25 @@ test("builds workflow runtime config from environment paths", () => {
   );
 });
 
+test("keeps WSL absolute paths as POSIX paths", () => {
+  const config = runtimeConfigFromEnv({
+    SIMPLE_WORKFLOW_REPOSITORY_DIR: "/mnt/d/Project/simple-workflow/.workflow/test-environment/repository",
+    SIMPLE_WORKFLOW_TASKS_DIR: "/mnt/d/Project/simple-workflow/.workflow/test-environment/repository/tasks",
+    SIMPLE_WORKFLOW_CONTEXT_STORE_DIR: "/mnt/d/Project/simple-workflow/.workflow/test-environment/repository/.workflow/task-context-packages",
+  }, "/mnt/d/Project/simple-workflow");
+
+  assert.equal(config.repositoryDir, "/mnt/d/Project/simple-workflow/.workflow/test-environment/repository");
+  assert.equal(config.tasksDir, "/mnt/d/Project/simple-workflow/.workflow/test-environment/repository/tasks");
+  assert.equal(
+    config.taskContextPackageStoreDir,
+    "/mnt/d/Project/simple-workflow/.workflow/test-environment/repository/.workflow/task-context-packages",
+  );
+  assert.equal(
+    config.recommendationPromptPath,
+    "/mnt/d/Project/simple-workflow/project_profiles/recommender-agent.prompt.md",
+  );
+});
+
 test("allows overriding recommendation prompt path", () => {
   const config = runtimeConfigFromEnv({
     SIMPLE_WORKFLOW_RECOMMENDATION_PROMPT_PATH: "D:\\Project\\simple-workflow\\.workflow\\prompt.md",

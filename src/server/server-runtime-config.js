@@ -5,7 +5,8 @@ export const rootDir = fileURLToPath(new URL("../..", import.meta.url));
 export const publicDir = join(rootDir, "public");
 
 function isWindowsAbsolutePath(value) {
-  return typeof value === "string" && win32.isAbsolute(value);
+  return typeof value === "string"
+    && (/^[A-Za-z]:[\\/]/.test(value) || /^\\\\[^\\]+\\[^\\]+/.test(value));
 }
 
 function joinRuntimePath(basePath, ...parts) {
