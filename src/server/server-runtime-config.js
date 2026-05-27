@@ -1,4 +1,4 @@
-import { join, resolve, win32 } from "node:path";
+import { join, posix, resolve, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const rootDir = fileURLToPath(new URL("../..", import.meta.url));
@@ -9,9 +9,16 @@ function isWindowsAbsolutePath(value) {
     && (/^[A-Za-z]:[\\/]/.test(value) || /^\\\\[^\\]+\\[^\\]+/.test(value));
 }
 
+function isPosixAbsolutePath(value) {
+  return typeof value === "string" && value.startsWith("/");
+}
+
 function joinRuntimePath(basePath, ...parts) {
   if (isWindowsAbsolutePath(basePath)) {
     return win32.join(basePath, ...parts);
+  }
+  if (isPosixAbsolutePath(basePath)) {
+    return posix.join(basePath, ...parts);
   }
   return join(basePath, ...parts);
 }
@@ -20,8 +27,14 @@ function resolveRuntimePath(pathValue, cwd = rootDir) {
   if (isWindowsAbsolutePath(pathValue)) {
     return win32.normalize(pathValue);
   }
+  if (isPosixAbsolutePath(pathValue)) {
+    return posix.normalize(pathValue);
+  }
   if (isWindowsAbsolutePath(cwd)) {
     return win32.resolve(cwd, pathValue);
+  }
+  if (isPosixAbsolutePath(cwd)) {
+    return posix.resolve(cwd, pathValue);
   }
   return resolve(pathValue);
 }

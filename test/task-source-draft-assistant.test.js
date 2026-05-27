@@ -95,6 +95,35 @@ test("task source draft assistant validates finalized YAML text", async () => {
   assert.equal(result.validation.parsed.id, "import-csv");
 });
 
+test("task source draft assistant exposes opencode JSON error events", async () => {
+  const assistant = createTaskSourceDraftAssistant({
+    promptPath: "prompt.md",
+    readPrompt: async () => "base prompt",
+    listTasks: async () => [],
+    runAssistant: async () => ({
+      stdout: JSON.stringify({
+        type: "error",
+        error: {
+          name: "UnknownError",
+          data: { message: "unknown certificate verification error" },
+        },
+      }),
+      stderr: "",
+      exitCode: 0,
+      error: null,
+    }),
+  });
+
+  const result = await assistant.discussTaskSourceDraft({
+    mode: "finalize",
+    messages: [{ role: "user", content: "敲定" }],
+  });
+
+  assert.match(result.assistantMessage, /unknown certificate verification error/);
+  assert.equal(result.taskSourceText, null);
+  assert.equal(result.error.data.message, "unknown certificate verification error");
+});
+
 test("task source draft validation reports malformed YAML", () => {
   const validation = validateTaskSourceDraft("id: [");
 

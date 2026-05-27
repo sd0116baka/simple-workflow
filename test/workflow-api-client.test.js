@@ -205,6 +205,26 @@ test("workflow API client posts task source draft creation as JSON", async () =>
   });
 });
 
+test("workflow API client posts task source draft commits as JSON", async () => {
+  const calls = [];
+  const client = createWorkflowApiClient({
+    fetchImpl: async (path, options = {}) => {
+      calls.push({ path, options });
+      return jsonResponse({ commit: { commitSha: "abc1234" } });
+    },
+  });
+
+  await client.commitTaskSourceFromDraft({
+    fileName: "drafted-task.yaml",
+  });
+
+  assert.equal(calls[0].path, "/api/task-draft-assistant/task-source/commit");
+  assert.equal(calls[0].options.method, "POST");
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    fileName: "drafted-task.yaml",
+  });
+});
+
 test("workflow API client preserves error status and payload", async () => {
   const client = createWorkflowApiClient({
     fetchImpl: async () => jsonResponse(

@@ -140,6 +140,14 @@ export function createWorkflowApiClient({
       });
     },
 
+    commitTaskSourceFromDraft({ fileName } = {}) {
+      return requestJson("/api/task-draft-assistant/task-source/commit", {
+        method: "POST",
+        body: { fileName },
+        errorMessage: "提交任务真源失败",
+      });
+    },
+
     restartServer() {
       return requestJson("/api/server/restart", {
         method: "POST",

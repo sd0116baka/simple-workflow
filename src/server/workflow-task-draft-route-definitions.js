@@ -34,5 +34,23 @@ export function createWorkflowTaskDraftRouteDefinitions({
         }
       },
     },
+    {
+      method: "POST",
+      path: "/api/task-draft-assistant/task-source/commit",
+      async handle({ request, response }) {
+        try {
+          const body = request ? await httpAdapter.readJsonBody(request) : {};
+          httpAdapter.sendJson(response, 201, {
+            commit: await workflowService.commitTaskSourceFromDraft({
+              fileName: body.fileName,
+            }),
+          });
+        } catch (error) {
+          httpAdapter.sendJson(response, 400, {
+            error: error.message,
+          });
+        }
+      },
+    },
   ];
 }

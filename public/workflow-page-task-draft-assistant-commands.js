@@ -40,6 +40,7 @@ export function createWorkflowPageTaskDraftAssistantCommands({
   workflowApi,
   elements = {},
   refreshPage = async () => {},
+  renderTaskDraftOutput = null,
 } = {}) {
   const messages = [];
   let latestValidTaskSourceText = "";
@@ -78,15 +79,29 @@ export function createWorkflowPageTaskDraftAssistantCommands({
       messages.push({ role: "assistant", content: taskDraft.assistantMessage });
       renderMessages({ messagesElement: elements.taskDraftMessages, messages });
       if (elements.taskDraftStatus) {
-        elements.taskDraftStatus.textContent = mode === "finalize" ? "已生成" : "等待继续";
+        elements.taskDraftStatus.textContent = taskDraft.error
+          ? "失败"
+          : mode === "finalize" && !taskDraft.taskSourceText
+            ? "未生成"
+            : mode === "finalize" ? "已生成" : "等待继续";
       }
-      if (taskDraft.taskSourceText && elements.taskDraftOutput) {
+      if (taskDraft.taskSourceText && elements.taskDraftOutput && renderTaskDraftOutput) {
+        renderTaskDraftOutput({
+          outputElement: elements.taskDraftOutput,
+          taskDraft,
+        });
+      } else if (taskDraft.taskSourceText && elements.taskDraftOutput) {
         elements.taskDraftOutput.textContent = taskDraft.taskSourceText;
       }
       renderValidation({
         validationElement: elements.taskDraftValidation,
         validation: taskDraft.validation,
       });
+      if (taskDraft.error && elements.taskDraftValidation) {
+        elements.taskDraftValidation.textContent = `生成失败：${taskDraft.error?.data?.message ?? taskDraft.error?.message ?? "未知错误"}`;
+      } else if (mode === "finalize" && !taskDraft.taskSourceText && elements.taskDraftValidation) {
+        elements.taskDraftValidation.textContent = "未生成任务文本";
+      }
       latestValidTaskSourceText = taskDraft.validation?.status === "valid"
         ? taskDraft.taskSourceText
         : "";

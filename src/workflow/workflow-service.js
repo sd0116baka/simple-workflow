@@ -117,6 +117,7 @@ export function createWorkflowService({
     getLatestRecommendationRun: () => recommendationRunLifecycle.getLatestRecommendationRun(),
   });
   const taskSourceMutationService = createTaskSourceMutationService({
+    repositoryDir,
     tasksDir,
     emitTaskChange: workflowEventBus.emitTaskChange,
   });

@@ -79,6 +79,10 @@ function createRuntimeHarness() {
         calls.push(["createTaskSourceFromText", input]);
         return { fileName: "drafted-task.yaml" };
       },
+      async commitTaskSourceFromDraft(input) {
+        calls.push(["commitTaskSourceFromDraft", input]);
+        return { commitSha: "abc1234" };
+      },
     },
     terminalSessionService: {
       createTerminalSession(input) {
@@ -246,6 +250,20 @@ test("workflow service runtime delegates task source draft creation", async () =
     {
       taskSourceText: "id: drafted-task\n",
     },
+  ]]);
+});
+
+test("workflow service runtime delegates task source draft commit", async () => {
+  const { calls, runtime } = createRuntimeHarness();
+
+  assert.deepEqual(
+    await runtime.commitTaskSourceFromDraft({ fileName: "drafted-task.yaml" }),
+    { commitSha: "abc1234" },
+  );
+
+  assert.deepEqual(calls, [[
+    "commitTaskSourceFromDraft",
+    { fileName: "drafted-task.yaml" },
   ]]);
 });
 

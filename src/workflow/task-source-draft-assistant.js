@@ -31,14 +31,23 @@ function extractFencedJson(text) {
 function parseAssistantOutput(text) {
   try {
     const parsed = JSON.parse(extractFencedJson(text));
+    if (parsed?.type === "error") {
+      return {
+        message: `任务起草助手运行失败：${parsed.error?.data?.message ?? parsed.error?.message ?? "未知错误"}`,
+        taskSourceText: null,
+        error: parsed.error ?? parsed,
+      };
+    }
     return {
       message: typeof parsed.message === "string" ? parsed.message.trim() : "",
       taskSourceText: typeof parsed.taskSourceText === "string" ? parsed.taskSourceText.trim() : null,
+      error: null,
     };
   } catch {
     return {
       message: String(text ?? "").trim(),
       taskSourceText: null,
+      error: null,
     };
   }
 }
@@ -152,6 +161,7 @@ export function createTaskSourceDraftAssistant({
       assistantMessage: output.message || "我已经读完上下文，可以继续讨论。",
       taskSourceText,
       validation: validateTaskSourceDraft(taskSourceText),
+      error: output.error,
       rawOutput: {
         stdout: result.stdout ?? "",
         stderr: result.stderr ?? "",

@@ -89,6 +89,40 @@ test("task draft route creates task source from finalized text", async () => {
   });
 });
 
+test("task draft route commits a generated task source", async () => {
+  const httpAdapter = createHttpAdapterProbe();
+  const calls = [];
+  const definitions = createWorkflowTaskDraftRouteDefinitions({
+    httpAdapter,
+    workflowService: {
+      async commitTaskSourceFromDraft(input) {
+        calls.push(input);
+        return {
+          fileName: "drafted-task.yaml",
+          commitSha: "abc1234",
+        };
+      },
+    },
+  });
+  const response = {};
+
+  await definitions[2].handle({
+    request: {
+      body: {
+        fileName: "drafted-task.yaml",
+      },
+    },
+    response,
+  });
+
+  assert.deepEqual(calls, [{ fileName: "drafted-task.yaml" }]);
+  assert.equal(response.sent.status, 201);
+  assert.deepEqual(response.sent.payload.commit, {
+    fileName: "drafted-task.yaml",
+    commitSha: "abc1234",
+  });
+});
+
 test("task draft route maps task source creation errors to bad request", async () => {
   const httpAdapter = createHttpAdapterProbe();
   const definitions = createWorkflowTaskDraftRouteDefinitions({

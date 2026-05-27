@@ -89,6 +89,10 @@ export function createWorkflowServiceRuntime({
       return taskSourceMutationService.createTaskSourceFromText(input);
     },
 
+    async commitTaskSourceFromDraft(input = {}) {
+      return taskSourceMutationService.commitTaskSourceFromDraft(input);
+    },
+
     createTerminalSession(input) {
       return terminalSessionService.createTerminalSession(input);
     },

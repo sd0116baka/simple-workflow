@@ -97,3 +97,32 @@ test("task draft commands skip creation before a valid draft exists", async () =
   });
   assert.deepEqual(calls, []);
 });
+
+test("task draft commands surface finalize errors without enabling creation", async () => {
+  const { elements } = createHarness();
+  elements.taskDraftInput.value = "敲定";
+  const errorCommands = createWorkflowPageTaskDraftAssistantCommands({
+    elements,
+    workflowApi: {
+      async discussTaskSourceDraft() {
+        return {
+          taskDraft: {
+            assistantMessage: "任务起草助手运行失败：unknown certificate verification error",
+            taskSourceText: null,
+            validation: { status: "empty", errors: [] },
+            error: { data: { message: "unknown certificate verification error" } },
+          },
+        };
+      },
+      async createTaskSourceFromDraft() {
+        throw new Error("should not create");
+      },
+    },
+  });
+
+  await errorCommands.finalizeTaskDraft();
+
+  assert.equal(elements.taskDraftStatus.textContent, "失败");
+  assert.match(elements.taskDraftValidation.textContent, /unknown certificate verification error/);
+  assert.equal(elements.taskDraftCreateButton.disabled, true);
+});
