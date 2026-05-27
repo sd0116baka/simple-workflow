@@ -1,4 +1,5 @@
 import { cloneJsonValue } from "./json-value.js";
+import { createInitialTaskModuleStates } from "./module-status.js";
 
 function taskDraftFromEntry(entry) {
   return {
@@ -46,6 +47,7 @@ export function taskContextPackageFromEntry(entry, existingPackage = null) {
     artifacts: cloneJsonValue(existingPackage?.artifacts ?? {}),
     agentRuns: cloneJsonValue(existingPackage?.agentRuns ?? []),
     timeline: cloneJsonValue(existingPackage?.timeline ?? []),
+    modules: createInitialTaskModuleStates(existingPackage?.modules),
   };
 }
 

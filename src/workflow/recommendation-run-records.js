@@ -1,4 +1,8 @@
 import { createEmptyRecommendationRunFields } from "./recommendation-run-field-defaults.js";
+import {
+  createBlockedTaskRecommenderState,
+  createRunningTaskRecommenderState,
+} from "./module-status.js";
 import { OPENCODE_RECOMMENDATION_ARGS } from "./recommendation-runner.js";
 import { normalizeWorkflowStageSwitches } from "./workflow-stage-switches.js";
 
@@ -20,6 +24,11 @@ export function createBlockedRecommendationRun({
     command: null,
     args: [],
     startupCheck,
+    taskRecommender: createBlockedTaskRecommenderState({
+      startedAt: timestamp,
+      finishedAt: timestamp,
+      error: startupCheck.error,
+    }),
     ...createEmptyRecommendationRunFields(),
     error: startupCheck.error ?? "启动检查未通过，任务推荐器未运行。",
   };
@@ -34,16 +43,20 @@ export function createRunningRecommendationRun({
   startupCheck,
   now = () => new Date().toISOString(),
 }) {
+  const timestamp = now();
   return {
     id,
     mode,
     stageSwitches: normalizeWorkflowStageSwitches(stageSwitches),
     status: "running",
-    startedAt: now(),
+    startedAt: timestamp,
     finishedAt: null,
     command: "opencode",
     args: OPENCODE_RECOMMENDATION_ARGS,
     startupCheck,
+    taskRecommender: createRunningTaskRecommenderState({
+      startedAt: timestamp,
+    }),
     ...createEmptyRecommendationRunFields(),
     error: null,
     prompt: buildRecommendationPrompt({

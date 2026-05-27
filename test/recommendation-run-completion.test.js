@@ -204,6 +204,14 @@ test("recommendation run completion marks failed command results and emits", asy
     id: "recommendation-run-1",
     status: "failed",
     finishedAt: "2026-05-22T00:00:00.000Z",
+    taskRecommender: {
+      status: "failed",
+      startedAt: null,
+      finishedAt: "2026-05-22T00:00:00.000Z",
+      selectedPackageId: null,
+      outputRef: null,
+      error: "command exploded",
+    },
     error: "command exploded",
   });
   assert.deepEqual(calls, [

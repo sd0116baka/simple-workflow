@@ -76,6 +76,15 @@ test("task package append request records multi artifacts and output refs", () =
   ]);
   assert.equal(second.timeline.at(-1).artifactId, "executionReport:002");
   assert.equal(second.timeline.at(-1).agentRunId, "execution-agent:002");
+  assert.deepEqual(second.modules.executionAgent, {
+    status: "succeeded",
+    attempts: 2,
+    startedAt: "2026-05-21T00:00:00.000Z",
+    finishedAt: "2026-05-21T00:02:00.000Z",
+    runRef: "execution-agent:002",
+    outputRef: "executionReport:002",
+    error: null,
+  });
 });
 
 test("task package append request records agent runs without artifacts", () => {
@@ -93,4 +102,13 @@ test("task package append request records agent runs without artifacts", () => {
   assert.deepEqual(updated.agentRuns[0].outputArtifactRefs, []);
   assert.equal(updated.timeline[0].artifactType, null);
   assert.equal(updated.timeline[0].agentRunId, "main-agent:initialization");
+  assert.deepEqual(updated.modules.mainAgentInitialization, {
+    status: "succeeded",
+    startedAt: "2026-05-21T00:00:00.000Z",
+    finishedAt: "2026-05-21T00:01:00.000Z",
+    runRef: "main-agent:initialization",
+    outputRef: null,
+    attempts: 0,
+    error: null,
+  });
 });

@@ -25,6 +25,14 @@ test("recommendation run records create blocked runs with empty workflow fields"
   assert.equal(run.finishedAt, "2026-05-21T00:00:00.000Z");
   assert.equal(run.command, null);
   assert.deepEqual(run.args, []);
+  assert.deepEqual(run.taskRecommender, {
+    status: "blocked",
+    startedAt: "2026-05-21T00:00:00.000Z",
+    finishedAt: "2026-05-21T00:00:00.000Z",
+    selectedPackageId: null,
+    outputRef: null,
+    error: "不能启动",
+  });
   assert.deepEqual(run.executionAgentRuns, []);
   assert.deepEqual(run.reviewAgentRuns, []);
   assert.deepEqual(run.convergenceRuns, []);
@@ -54,6 +62,14 @@ test("recommendation run records create running runs with prompt candidate view"
   assert.equal(run.command, "opencode");
   assert.deepEqual(run.args, ["run", "--format", "json"]);
   assert.equal(run.finishedAt, null);
+  assert.deepEqual(run.taskRecommender, {
+    status: "running",
+    startedAt: "2026-05-21T00:00:00.000Z",
+    finishedAt: null,
+    selectedPackageId: null,
+    outputRef: null,
+    error: null,
+  });
   assert.match(run.prompt, /candidateTasks/);
   assert.match(run.prompt, /task-context-package:tasks\/task-001.yaml/);
   assert.equal(run.error, null);

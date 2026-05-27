@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildTaskPool } from "../src/workflow/task-pool.js";
+import { createInitialTaskModuleStates } from "../src/workflow/module-status.js";
 import {
   createExistingTaskContextPackage,
   createTaskSource,
@@ -100,6 +101,7 @@ test("task pool contains parsed tasks with minimal pool metadata", () => {
         artifacts: {},
         agentRuns: [],
         timeline: [],
+        modules: createInitialTaskModuleStates(),
       },
       {
         packageId: "task-context-package:tasks/task-002.yaml",
@@ -134,6 +136,7 @@ test("task pool contains parsed tasks with minimal pool metadata", () => {
         artifacts: {},
         agentRuns: [],
         timeline: [],
+        modules: createInitialTaskModuleStates(),
       },
     ],
     views: {

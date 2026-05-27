@@ -1,5 +1,6 @@
 import { cloneJsonValue } from "./json-value.js";
 import { appendArtifact } from "./task-package-artifact-append.js";
+import { updateTaskModuleStatesForAppend } from "./module-status.js";
 
 function normalizeAgentRun(agentRun, artifactId) {
   if (!agentRun) return null;
@@ -23,10 +24,20 @@ export function applyAppendRequestToTaskPackage(
     appendedAt,
   );
   const agentRun = normalizeAgentRun(appendRequest.agentRun, artifactId);
+  const modules = updateTaskModuleStatesForAppend({
+    modules: taskPackage.modules,
+    appendRequest: {
+      ...appendRequest,
+      agentRun,
+    },
+    artifactId,
+    appendedAt,
+  });
   return {
     ...taskPackage,
     currentWorkStage: currentWorkStage ?? taskPackage.currentWorkStage,
     artifacts,
+    modules,
     agentRuns: agentRun
       ? [...taskPackage.agentRuns, agentRun]
       : taskPackage.agentRuns,
