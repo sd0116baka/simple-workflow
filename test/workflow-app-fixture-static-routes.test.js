@@ -67,3 +67,18 @@ test("static assets are not cached during workflow UI development", async (t) =>
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("cache-control"), "no-store");
 });
+
+test("user UI is served as a static page independent from debug UI assets", async (t) => {
+  const workflowService = createWorkflowServiceStub();
+  const { baseUrl } = await startWorkflowApp(t, { workflowService });
+
+  const response = await fetch(`${baseUrl}/user.html`);
+  const html = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(html, /id="userApp"/);
+  assert.match(html, /\/user-app\.js/);
+  assert.match(html, /\/user-styles\.css/);
+  assert.doesNotMatch(html, /\/app\.js/);
+  assert.doesNotMatch(html, /\/styles\.css/);
+});
