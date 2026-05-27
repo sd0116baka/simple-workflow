@@ -48,6 +48,25 @@ export function applyAppendRequest(taskPool, appendRequest, { currentWorkStage }
   };
 }
 
+export function transitionTaskContextPackageStage(taskPool, packageId, { currentWorkStage } = {}) {
+  if (!currentWorkStage) return taskPool;
+  const target = findTaskContextPackage(taskPool, packageId);
+  if (!target) {
+    throw new Error(`Task context package not found: ${packageId}`);
+  }
+
+  const updatedPackages = taskPool.taskContextPackages.map((taskPackage) =>
+    taskPackage.packageId === packageId
+      ? { ...taskPackage, currentWorkStage }
+      : taskPackage);
+
+  return {
+    ...taskPool,
+    taskContextPackages: updatedPackages,
+    views: buildTaskPoolViews(updatedPackages),
+  };
+}
+
 export function taskPoolEntryFromSource(task) {
   return {
     id: task.parsed.id ?? task.id,

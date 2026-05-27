@@ -5,6 +5,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { prepareRecommendationExecution } from "../src/workflow/recommendation-execution-preparation.js";
+import { applyAppendRequest, buildTaskPool } from "../src/workflow/task-pool.js";
 
 function runGit(args, cwd) {
   return execFileSync("git", args, {
@@ -139,6 +140,55 @@ test("recommendation execution preparation reaches main agent initialization", a
     result.taskContextPackage.agentRuns[0].sessionId,
     "session:main:task-context-package:tasks/task-001.yaml",
   );
+});
+
+test("recommendation execution preparation can persist each downstream append", async (t) => {
+  const repositoryDir = await createGitRepository(t);
+  const appendCalls = [];
+  let currentTaskPool = buildTaskPool(taskSource());
+
+  const result = await prepareRecommendationExecution({
+    commandResult: commandResult(),
+    tasks: taskSource(),
+    startupCheck: startupCheck(),
+    projectProfile: {
+      defaults: {
+        maxIterations: 3,
+      },
+    },
+    runMainAgentSession: ({ role, packageId }) => ({
+      sessionId: `session:${role}:${packageId}`,
+      status: "succeeded",
+    }),
+    repositoryDir,
+    now: () => "2026-05-22T10:00:00.000Z",
+    applyAppendRequest: async (appendRequest, { currentWorkStage }) => {
+      appendCalls.push({
+        artifactType: appendRequest.artifactType ?? null,
+        agentRunId: appendRequest.agentRun?.runId ?? null,
+        currentWorkStage,
+      });
+      currentTaskPool = applyAppendRequest(currentTaskPool, appendRequest, {
+        currentWorkStage,
+      });
+      return currentTaskPool;
+    },
+  });
+
+  assert.deepEqual(
+    appendCalls.map(({ artifactType, agentRunId, currentWorkStage }) => ({
+      artifactType,
+      agentRunId,
+      currentWorkStage,
+    })),
+    [
+      { artifactType: "executionIntent", agentRunId: null, currentWorkStage: "task-recommender" },
+      { artifactType: "executionAuthorization", agentRunId: null, currentWorkStage: "execution-admission" },
+      { artifactType: "isolatedWorkspace", agentRunId: null, currentWorkStage: "isolated-workspace" },
+      { artifactType: null, agentRunId: "main-agent:initialization", currentWorkStage: "main-agent" },
+    ],
+  );
+  assert.equal(result.taskContextPackage.currentWorkStage, "main-agent");
 });
 
 test("recommendation execution preparation skips downstream work for failed commands", async () => {

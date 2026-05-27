@@ -4,6 +4,7 @@ import {
   applyAppendRequest,
   buildTaskPool,
   findTaskContextPackage,
+  transitionTaskContextPackageStage,
 } from "../src/workflow/task-pool.js";
 import { createTask003Source } from "./support/task-pool-fixtures.js";
 
@@ -103,4 +104,20 @@ test("task pool records a main agent run without requiring an artifact", () => {
   assert.deepEqual(taskPackage.agentRuns[0].outputArtifactRefs, []);
   assert.equal(taskPackage.timeline[0].artifactId, null);
   assert.equal(taskPackage.timeline[0].agentRunId, "main-agent:initialization");
+});
+
+test("task pool can transition current stage without adding timeline evidence", () => {
+  const updated = transitionTaskContextPackageStage(
+    createTask003Pool(),
+    "task-context-package:tasks/task-003.yaml",
+    { currentWorkStage: "review-agent" },
+  );
+  const taskPackage = findTaskContextPackage(
+    updated,
+    "task-context-package:tasks/task-003.yaml",
+  );
+
+  assert.equal(taskPackage.currentWorkStage, "review-agent");
+  assert.deepEqual(taskPackage.timeline, []);
+  assert.deepEqual(taskPackage.artifacts, {});
 });

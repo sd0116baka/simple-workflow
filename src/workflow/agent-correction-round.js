@@ -26,6 +26,7 @@ export async function runAgentCorrectionRound({
   onProgress,
   signal,
   applyAppendRequest,
+  transitionCurrentWorkStage,
   runExecution = runExecutionAgent,
   runReview = runReviewAgent,
   runConverge = runConvergence,
@@ -59,14 +60,17 @@ export async function runAgentCorrectionRound({
 
   const executionAgentRun = hasExecutionReport
     ? null
-    : await runExecution({
-        taskContextPackage: currentPackage,
-        runAgentSession: runExecutionAgentSession,
-        repositoryDir,
-        now,
-        onProgress,
-        signal,
-      });
+    : await (async () => {
+        currentPackage = await transitionCurrentWorkStage?.("execution-agent") ?? currentPackage;
+        return runExecution({
+          taskContextPackage: currentPackage,
+          runAgentSession: runExecutionAgentSession,
+          repositoryDir,
+          now,
+          onProgress,
+          signal,
+        });
+      })();
   currentPackage = await applyRoundAppend({
     appendRequest: executionAgentRun?.appendRequest,
     currentWorkStage: "execution-agent",
@@ -100,14 +104,17 @@ export async function runAgentCorrectionRound({
 
   const reviewAgentRun = hasReviewReport
     ? null
-    : await runReview({
-        taskContextPackage: currentPackage,
-        runAgentSession: runReviewAgentSession,
-        repositoryDir,
-        now,
-        onProgress,
-        signal,
-      });
+    : await (async () => {
+        currentPackage = await transitionCurrentWorkStage?.("review-agent") ?? currentPackage;
+        return runReview({
+          taskContextPackage: currentPackage,
+          runAgentSession: runReviewAgentSession,
+          repositoryDir,
+          now,
+          onProgress,
+          signal,
+        });
+      })();
   currentPackage = await applyRoundAppend({
     appendRequest: reviewAgentRun?.appendRequest,
     currentWorkStage: "review-agent",
@@ -142,15 +149,18 @@ export async function runAgentCorrectionRound({
 
   const convergenceRun = hasConvergenceResult
     ? null
-    : await runConverge({
-        taskContextPackage: currentPackage,
-        runAgentSession: runConvergenceSession,
-        repositoryDir,
-        maxIterations,
-        now,
-        onProgress,
-        signal,
-      });
+    : await (async () => {
+        currentPackage = await transitionCurrentWorkStage?.("convergence") ?? currentPackage;
+        return runConverge({
+          taskContextPackage: currentPackage,
+          runAgentSession: runConvergenceSession,
+          repositoryDir,
+          maxIterations,
+          now,
+          onProgress,
+          signal,
+        });
+      })();
   currentPackage = await applyRoundAppend({
     appendRequest: convergenceRun?.appendRequest,
     currentWorkStage: "convergence",

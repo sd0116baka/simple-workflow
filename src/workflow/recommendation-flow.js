@@ -35,6 +35,8 @@ export async function completeRecommendationFlow({
   startupCheck,
   projectProfile,
   existingTaskContextPackages = [],
+  applyAppendRequest,
+  transitionCurrentWorkStage,
   runMainAgentSession,
   runExecutionAgentSession,
   runReviewAgentSession,
@@ -57,6 +59,8 @@ export async function completeRecommendationFlow({
     now,
     prepareDownstream: mode !== "probe",
     onPackageBound,
+    applyAppendRequest,
+    transitionCurrentWorkStage,
   });
   const sequence = mode === "probe"
     ? createSkippedRecommendationSequence(preparation.taskPool)
@@ -66,6 +70,8 @@ export async function completeRecommendationFlow({
         runExecutionAgentSession,
         runReviewAgentSession,
         runConvergenceSession,
+        applyAppendRequest,
+        transitionCurrentWorkStage,
         stageSwitches,
         repositoryDir,
         now,

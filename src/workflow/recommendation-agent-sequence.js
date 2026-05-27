@@ -4,7 +4,10 @@ import {
   requestHumanDecisionForConvergenceSuccess,
 } from "./human-decision-request-flow.js";
 import { runRecommendationAgentRounds } from "./recommendation-agent-rounds.js";
-import { applyAppendRequest, findTaskContextPackage } from "./task-pool.js";
+import {
+  applyAppendRequest as applyAppendRequestToTaskPool,
+  findTaskContextPackage,
+} from "./task-pool.js";
 
 export async function runRecommendationAgentSequence({
   taskPool,
@@ -17,6 +20,8 @@ export async function runRecommendationAgentSequence({
   maxIterations = null,
   now = () => new Date().toISOString(),
   onProgress,
+  applyAppendRequest = null,
+  transitionCurrentWorkStage = null,
   signal,
   stageSwitches,
   runExecution,
@@ -36,6 +41,8 @@ export async function runRecommendationAgentSequence({
     maxIterations,
     now,
     onProgress,
+    applyAppendRequest,
+    transitionCurrentWorkStage,
     signal,
     stageSwitches,
     runExecution,
@@ -62,8 +69,10 @@ export async function runRecommendationAgentSequence({
     now,
     requestSuccessHumanDecision,
     requestFailureHumanDecision,
-    applyAppendRequest: (appendRequest, { currentWorkStage }) => {
-      taskPool = applyAppendRequest(taskPool, appendRequest, { currentWorkStage });
+    applyAppendRequest: async (appendRequest, { currentWorkStage }) => {
+      taskPool = applyAppendRequest
+        ? await applyAppendRequest(appendRequest, { currentWorkStage })
+        : applyAppendRequestToTaskPool(taskPool, appendRequest, { currentWorkStage });
       return findTaskContextPackage(taskPool, packageId);
     },
   });

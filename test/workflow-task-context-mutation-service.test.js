@@ -10,6 +10,7 @@ function createMutationService({
   const calls = {
     persist: [],
     apply: [],
+    transition: [],
   };
   const service = createWorkflowTaskContextMutationService({
     getLatestRecommendationRun: () => latestRecommendationRun,
@@ -22,6 +23,13 @@ function createMutationService({
           appendRequest,
           options,
         });
+        return {
+          taskPool,
+          taskContextPackage: appliedTaskContextPackage,
+        };
+      },
+      async transitionCurrentPackageStage(packageId, options) {
+        calls.transition.push({ packageId, options });
         return {
           taskPool,
           taskContextPackage: appliedTaskContextPackage,
@@ -109,4 +117,39 @@ test("workflow task context mutation service leaves latest run unchanged when no
   });
 
   assert.equal(latestRecommendationRun.taskContextPackage, originalPackage);
+});
+
+test("workflow task context mutation service transitions current stage with the latest run", async () => {
+  const latestRecommendationRun = {
+    id: "recommendation-run-1",
+    taskContextPackage: {
+      packageId: "pkg-old",
+    },
+  };
+  const updatedTaskContextPackage = {
+    packageId: "pkg-updated",
+    currentWorkStage: "review-agent",
+  };
+  const taskPool = { entries: [{ id: "task-1" }] };
+  const { calls, service } = createMutationService({
+    latestRecommendationRun,
+    appliedTaskContextPackage: updatedTaskContextPackage,
+    taskPool,
+  });
+
+  const result = await service.transitionCurrentWorkStage("pkg-updated", {
+    currentWorkStage: "review-agent",
+  });
+
+  assert.equal(result, taskPool);
+  assert.deepEqual(calls.transition, [
+    {
+      packageId: "pkg-updated",
+      options: {
+        currentWorkStage: "review-agent",
+        latestRecommendationRun,
+      },
+    },
+  ]);
+  assert.equal(latestRecommendationRun.taskContextPackage, updatedTaskContextPackage);
 });

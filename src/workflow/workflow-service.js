@@ -81,6 +81,8 @@ export function createWorkflowService({
     taskContextWorkspace,
     getStartupCheck: () => workflowReadModelService.getStartupCheck(),
     persistTaskContextPackage: taskContextMutationService.persistTaskContextPackage,
+    applyAppendRequest: taskContextMutationService.applyAppendRequest,
+    transitionCurrentWorkStage: taskContextMutationService.transitionCurrentWorkStage,
     runRecommendationCommand: effectiveRunRecommendationCommand,
     runMainAgentSession,
     runExecutionAgentSession,

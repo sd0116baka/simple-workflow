@@ -1,5 +1,9 @@
 import { runAgentCorrectionRound } from "./agent-correction-round.js";
-import { applyAppendRequest, findTaskContextPackage } from "./task-pool.js";
+import {
+  applyAppendRequest as applyAppendRequestToTaskPool,
+  findTaskContextPackage,
+  transitionTaskContextPackageStage,
+} from "./task-pool.js";
 import { multiArtifactRecords } from "./task-package-artifacts.js";
 
 const MAIN_AGENT_INITIALIZATION_RUN_ID = "main-agent:initialization";
@@ -65,6 +69,8 @@ export async function runRecommendationAgentRounds({
   onProgress,
   signal,
   stageSwitches,
+  applyAppendRequest = null,
+  transitionCurrentWorkStage = null,
   runExecution,
   runReview,
   runConverge,
@@ -79,6 +85,14 @@ export async function runRecommendationAgentRounds({
   }
 
   let currentTaskPool = taskPool;
+  async function transitionStage(currentWorkStage) {
+    if (!currentWorkStage) return findTaskContextPackage(currentTaskPool, packageId);
+    currentTaskPool = transitionCurrentWorkStage
+      ? await transitionCurrentWorkStage(packageId, { currentWorkStage })
+      : transitionTaskContextPackageStage(currentTaskPool, packageId, { currentWorkStage });
+    return findTaskContextPackage(currentTaskPool, packageId);
+  }
+
   const runRound = async () =>
     runCorrectionRound({
       taskContextPackage: findTaskContextPackage(currentTaskPool, packageId),
@@ -94,8 +108,11 @@ export async function runRecommendationAgentRounds({
       runExecution,
       runReview,
       runConverge,
-      applyAppendRequest: (appendRequest, { currentWorkStage }) => {
-        currentTaskPool = applyAppendRequest(currentTaskPool, appendRequest, { currentWorkStage });
+      transitionCurrentWorkStage: transitionStage,
+      applyAppendRequest: async (appendRequest, { currentWorkStage }) => {
+        currentTaskPool = applyAppendRequest
+          ? await applyAppendRequest(appendRequest, { currentWorkStage })
+          : applyAppendRequestToTaskPool(currentTaskPool, appendRequest, { currentWorkStage });
         return findTaskContextPackage(currentTaskPool, packageId);
       },
     });

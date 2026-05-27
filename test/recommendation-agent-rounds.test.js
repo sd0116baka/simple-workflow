@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runRecommendationAgentRounds } from "../src/workflow/recommendation-agent-rounds.js";
-import { buildTaskPool } from "../src/workflow/task-pool.js";
+import { applyAppendRequest, buildTaskPool } from "../src/workflow/task-pool.js";
 import { applyAppendRequestToTaskPackage } from "../src/workflow/task-package-append-request.js";
 
 function taskPoolFixture() {
@@ -135,6 +135,67 @@ test("recommendation agent rounds run a second round after convergence advice", 
   assert.equal(result.taskContextPackage.currentWorkStage, "convergence");
   assert.equal(result.taskContextPackage.artifacts.convergenceAdvice[0].artifactId, "convergenceAdvice:001");
   assert.equal(result.taskContextPackage.artifacts.convergenceSuccess.artifactId, "convergenceSuccess");
+});
+
+test("recommendation agent rounds use the provided append mutation for every agent output", async () => {
+  const appendCalls = [];
+  let persistedTaskPool = taskPoolFixture();
+  let convergenceCount = 0;
+
+  const result = await runRecommendationAgentRounds({
+    taskPool: persistedTaskPool,
+    packageId,
+    mainAgentInitialization: {
+      appendRequest: {
+        agentRun: agentRun("main-agent:initialization"),
+      },
+    },
+    applyAppendRequest: async (appendRequest, { currentWorkStage }) => {
+      appendCalls.push({
+        artifactType: appendRequest.artifactType,
+        currentWorkStage,
+      });
+      persistedTaskPool = applyAppendRequest(persistedTaskPool, appendRequest, {
+        currentWorkStage,
+      });
+      return persistedTaskPool;
+    },
+    runExecution: async () => ({
+      appendRequest: appendRequest(
+        "executionReport",
+        convergenceCount === 0 ? "execution-agent:001" : "execution-agent:002",
+      ),
+      error: null,
+    }),
+    runReview: () => ({
+      appendRequest: appendRequest(
+        "reviewReport",
+        convergenceCount === 0 ? "review-agent:001" : "review-agent:002",
+      ),
+      error: null,
+    }),
+    runConverge: () => {
+      convergenceCount += 1;
+      return {
+        appendRequest: appendRequest(
+          convergenceCount === 1 ? "convergenceAdvice" : "convergenceSuccess",
+          `main-agent:convergence:00${convergenceCount}`,
+        ),
+        error: null,
+      };
+    },
+  });
+
+  assert.deepEqual(appendCalls, [
+    { artifactType: "executionReport", currentWorkStage: "execution-agent" },
+    { artifactType: "reviewReport", currentWorkStage: "review-agent" },
+    { artifactType: "convergenceAdvice", currentWorkStage: "convergence" },
+    { artifactType: "executionReport", currentWorkStage: "execution-agent" },
+    { artifactType: "reviewReport", currentWorkStage: "review-agent" },
+    { artifactType: "convergenceSuccess", currentWorkStage: "convergence" },
+  ]);
+  assert.equal(result.taskContextPackage.artifacts.convergenceSuccess.artifactId, "convergenceSuccess");
+  assert.equal(result.taskPool, persistedTaskPool);
 });
 
 test("recommendation agent rounds keep running advice loops within the iteration budget", async () => {

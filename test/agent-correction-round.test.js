@@ -63,6 +63,46 @@ test("agent correction round runs execution, review, and convergence through one
   assert.equal(result.convergenceRun.appendRequest.artifactType, "convergenceSuccess");
 });
 
+test("agent correction round marks the active stage before long-running agents start", async () => {
+  const observed = [];
+  const transitions = [];
+  let currentPackage = createTaskContextPackageFixture({
+    currentWorkStage: "main-agent",
+  });
+
+  await runAgentCorrectionRound({
+    taskContextPackage: currentPackage,
+    transitionCurrentWorkStage: async (currentWorkStage) => {
+      transitions.push(currentWorkStage);
+      currentPackage = { ...currentPackage, currentWorkStage };
+      return currentPackage;
+    },
+    runExecution: async ({ taskContextPackage }) => {
+      observed.push(["execution", taskContextPackage.currentWorkStage]);
+      return { appendRequest: appendRequest("executionReport"), error: null };
+    },
+    runReview: async ({ taskContextPackage }) => {
+      observed.push(["review", taskContextPackage.currentWorkStage]);
+      return { appendRequest: appendRequest("reviewReport"), error: null };
+    },
+    runConverge: async ({ taskContextPackage }) => {
+      observed.push(["convergence", taskContextPackage.currentWorkStage]);
+      return { appendRequest: appendRequest("convergenceSuccess"), error: null };
+    },
+    applyAppendRequest: async (request, { currentWorkStage }) => {
+      currentPackage = { ...currentPackage, currentWorkStage };
+      return currentPackage;
+    },
+  });
+
+  assert.deepEqual(transitions, ["execution-agent", "review-agent", "convergence"]);
+  assert.deepEqual(observed, [
+    ["execution", "execution-agent"],
+    ["review", "review-agent"],
+    ["convergence", "convergence"],
+  ]);
+});
+
 test("agent correction round passes progress and cancellation through review", async () => {
   const progressEntries = [];
   const signal = AbortSignal.timeout(1000);

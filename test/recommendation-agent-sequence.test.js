@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runRecommendationAgentSequence } from "../src/workflow/recommendation-agent-sequence.js";
-import { buildTaskPool } from "../src/workflow/task-pool.js";
+import { applyAppendRequest, buildTaskPool } from "../src/workflow/task-pool.js";
 
 function taskPoolFixture() {
   return buildTaskPool([
@@ -105,6 +105,99 @@ test("recommendation agent sequence runs a second round after convergence advice
   assert.equal(result.taskContextPackage.currentWorkStage, "human-decision");
   assert.equal(result.taskContextPackage.artifacts.convergenceAdvice[0].artifactId, "convergenceAdvice:001");
   assert.equal(result.taskContextPackage.artifacts.convergenceSuccess.artifactId, "convergenceSuccess");
+});
+
+test("recommendation agent sequence persists terminal human decision transition through append mutation", async () => {
+  const appendCalls = [];
+  let persistedTaskPool = taskPoolFixture();
+
+  const result = await runRecommendationAgentSequence({
+    taskPool: persistedTaskPool,
+    packageId,
+    mainAgentInitialization: {
+      appendRequest: {
+        agentRun: {
+          runId: "main-agent:initialization",
+          status: "succeeded",
+        },
+      },
+    },
+    applyAppendRequest: async (appendRequest, { currentWorkStage }) => {
+      appendCalls.push({
+        artifactType: appendRequest.artifactType,
+        currentWorkStage,
+      });
+      persistedTaskPool = applyAppendRequest(persistedTaskPool, appendRequest, {
+        currentWorkStage,
+      });
+      return persistedTaskPool;
+    },
+    runExecution: async () => ({
+      appendRequest: {
+        packageId,
+        artifactType: "executionReport",
+        artifact: { status: "succeeded" },
+        agentRun: {
+          runId: "execution-agent:001",
+          role: "execution",
+          sessionId: "execution-session",
+          status: "succeeded",
+          startedAt: "2026-05-21T00:00:00.000Z",
+          finishedAt: "2026-05-21T00:00:00.000Z",
+          inputArtifactRefs: [],
+          outputArtifactRefs: [],
+        },
+      },
+      error: null,
+    }),
+    runReview: () => ({
+      appendRequest: {
+        packageId,
+        artifactType: "reviewReport",
+        artifact: { outcome: "passed" },
+        agentRun: {
+          runId: "review-agent:001",
+          role: "review",
+          sessionId: "review-session",
+          status: "succeeded",
+          startedAt: "2026-05-21T00:00:00.000Z",
+          finishedAt: "2026-05-21T00:00:00.000Z",
+          inputArtifactRefs: [],
+          outputArtifactRefs: [],
+        },
+      },
+      error: null,
+    }),
+    runConverge: () => ({
+      appendRequest: {
+        packageId,
+        artifactType: "convergenceSuccess",
+        artifact: { summary: "完成" },
+        agentRun: {
+          runId: "main-agent:convergence:001",
+          role: "main",
+          sessionId: "main-session",
+          status: "succeeded",
+          startedAt: "2026-05-21T00:00:00.000Z",
+          finishedAt: "2026-05-21T00:00:00.000Z",
+          inputArtifactRefs: [],
+          outputArtifactRefs: [],
+        },
+      },
+      error: null,
+    }),
+    now: () => "2026-05-21T00:00:00.000Z",
+  });
+
+  assert.deepEqual(appendCalls.map((call) => call.artifactType), [
+    "executionReport",
+    "reviewReport",
+    "convergenceSuccess",
+    "humanDecisionRequest",
+  ]);
+  assert.equal(appendCalls.at(-1).currentWorkStage, "human-decision");
+  assert.equal(result.taskContextPackage.currentWorkStage, "human-decision");
+  assert.equal(result.taskPool, persistedTaskPool);
 });
 
 test("recommendation agent sequence stops before review when execution fails", async () => {

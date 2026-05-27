@@ -2,7 +2,11 @@ import {
   loadTaskContextPackages,
   saveTaskContextPackage,
 } from "./task-context-package-store.js";
-import { applyAppendRequest, buildTaskPool } from "./task-pool.js";
+import {
+  applyAppendRequest,
+  buildTaskPool,
+  transitionTaskContextPackageStage,
+} from "./task-pool.js";
 import { listRawTasks } from "./task-source.js";
 import {
   findAcceptableTaskContextPackage,
@@ -57,6 +61,24 @@ export function createTaskContextPackageWorkspace({
     return { taskPool, taskContextPackage };
   }
 
+  async function transitionCurrentPackageStage(
+    packageId,
+    { currentWorkStage, latestRecommendationRun = null } = {},
+  ) {
+    const taskPool = transitionTaskContextPackageStage(
+      await buildCurrentTaskPool({ latestRecommendationRun }),
+      packageId,
+      { currentWorkStage },
+    );
+    const taskContextPackage = taskPool.taskContextPackages.find((candidate) =>
+      candidate.packageId === packageId,
+    ) ?? null;
+    if (taskContextPackage) {
+      await persistTaskContextPackage(taskContextPackage);
+    }
+    return { taskPool, taskContextPackage };
+  }
+
   async function selectWithCurrentPackages(selector, options = {}) {
     const taskContextPackages = await loadExistingTaskContextPackages({
       latestRecommendationRun: options.latestRecommendationRun,
@@ -72,6 +94,7 @@ export function createTaskContextPackageWorkspace({
     persistTaskContextPackage,
     buildCurrentTaskPool,
     applyAppendRequestToCurrentPool,
+    transitionCurrentPackageStage,
     findActiveWork,
     findAcceptableTaskContextPackage: (options = {}) =>
       selectWithCurrentPackages(findAcceptableTaskContextPackage, options),
