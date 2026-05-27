@@ -136,7 +136,7 @@ export async function runConvergence({
     startedAt,
     finishedAt,
   };
-  const outcome = convergenceOutcome({ taskContextPackage, reviewReport, maxIterations });
+  const outcome = convergenceOutcome({ taskContextPackage, session, maxIterations });
   const appendRequest = outcome.kind === "success"
     ? buildConvergenceSuccessRequest(commonRequest)
     : outcome.kind === "failure"

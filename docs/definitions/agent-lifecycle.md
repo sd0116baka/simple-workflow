@@ -351,6 +351,16 @@ tasks/task-003.yaml -> tasks-task-003
 
 它汇总某一轮 `execution` Agent 和 `review` Agent 的结果，结合任务上下文包内已有信息，产出下一轮执行意见。
 
+收敛是否通过由 `main` Agent 在收敛环节明确判断。`reviewReport.body.outcome` 只是收敛判断的输入证据，不能直接等同为收敛通过。`main` Agent 的结构化输出必须包含 `convergenceDecision`：
+
+```text
+success
+advice
+failure
+```
+
+`success` 表示当前结果已经收敛通过；`advice` 表示需要下一轮执行建议；`failure` 表示不能继续自动收敛，需要进入人工判断。
+
 收敛环节产物：
 
 ```text
@@ -368,7 +378,7 @@ convergenceAdvice:002
 
 收敛环节不会结束工作流。状态机收到 `convergenceAdvice:N` 后，可以继续调用下一轮 `execution` Agent，并把该建议放进下一轮 `execution` Agent 的 `inputArtifactRefs`。
 
-如果 `main` Agent 在收敛环节判断任务已经满足完成条件，它不再产出 `convergenceAdvice`，而是产出：
+如果 `main` Agent 在收敛环节输出 `convergenceDecision: "success"`，表示任务已经满足完成条件。系统不再产出 `convergenceAdvice`，而是产出：
 
 ```text
 convergenceSuccess
@@ -409,7 +419,7 @@ convergenceSuccess
 
 追加 `humanDecision` 后，`currentWorkStage` 推进到 `auto-merge-planning`。自动合并规划环节另行消费该产物，本环节不合并主线。
 
-如果 `main` Agent 在收敛环节判断当前结果不能继续自动收敛，或状态机判断已经达到终止条件，它不产出下一轮 `convergenceAdvice`，而是产出：
+如果 `main` Agent 在收敛环节输出 `convergenceDecision: "failure"`，或状态机判断已经达到终止条件，系统不产出下一轮 `convergenceAdvice`，而是产出：
 
 ```text
 convergenceFailure

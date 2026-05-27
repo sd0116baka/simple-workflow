@@ -57,6 +57,26 @@ test("runs convergence with main agent session and requests advice append", asyn
   ]);
 });
 
+test("completes task when first convergence decision is success", async () => {
+  const taskPackage = convergenceReadyPackage();
+  taskPackage.artifacts.reviewReport[0].body.outcome = "failed";
+
+  const result = await runConvergence({
+    taskContextPackage: taskPackage,
+    runAgentSession: () => ({
+      sessionId: "session:converged",
+      status: "succeeded",
+      summary: "main 判断已经收敛",
+      convergenceDecision: "success",
+    }),
+  });
+
+  assert.equal(result.error, null);
+  assert.equal(result.appendRequest.artifactType, "convergenceSuccess");
+  assert.equal(result.appendRequest.artifact.summary, "main 判断已经收敛");
+  assert.equal(result.appendRequest.agentRun.runId, "main-agent:convergence:001");
+});
+
 test("increments convergence run id from existing advice", async () => {
   const taskPackage = convergenceReadyPackage();
   taskPackage.artifacts.convergenceAdvice = [
@@ -67,6 +87,11 @@ test("increments convergence run id from existing advice", async () => {
 
   const result = await runConvergence({
     taskContextPackage: taskPackage,
+    runAgentSession: () => ({
+      sessionId: "session:converged",
+      status: "succeeded",
+      convergenceDecision: "success",
+    }),
   });
 
   assert.equal(result.appendRequest.agentRun.runId, "main-agent:convergence:002");
@@ -98,6 +123,11 @@ test("completes task after a reviewed execution that used convergence advice", a
 
   const result = await runConvergence({
     taskContextPackage: taskPackage,
+    runAgentSession: () => ({
+      sessionId: "session:converged",
+      status: "succeeded",
+      convergenceDecision: "success",
+    }),
   });
 
   assert.equal(result.appendRequest.artifactType, "convergenceSuccess");

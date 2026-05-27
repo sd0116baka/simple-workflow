@@ -1,11 +1,7 @@
-import { latestArtifactRecord, multiArtifactRecords } from "./task-package-artifacts.js";
+import { multiArtifactRecords } from "./task-package-artifacts.js";
 
 function convergenceAdviceRecords(taskContextPackage) {
   return multiArtifactRecords(taskContextPackage, "convergenceAdvice");
-}
-
-function hasPriorConvergenceAdvice(taskContextPackage) {
-  return Boolean(latestArtifactRecord(taskContextPackage, "convergenceAdvice"));
 }
 
 function failureInputFromAdvice(taskContextPackage, maxIterations) {
@@ -17,14 +13,18 @@ function failureInputFromAdvice(taskContextPackage, maxIterations) {
   };
 }
 
-export function convergenceOutcome({ taskContextPackage, reviewReport, maxIterations = null }) {
-  if (reviewReport?.body?.outcome === "passed" && hasPriorConvergenceAdvice(taskContextPackage)) {
+export function convergenceOutcome({ taskContextPackage, session, maxIterations = null }) {
+  if (session?.convergenceDecision === "success") {
     return { kind: "success" };
   }
 
+  const requestedFailure = session?.convergenceDecision === "failure";
   if (
-    Number.isInteger(maxIterations)
-    && convergenceAdviceRecords(taskContextPackage).length >= maxIterations
+    requestedFailure
+      || (
+        Number.isInteger(maxIterations)
+        && convergenceAdviceRecords(taskContextPackage).length >= maxIterations
+      )
   ) {
     return {
       kind: "failure",

@@ -17,13 +17,19 @@ function normalizeFindings(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function normalizeConvergenceDecision(value) {
+  return ["success", "advice", "failure"].includes(value) ? value : null;
+}
+
 export function parseMainAgentOutputText(text) {
   try {
     const parsed = JSON.parse(extractAgentJsonOutputText(text));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const convergenceDecision = normalizeConvergenceDecision(parsed.convergenceDecision);
     return {
       ...parsed,
       findings: normalizeFindings(parsed.findings),
+      ...(Object.hasOwn(parsed, "convergenceDecision") ? { convergenceDecision } : {}),
     };
   } catch {
     return {};

@@ -427,6 +427,7 @@ function mainText(role) {
       : "fake main initialization completed",
     nextAction: "continue",
     findings: [],
+    ...(role === "main-convergence" ? { convergenceDecision: "success" } : {}),
   });
 }
 

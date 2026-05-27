@@ -15,7 +15,7 @@ test("convergence outcome requests advice for a first reviewed execution", () =>
   });
 });
 
-test("convergence outcome succeeds after a passing review used prior advice", () => {
+test("convergence outcome succeeds when main convergence decision is success", () => {
   assert.deepEqual(convergenceOutcome({
     taskContextPackage: {
       artifacts: {
@@ -23,6 +23,7 @@ test("convergence outcome succeeds after a passing review used prior advice", ()
       },
     },
     reviewReport: record("reviewReport:002", { outcome: "passed" }),
+    session: { convergenceDecision: "success" },
     maxIterations: 1,
   }), {
     kind: "success",

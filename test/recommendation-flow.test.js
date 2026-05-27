@@ -152,6 +152,7 @@ test("recommendation flow blocks when there are no candidate tasks", async () =>
 
 test("recommendation flow applies module append requests through the task pool", async (t) => {
   const repositoryDir = await createGitRepository(t);
+  let convergenceCount = 0;
   const completed = await completeRecommendationFlow({
     run: {
       id: "recommendation-run-flow",
@@ -182,10 +183,14 @@ test("recommendation flow applies module append requests through the task pool",
       sessionId: `session:${role}:${packageId}`,
       status: "succeeded",
     }),
-    runConvergenceSession: ({ role, sessionId }) => ({
-      sessionId: `resumed:${role}:${sessionId}`,
-      status: "succeeded",
-    }),
+    runConvergenceSession: ({ role, sessionId }) => {
+      convergenceCount += 1;
+      return {
+        sessionId: `resumed:${role}:${sessionId}`,
+        status: "succeeded",
+        convergenceDecision: convergenceCount === 1 ? "advice" : "success",
+      };
+    },
     repositoryDir,
     now: () => "2026-05-18T10:00:01.000Z",
   });

@@ -14,6 +14,7 @@ import {
 test("workflow service captures a successful recommendation run", async (t) => {
   const repositoryDir = await createGitRepository(t);
   const promptPath = await writePrompt("recommendation-success");
+  let convergenceCount = 0;
   const tasksDir = join(process.cwd(), ".tmp-test-tasks", String(Date.now()), "tasks");
   await mkdir(tasksDir, { recursive: true });
   await writeFile(
@@ -47,7 +48,13 @@ test("workflow service captures a successful recommendation run", async (t) => {
     runMainAgentSession: createStubAgentSession,
     runExecutionAgentSession: runStubExecutionAgentSession,
     runReviewAgentSession: createStubAgentSession,
-    runConvergenceSession: createStubAgentSession,
+    runConvergenceSession: (request) => {
+      convergenceCount += 1;
+      return {
+        ...createStubAgentSession(request),
+        convergenceDecision: convergenceCount === 1 ? "advice" : "success",
+      };
+    },
   });
 
   const completed = new Promise((resolve) => {

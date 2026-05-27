@@ -103,6 +103,7 @@ export function runOpencodeMainAgentSession({
         : extractedText.trim() || failure?.message,
       nextAction: typeof report.nextAction === "string" ? report.nextAction : "",
       findings: Array.isArray(report.findings) ? report.findings : [],
+      convergenceDecision: report.convergenceDecision ?? null,
       rawOutput: {
         stdout: extractedText,
         stderr: result.stderr,
